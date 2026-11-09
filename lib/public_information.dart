@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-final supportPage = Uri.parse('https://mailburrow-at0.pages.dev/');
-final privacyPage = Uri.parse('https://mailburrow-at0.pages.dev/privacy');
+final supportPage = Uri.parse('https://mailburrow.pages.dev/');
+final privacyPage = Uri.parse('https://mailburrow.pages.dev/privacy');
 
 /// Fixed public destinations: never include archive settings or credentials.
 class PublicInformationLinks extends StatelessWidget {
