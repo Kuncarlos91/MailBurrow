@@ -170,7 +170,7 @@ void main() {
     tearDown(() async => folder.delete(recursive: true));
 
     Future<(int, Map<String, dynamic>)> withAttachment() async {
-      final mail = items(await demo.emails(1, 'lake', 1))
+      final mail = items(await demo.emails(1, 'photos', 1))
           .firstWhere((m) => m['hasAttachments'] == true);
       final detail = await demo.message(mail['id'] as int);
       final file = (detail['attachments'] as List<dynamic>).first
