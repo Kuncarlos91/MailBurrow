@@ -7,6 +7,7 @@
   "license_url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
   "license_download_sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
   "asset": "assets/licenses/guava-listenablefuture-1.0.txt",
-  "asset_sha256": "8a6be7c9da3aee06979fc0705292578faa6fa2d28bf993a9201c87e7bafb7caf",
-  "scope": "Android attribution addition; not complete native-license certification"
+  "asset_sha256": "0035edb89962935e292ab42b76c70724dc164d9672e63f7313aebe14eea1fc1d",
+  "scope": "Android attribution addition; not complete native-license certification",
+  "asset_hash_basis": "Committed file bytes with LF line endings; enforced by .gitattributes. Compare APK entry bytes without normalization."
 }

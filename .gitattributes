@@ -1,0 +1,2 @@
+# Keep bundled third-party notice bytes identical across build hosts.
+assets/licenses/*.txt text eol=lf

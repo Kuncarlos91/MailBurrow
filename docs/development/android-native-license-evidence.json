@@ -10,7 +10,7 @@
   "engine_notice_bundle_normalized_sha256": "bc93c4fefb726e3d68b5e9b02ed43567c800284c9cafb520a24455ae5c899cb2",
   "engine_notice_source": "Flutter SDK sky_engine/license; locked Dart inventory and root notice text",
   "guava_source_archive_sha256": "3d1bd8d4a39b293612a40e547ec51d9ce34fa638d7adeae83871cdbe2923b161",
-  "guava_asset_sha256": "8a6be7c9da3aee06979fc0705292578faa6fa2d28bf993a9201c87e7bafb7caf",
+  "guava_asset_sha256": "0035edb89962935e292ab42b76c70724dc164d9672e63f7313aebe14eea1fc1d",
   "guava_parent": "com.google.guava:guava-parent:26.0-android",
   "guava_parent_license": "Apache-2.0",
   "androidx_supplied_license_sha256": "809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0",
@@ -31,5 +31,6 @@
     "Existing debug notice inspection is not proof for the next release APK.",
     "No iOS native-license conclusion is made."
   ],
-  "engine_notice_normalization": "Strip trailing whitespace per line, strip outer whitespace, append one LF; same as dependency_notices.py"
+  "engine_notice_normalization": "Strip trailing whitespace per line, strip outer whitespace, append one LF; same as dependency_notices.py",
+  "guava_asset_hash_basis": "Committed file bytes with LF line endings; enforced by .gitattributes. Compare APK entry bytes without normalization."
 }

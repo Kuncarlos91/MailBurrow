@@ -10,10 +10,14 @@ The pinned release-runtime graph resolves 63 external coordinates and matches th
 
 | Component | License/notice evidence | Result |
 | --- | --- | --- |
-| Guava ListenableFuture 1.0 | Its exact source archive and bundled notice match the existing [provenance](guava-notice-provenance.json). The source header and parent `guava-parent:26.0-android` declare Apache-2.0. | Attribution already registered from a bundled asset; verify it in the next signed APK. |
+| Guava ListenableFuture 1.0 | Its exact source archive and committed LF notice bytes match the [provenance](guava-notice-provenance.json). The source header and parent `guava-parent:26.0-android` declare Apache-2.0. | Attribution already registered from a bundled asset; verify it in the next signed APK. |
 | Flutter Android embedding and three release architecture artifacts | Pinned engine revision matches the installed SDK. Flutter uses BSD-style terms; the SDK `sky_engine` multi-license bundle includes Flutter and engine third-party notices and is represented in the locked dependency inventory/root notices. An earlier debug APK contains the aggregate engine notices. | Absence of direct Maven license fields is not evidence of an unlicensed dependency. Preserve the SDK notice inputs and verify the exact release asset. |
 
 The remaining 58 coordinates have direct Apache-2.0 declarations in cached POMs. These declarations do not independently establish all redistribution obligations. The four Flutter coordinates share an engine revision; their transitive third-party notices must not be replaced with only Flutter's own BSD text.
+
+## Reproducible bundled notice bytes
+
+The Guava asset hash is based on the committed file bytes with LF line endings. `.gitattributes` enforces LF for `assets/licenses/*.txt` so Windows and Linux builds bundle the same notice bytes. Earlier provenance used a CRLF-converted Windows checkout hash; the corrected value changes the byte basis, not the upstream license wording. A helper regression checks the actual checkout bytes against both provenance records.
 
 ## Supplied artifact notice files
 
@@ -24,7 +28,7 @@ No additional distinct notice payload was identified by this review. Do not remo
 ## Required check on the next release APK
 
 1. Record the exact source, SDK/engine, resolved graph and APK hash. Re-review if any dependency/version changes.
-2. Inspect that APK's NOTICES/NOTICES.Z and Guava asset. Verify the expected Flutter/engine license groups and supplied Apache terms survive packaging; inspect the metadata resources actually included.
+2. Inspect that APK's NOTICES/NOTICES.Z and Guava asset. Hash the Guava APK entry as raw bytes and match the committed LF asset hash recorded in the provenance, without newline normalization. Verify the expected Flutter/engine license groups and supplied Apache terms survive packaging; inspect the metadata resources actually included.
 3. Open Settings > Open source licenses offline on Android, find Flutter and Guava entries, and read/scroll their complete notices. A host mock or an older debug APK does not establish this.
 4. Keep binary metadata/privacy, signature/package/version/permissions and device regression as separate release gates. Do not treat this document as permission to publish a binary.
 
