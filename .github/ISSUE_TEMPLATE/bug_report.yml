@@ -1,0 +1,69 @@
+name: Bug report
+description: Something in the MailBurrow app doesn't work as expected.
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Never include** API keys, passwords, server addresses, email contents, attachments, or screenshots showing private mail. Use made-up examples instead.
+        Security problems should be reported privately, as described in SECURITY.md, not here.
+  - type: input
+    id: app-version
+    attributes:
+      label: App version and build
+      description: Shown in Settings, for example 0.3.0 (22).
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and OS version
+      placeholder: "Example: Pixel 8, Android 16; or iPad, iPadOS 26"
+    validations:
+      required: true
+  - type: input
+    id: server-version
+    attributes:
+      label: Mail-Archiver version
+      description: If you know it.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Setup or connection
+        - Mail list or refresh
+        - Search, filters or paging
+        - Message reader
+        - Attachment save or open
+        - Account switching
+        - Large text or landscape layout
+        - Settings
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: What happened?
+      description: The steps you took and what you saw.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: dropdown
+    id: repeatability
+    attributes:
+      label: Does it happen again?
+      options:
+        - Every time
+        - Sometimes
+        - Happened once
+        - Not tested again
+    validations:
+      required: true

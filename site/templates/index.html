@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="description" content="Setup and support for MailBurrow, an independent read-only Mail-Archiver client.">
+  <title>MailBurrow Support</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header><a class="brand" href="index.html">MailBurrow</a><nav aria-label="Main"><a aria-current="page" href="index.html">Support</a><a href="privacy.html">Privacy</a><a href="https://github.com/Kuncarlos91/MailBurrow">Source</a></nav></header>
+<main id="main" tabindex="-1">
+  <p class="notice">Updated November 8, 2026</p>
+  <p class="eyebrow">YOUR ARCHIVE, WITHIN REACH</p>
+  <h1>A little help finding your mail.</h1>
+  <p class="lead">MailBurrow is an independent, read-only mobile viewer for Mail-Archiver. Developed by {{PUBLIC_PROVIDER_NAME}}.</p>
+  <p>MailBurrow was previously distributed as MailShelf, and earlier installations may still show that name. MailBurrow is an early source preview for Android and iOS: no public signed download or app-store release is available yet, and you can build it from the <a href="https://github.com/Kuncarlos91/MailBurrow">source repository</a>. The code is open source under the MIT License.</p>
+  <section id="setup"><h2>Before you connect</h2>
+    <p>The <a href="https://github.com/Kuncarlos91/MailBurrow/blob/main/docs/setup-guide.md">setup guide</a> has step-by-step settings for Mail-Archiver's API, TrueNAS and Tailscale, and fixes for common connection errors.</p>
+    <ol><li>Configure your own Mail-Archiver server with archived mail and API access enabled, or obtain access from your independent administrator.</li><li>Use a reachable HTTPS server address with a valid certificate and an API key issued by your archive operator. The app adds HTTPS if you omit the scheme.</li><li>If the server is private, configure and connect your own Tailscale or other required private network first.</li></ol>
+    <p>TrueNAS is one possible server host. MailBurrow does not provide hosting, email accounts, server administration or managed private networks. It does not connect directly to Gmail, sync from your email provider, or send, edit or delete messages.</p>
+    <p>For server setup, see the independent <a href="https://github.com/s1t5/mail-archiver">Mail-Archiver project</a>. MailBurrow is not the official Mail-Archiver or Tailscale app.</p>
+  </section>
+  <section id="connection"><h2>Connection and account help</h2>
+    <p>Check your network, required private-network connection and server availability, then refresh. Replace expired or revoked keys through your archive operator. Never disable certificate validation to solve a connection problem.</p>
+    <p>Missing accounts or folders? Check permissions and synchronization with your administrator. The API key determines the accounts available to you. Switching accounts changes the browsing context; it does not merge their messages.</p>
+  </section>
+  <section id="attachments"><h2>Read and save carefully</h2>
+    <p>Complex emails may use simplified formatting. Remote resources are blocked, but messages, links and attachments are not malware-scanned or certified safe. Avoid unexpected files and links.</p>
+    <p>MailBurrow limits attachment downloads to 50 MiB and applies a two-minute archive-download deadline with a 30-second idle timeout. These timeouts do not cover the system save picker, file-provider upload or opening a viewer. Cancel download or go Back during transfer; after the system save picker opens, use its Cancel. These client limits do not change your server's mail limits.</p>
+    <p>After saving, use <strong>Open saved file</strong>. You can cancel Android's Open with chooser and try again, or close a viewer and reopen while the same message stays open. Your provider may still require its own connection or sign-in.</p>
+    <p>After an Android open failure, <strong>Choose saved file</strong> lets you select an existing copy without downloading it again. Choose the intended attachment: the app does not verify that the selected copy matches the original. Selection does not automatically open the file, and Cancel keeps the previous reference. This recovery action is Android-only.</p>
+    <p>Leaving the message ends its app-held saved-file reference. Use Files afterward. Moving or deleting the copy can also end access. Removing a connection does not delete exported files. If the app cannot open a saved copy, try it directly in Files before downloading again.</p>
+  </section>
+  <section id="contact"><h2>Report a problem or get help</h2>
+    <p>For bugs and setup questions, open an issue on <a href="https://github.com/Kuncarlos91/MailBurrow/issues">GitHub</a>. Issues are public: use fictional examples and never include keys, server addresses or real messages. Report security problems privately through <a href="https://github.com/Kuncarlos91/MailBurrow/security">the repository's Security tab</a>, not in a public issue.</p>
+    <p>You can also email app support:</p>
+    <p><a href="mailto:{{PUBLIC_CONTACT_EMAIL}}">{{PUBLIC_CONTACT_EMAIL}}</a></p>
+    <p>Include the app version/build, device and operating-system version, the destination category if relevant (such as local Downloads or Nextcloud), and steps using fictional examples.</p>
+    <p>Do not send API keys, passwords, private server addresses, real messages, private file paths or unredacted screenshots. For sensitive security evidence, use private reporting on GitHub or first ask to arrange a private route.</p>
+    <p>Support is managed by {{PUBLIC_PROVIDER_NAME}}. No response time is guaranteed. Server accounts, permissions, keys and synchronization are managed by your own archive administrator. For requests about information sent to app support, see the <a href="privacy.html#requests">privacy request process</a>.</p>
+  </section>
+</main>
+<footer>MailBurrow &middot; {{PUBLIC_PROVIDER_NAME}} &middot; <a href="privacy.html">Privacy notice</a> &middot; <a href="https://github.com/Kuncarlos91/MailBurrow">Source</a></footer>
+</body>
+</html>

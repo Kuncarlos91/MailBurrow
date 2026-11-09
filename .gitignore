@@ -1,0 +1,52 @@
+.dart_tool/
+.idea/
+*.iml
+.flutter-plugins
+.flutter-plugins-dependencies
+/build/
+/android/local.properties
+/android/key.properties
+/android/.gradle/
+/ios/Pods/
+/ios/.symlinks/
+/ios/Flutter/Generated.xcconfig
+/ios/Flutter/flutter_export_environment.sh
+/ios/Flutter/ephemeral/
+*.jks
+*.keystore
+*.p12
+*.mobileprovision
+
+# Local secrets, build output, and IDE inspections
+keystore.properties
+local.properties
+*.pem
+*.pfx
+.gradle/
+.kotlin/
+.cxx/
+.externalNativeBuild/
+inspection-results/
+inspectionResults/
+**/inspection-results/
+**/inspectionResults/
+
+# Local review material and Python helper caches
+__pycache__/
+*.py[cod]
+/private-review/
+/privacy-review-local/
+.env
+.env.*
+
+# Apple signing requests, certificates, and upload credentials stay local
+*.csr
+*.cer
+*.certSigningRequest
+*.p8
+*.key
+*.provisionprofile
+/AppleSigning/
+
+# Gradle-generated local diagnostic reports; never source material
+/android/build/

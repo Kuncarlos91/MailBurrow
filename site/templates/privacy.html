@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="description" content="How the MailBurrow client handles connection details, saved attachments and support inquiries.">
+  <title>MailBurrow Privacy</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header><a class="brand" href="index.html">MailBurrow</a><nav aria-label="Main"><a href="index.html">Support</a><a aria-current="page" href="privacy.html">Privacy</a><a href="https://github.com/Kuncarlos91/MailBurrow">Source</a></nav></header>
+<main id="main" tabindex="-1">
+  <p class="notice">Effective November 5, 2026 &middot; Updated November 8, 2026</p>
+  <p class="eyebrow">PRIVACY</p>
+  <h1>MailBurrow Privacy Notice</h1>
+  <p class="lead">MailBurrow is developed by {{PUBLIC_PROVIDER_NAME}}. Privacy contact: <a href="mailto:{{PUBLIC_CONTACT_EMAIL}}">{{PUBLIC_CONTACT_EMAIL}}</a>.</p>
+  <p>This notice covers the read-only mobile client, voluntary app-support correspondence, the public source repository and these public support/privacy pages. MailBurrow was previously distributed as MailShelf. Earlier installations may still show that name.</p>
+  <section id="scope"><h2>Your independently operated archive</h2>
+    <p>You configure your own Mail-Archiver server, HTTPS address, API key and any required Tailscale or private network. We do not provide customer archive hosting, mailbox provisioning, a mail relay or managed private networks.</p>
+    <p>The app sends archive requests directly to the endpoint you enter. The developer does not receive your archive credentials or mail through a MailBurrow-hosted production backend. Your archive operator controls synchronization, permissions, original mail, server records and backups.</p>
+  </section>
+  <section id="app-data"><h2>Information used to browse your mail</h2>
+    <p>Your server address, API key and selected account identifier are saved using platform secure storage to restore the connection. Authentication, relevant account/message identifiers, search text, filters and page requests are sent to the configured archive. Its responses provide account and folder information, subjects, senders, recipients, dates, snippets, message bodies and requested attachments for display or saving.</p>
+    <p>The app does not intentionally keep a local mail database. Message information and browsing state are processed in memory. HTTPS protects transport to the selected server; it does not prevent your archive operator from reading its stored mail. Your independent server, proxy and network providers may retain requests, access records and connection metadata under their own practices.</p>
+  </section>
+  <section id="files"><h2>Attachments, links and file providers</h2>
+    <p>Attachments download after your explicit action. Saving uses a private temporary file, with cleanup attempted after completion or failure. Interrupted processes or cleanup errors can leave temporary copies. Files exported to Files, Nextcloud, iCloud Drive or another destination remain under your and that provider's control. Selecting a cloud destination can upload or synchronize the attachment through that provider; this is separate from your archive connection and is not developer-operated archive hosting.</p>
+    <p>On Android, the app retains an offered read permission for the specific saved document so it can be reopened while its message remains open. The app attempts to release read grants acquired during the current native session when its last reader reference is released. Pre-existing retained permissions, cleanup failures or abrupt interruption can leave an operating-system grant in place longer. No broad media-library access or saved-file-history database is added. On iOS, the app keeps a session-only document-picker reference and releases it on normal reader exit.</p>
+    <p>After an open failure, Choose saved file on Android explicitly reconnects a copy you select; the app does not verify that it matches the original attachment. This action does not download another archive copy or automatically open the file. Opening a saved document or confirmed link hands the file or destination to a viewer, browser or provider you choose. Those services have their own privacy practices.</p>
+    <p>Remote resources are removed from displayed mail. Explicitly confirmed links can use HTTPS or unencrypted HTTP; the confirmation warns about HTTP. Link query parameters, including possible tracking identifiers, are not automatically removed and can reach the external browser or destination. This does not scan messages, links or attachments for malware or phishing.</p>
+  </section>
+  <section id="requests"><h2>Removing information and privacy requests</h2>
+    <p>Disconnect and forget connection removes the saved local connection record when successful. It does not revoke your server API key, delete your archive account, erase mail/logs/backups or remove exported files. We cannot administer independently operated archives. Direct those requests to your archive operator; manage saved files with your chosen file provider.</p>
+    <p>To request access, correction or deletion of information you voluntarily sent to app support, email the privacy contact above, preferably from the address used for the original conversation. Describe the request without including keys, private server details or sensitive mail. We may need proportionate confirmation that the information concerns you before disclosing or changing it. We consider requests under applicable requirements; available rights and response requirements depend on your location and circumstances.</p>
+  </section>
+  <section id="support-data"><h2>Support correspondence and retention</h2>
+    <p>If you contact support, your email address and the information you choose to provide are handled through Google Gmail to investigate and respond. {{PUBLIC_PROVIDER_NAME}} is the only person managing the support inbox. Google processes the service data under its <a href="https://policies.google.com/privacy">Privacy Policy</a>.</p>
+    <p>Each month, resolved support conversations are reviewed and those resolved 12 months or more ago are deleted, unless an ongoing security issue or legal requirement justifies longer retention. Privacy requests are handled separately from that routine cleanup.</p>
+    <p>Deleting Gmail messages normally moves them to Trash, where they can remain for up to 30 days before permanent deletion unless removed sooner. Provider backup handling may differ. This support-inbox policy does not control your archive server's retention or copies you export.</p>
+  </section>
+  <section id="github"><h2>Source repository and GitHub issues</h2>
+    <p>MailBurrow's source code, issues and private security reports are hosted on <a href="https://github.com/Kuncarlos91/MailBurrow">GitHub</a>. Issues, comments and pull requests you post there are public and are processed by GitHub under its <a href="https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement">Privacy Statement</a>. Do not post keys, server addresses, real messages or unredacted screenshots. Private vulnerability reports are not public; access is limited to authorized participants under GitHub's security-advisory permissions. Contributions and comments you publish remain part of the public project history.</p>
+  </section>
+  <section id="diagnostics"><h2>App diagnostics</h2>
+    <p>Normal Android and iOS builds leave file-operation diagnostic tracing disabled. No advertising, analytics or third-party crash-reporting service is configured by the app. It does not automatically send archive data or app-support reports to the developer.</p>
+    <p>A separately identified diagnostic build may enable local, fixed file-operation event categories for an agreed troubleshooting session. Those events exclude file names, paths, file contents, message contents, server details and credentials; there is no automatic report upload. If you voluntarily share diagnostic information with support, it is handled as support correspondence. Apple, Google and other platform services may process crash reports or feedback under their own settings and policies.</p>
+  </section>
+  <section id="website"><h2>Public information pages</h2>
+    <p>These public information pages use Cloudflare Pages hosting. Cloudflare processes website requests and may process IP addresses and request metadata to deliver and protect its services. Its <a href="https://www.cloudflare.com/privacypolicy/">Privacy Policy</a> describes those practices. This hosting is separate from your archive and does not grant access to your configured server.</p>
+    <p>These pages contain no forms, analytics scripts, remote fonts or remote images. Optional Cloudflare Web Analytics is disabled. This does not mean the host keeps no operational records. Provider processing and retention follow the applicable service practices; no fixed host-log deletion deadline or processing region is promised here.</p>
+  </section>
+  <section id="updates"><h2>Changes and contact</h2>
+    <p>This notice takes effect on November 5, 2026. Changes to our practices will be reflected in an updated notice with its effective date. For questions about app privacy or information sent to support, contact <a href="mailto:{{PUBLIC_CONTACT_EMAIL}}">{{PUBLIC_CONTACT_EMAIL}}</a>.</p>
+  </section>
+</main>
+<footer>MailBurrow &middot; {{PUBLIC_PROVIDER_NAME}} &middot; <a href="index.html">Support</a></footer>
+</body>
+</html>

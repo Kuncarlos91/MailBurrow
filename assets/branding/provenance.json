@@ -1,0 +1,15 @@
+{
+  "selection": "A - purple burrow and envelope",
+  "owner_approved_direction": "2026-11-07",
+  "concept_origin": "Built-in image generation; selected from three concepts by owner",
+  "reference": "concept-a-reference.png",
+  "reference_sha256": "d42304a2133a9dbf6ef3f177d9dd50a72150324d618833299fdf41523ec7a8da",
+  "master": "mailburrow-icon.svg",
+  "geometry": "icon-design.json",
+  "adaptation": "Project-authored geometric vector reconstruction with flat colors for small-size rendering",
+  "rights_note": "Provenance record only; no trademark clearance or exclusivity guarantee",
+  "production_status": "Prepared locally; not built, installed or submitted",
+  "master_sha256": "6722ddfd027c4d965e172cb8e46d2e5eb00e55d7faea570cf3042dc7973b7242",
+  "geometry_sha256": "be23072c2b00da537991652159e99666a4c66323f96d3682e6ea7e79d518c1db",
+  "owner_reviewed_vector_refinement": "Approved November 7, 2026 after rendered square/circle/rounded and small-size review"
+}

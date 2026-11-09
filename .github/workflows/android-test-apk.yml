@@ -1,0 +1,54 @@
+name: Android test APK
+
+# On request only: builds a debug APK for installing on a phone. It runs when
+# started by hand (once this file is on the default branch) or when a pushed
+# commit message contains [build apk]; other pushes skip the job. It never creates
+# a tag, release or prerelease, and uses no signing secrets. The APK is
+# debug-signed, installs as MailBurrow Preview (com.kuncarlos91.mailburrow.debug)
+# and is kept for 3 days.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['**']
+
+permissions:
+  contents: read
+
+concurrency:
+  # Skipped runs get their own group so an ordinary push never cancels a build.
+  group: android-test-apk-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[build apk]') }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build debug APK
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[build apk]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: '3.47.8'
+          channel: stable
+          cache: true
+      - name: Install locked dependencies
+        run: flutter pub get --enforce-lockfile
+      - name: Build debug APK for 64-bit phones
+        run: flutter build apk --debug --target-platform android-arm64
+      - name: Name the APK and record its checksum
+        run: |
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-debug.apk "dist/mailburrow-debug-${GITHUB_SHA::7}.apk"
+          cd dist && sha256sum ./*.apk > SHA256SUMS.txt
+      - name: Upload test APK
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mailburrow-test-apk
+          path: dist/
+          retention-days: 3
+          if-no-files-found: error

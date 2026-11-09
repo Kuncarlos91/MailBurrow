@@ -1,0 +1,26 @@
+name: mailburrow
+description: Read-only Mail-Archiver client for Android and iOS.
+publish_to: none
+version: 0.3.0-rc.8+22
+environment:
+  sdk: '>=3.8.0 <4.0.0'
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_file_dialog: ^3.3.3
+  flutter_secure_storage: ^11.2.0
+  flutter_widget_from_html_core: ^0.17.4
+  html: ^0.15.7
+  open_filex: ^5.0.0
+  path_provider: ^2.1.6
+  url_launcher: ^6.3.3
+dev_dependencies:
+  integration_test:
+    sdk: flutter
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/licenses/guava-listenablefuture-1.0.txt

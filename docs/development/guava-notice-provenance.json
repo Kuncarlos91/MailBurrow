@@ -1,0 +1,12 @@
+{
+  "coordinate": "com.google.guava:listenablefuture:1.0",
+  "source_archive_url": "https://repo.maven.apache.org/maven2/com/google/guava/listenablefuture/1.0/listenablefuture-1.0-sources.jar",
+  "source_archive_sha256": "3d1bd8d4a39b293612a40e547ec51d9ce34fa638d7adeae83871cdbe2923b161",
+  "publisher_sha1_verified": true,
+  "source_file": "com/google/common/util/concurrent/ListenableFuture.java",
+  "license_url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+  "license_download_sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+  "asset": "assets/licenses/guava-listenablefuture-1.0.txt",
+  "asset_sha256": "8a6be7c9da3aee06979fc0705292578faa6fa2d28bf993a9201c87e7bafb7caf",
+  "scope": "Android attribution addition; not complete native-license certification"
+}

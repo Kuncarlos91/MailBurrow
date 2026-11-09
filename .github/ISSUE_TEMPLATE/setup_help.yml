@@ -1,0 +1,56 @@
+name: Setup help
+description: You followed the setup guide but the app still can't connect.
+labels:
+  - setup
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please work through the [setup guide](https://github.com/Kuncarlos91/MailBurrow/blob/main/docs/setup-guide.md) and its "If something goes wrong" checks first.
+        **Never include** your API key, real server address or tailnet name. Write `archive.example.ts.net` instead.
+  - type: input
+    id: app-version
+    attributes:
+      label: App version and build
+      description: Shown in Settings.
+    validations:
+      required: true
+  - type: input
+    id: server-version
+    attributes:
+      label: Mail-Archiver version
+    validations:
+      required: true
+  - type: dropdown
+    id: hosting
+    attributes:
+      label: How is Mail-Archiver hosted?
+      options:
+        - TrueNAS app
+        - Docker / Docker Compose
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: https
+    attributes:
+      label: How do you provide HTTPS?
+      options:
+        - Tailscale Serve
+        - Reverse proxy (Caddy, nginx, Traefik, etc.)
+        - Cloudflare Tunnel
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: Error message in the app
+      description: Copy the exact wording.
+    validations:
+      required: true
+  - type: textarea
+    id: checked
+    attributes:
+      label: What have you checked?
+      description: For example, API enabled, the HTTPS address opens in the phone's browser, Tailscale connected.
