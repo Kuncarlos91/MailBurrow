@@ -7,6 +7,7 @@ Thanks for your interest. MailBurrow is a small, one-person project, so bug repo
 - **Bugs and setup problems:** open an issue using a template. Never include API keys, server addresses, real mail or unredacted screenshots.
 - **Security problems:** report them privately, as described in [SECURITY.md](SECURITY.md).
 - **Bigger changes:** open an issue first to discuss the idea, so your time isn't wasted.
+- **Conduct:** everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md).
 
 ## Product boundaries
 
