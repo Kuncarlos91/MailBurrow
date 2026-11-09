@@ -1,0 +1,254 @@
+import 'dart:io';
+
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mailburrow/archive_errors.dart';
+import 'package:mailburrow/attachment_download.dart';
+import 'package:mailburrow/demo/demo_archive.dart';
+import 'package:mailburrow/search_filters.dart';
+
+/// Fails the test if anything tries to open a network connection.
+class _NoNetwork extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) =>
+      throw StateError('Demo mode must not open network connections');
+}
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  late DemoArchive demo;
+
+  setUp(() async {
+    demo = await DemoArchive.load(latency: Duration.zero);
+  });
+
+  List<Map<String, dynamic>> items(Map<String, dynamic> page) =>
+      (page['items'] as List<dynamic>).cast<Map<String, dynamic>>();
+
+  test('identifies itself as a reserved, unreachable demo address', () {
+    expect(demo.server.scheme, 'https');
+    expect(demo.server.host, 'demo.mailburrow.invalid');
+    expect(demo.server.host.endsWith('.invalid'), isTrue);
+  });
+
+  test('lists three fictional accounts on reserved domains', () async {
+    final accounts = (await demo.accounts()).cast<Map<String, dynamic>>();
+    expect(accounts.map((item) => item['id']), [1, 2, 3]);
+    for (final account in accounts) {
+      final address = account['emailAddress'] as String;
+      expect(
+        address.endsWith('@example.com') || address.endsWith('.example'),
+        isTrue,
+        reason: address,
+      );
+    }
+  });
+
+  test('folders flatten with nesting and counts that match the mail', () async {
+    final folders = await demo.folders(1);
+    final family = folders.firstWhere((item) => item.path == 'INBOX/Family');
+    expect(family.depth, 1);
+    expect(family.name, 'Family');
+    final total = folders.fold<int>(0, (sum, item) => sum + item.count);
+    final all = await demo.emails(1, '', 1);
+    expect(total, all['totalItems']);
+    await expectLater(demo.folders(99), throwsA(isA<ArchiveFailure>()));
+  });
+
+  test('pages 25 results at a time, newest first by default', () async {
+    final first = await demo.emails(1, '', 1);
+    final second = await demo.emails(1, '', 2);
+    expect(items(first), hasLength(25));
+    expect(first['totalPages'], 2);
+    expect(
+      items(second),
+      hasLength((first['totalItems'] as int) - 25),
+    );
+    expect(items(first).first['subject'], 'Welcome to the MailBurrow demo');
+    final dates = items(first)
+        .map((mail) => mail['sentDate'] as String)
+        .where((date) => date.isNotEmpty)
+        .toList();
+    expect(dates, [...dates]..sort((a, b) => b.compareTo(a)));
+    expect(items(first).first.containsKey('textBody'), isFalse);
+  });
+
+  test('search is case-insensitive across subject, people and body', () async {
+    final upper = items(await demo.emails(2, 'INVOICE', 1));
+    final lower = items(await demo.emails(2, 'invoice', 1));
+    expect(upper, isNotEmpty);
+    expect(upper.map((m) => m['id']), lower.map((m) => m['id']));
+    final byBody = items(await demo.emails(1, 'lemon cake', 1));
+    expect(byBody.map((m) => m['subject']), contains('Recipe you asked for'));
+    final none = await demo.emails(1, 'no such words anywhere', 1);
+    expect(items(none), isEmpty);
+    expect(none['totalPages'], 0);
+  });
+
+  test('filters by folder, direction and inclusive date range', () async {
+    final receipts = items(await demo.emails(1, '', 1, folder: 'Receipts'));
+    expect(receipts, isNotEmpty);
+    expect(receipts.every((m) => m['folderName'] == 'Receipts'), isTrue);
+
+    final sent = items(
+      await demo.emails(
+        1,
+        '',
+        1,
+        filters: const SearchFilters(direction: 'outgoing'),
+      ),
+    );
+    expect(sent, isNotEmpty);
+    expect(sent.every((m) => m['isOutgoing'] == true), isTrue);
+    final received = items(
+      await demo.emails(
+        1,
+        '',
+        1,
+        filters: const SearchFilters(direction: 'incoming'),
+      ),
+    );
+    expect(received.any((m) => m['isOutgoing'] == true), isFalse);
+
+    final ranged = items(
+      await demo.emails(
+        1,
+        '',
+        1,
+        filters: SearchFilters(
+          from: DateTime(2021, 1, 1),
+          to: DateTime(2021, 12, 31),
+        ),
+      ),
+    );
+    expect(ranged, isNotEmpty);
+    expect(
+      ranged.every((m) => (m['sentDate'] as String).startsWith('2021-')),
+      isTrue,
+    );
+  });
+
+  test('sorts by subject in either order', () async {
+    final ascending = items(
+      await demo.emails(
+        3,
+        '',
+        1,
+        filters: const SearchFilters(sortBy: 'subject', sortOrder: 'asc'),
+      ),
+    ).map((m) => (m['subject'] as String).toLowerCase()).toList();
+    expect(ascending, [...ascending]..sort());
+    final descending = items(
+      await demo.emails(
+        3,
+        '',
+        1,
+        filters: const SearchFilters(sortBy: 'subject'),
+      ),
+    ).map((m) => (m['subject'] as String).toLowerCase()).toList();
+    expect(descending, ascending.reversed.toList());
+  });
+
+  test('opens full messages and rejects unknown ones', () async {
+    final welcome = items(await demo.emails(1, 'welcome', 1)).first;
+    final mail = await demo.message(welcome['id'] as int);
+    expect(mail['textBody'], contains('fictional sample mail'));
+    expect(mail['attachments'], isEmpty);
+    await expectLater(demo.message(99999), throwsA(isA<ArchiveFailure>()));
+  });
+
+  test('reports totals across all demo accounts', () async {
+    final stats = await demo.stats();
+    expect(stats['accounts'], 3);
+    expect(stats['emails'], greaterThanOrEqualTo(50));
+    expect(stats['attachments'], greaterThanOrEqualTo(10));
+  });
+
+  group('attachments', () {
+    late Directory folder;
+    setUp(() async => folder = await Directory.systemTemp.createTemp('demo'));
+    tearDown(() async => folder.delete(recursive: true));
+
+    Future<(int, Map<String, dynamic>)> withAttachment() async {
+      final mail = items(await demo.emails(1, 'lake', 1))
+          .firstWhere((m) => m['hasAttachments'] == true);
+      final detail = await demo.message(mail['id'] as int);
+      final file = (detail['attachments'] as List<dynamic>).first
+          as Map<String, dynamic>;
+      return (mail['id'] as int, file);
+    }
+
+    test('saves the exact bundled bytes with progress', () async {
+      final (emailId, file) = await withAttachment();
+      final target = File('${folder.path}/saved');
+      final progress = <int>[];
+      await demo.downloadAttachment(
+        emailId,
+        file['id'] as int,
+        target,
+        onProgress: progress.add,
+      );
+      final bundled = await rootBundle.load(
+        '$demoAttachmentDirectory/${file['fileName']}',
+      );
+      expect(
+        await target.readAsBytes(),
+        bundled.buffer.asUint8List(
+          bundled.offsetInBytes,
+          bundled.lengthInBytes,
+        ),
+      );
+      expect(progress.last, file['size']);
+    });
+
+    test('a cancelled save leaves no file', () async {
+      final (emailId, file) = await withAttachment();
+      final target = File('${folder.path}/cancelled');
+      final transfer = AttachmentDownload()..cancel();
+      await expectLater(
+        demo.downloadAttachment(
+          emailId,
+          file['id'] as int,
+          target,
+          transfer: transfer,
+        ),
+        throwsA(isA<AttachmentDownloadCancelled>()),
+      );
+      expect(target.existsSync(), isFalse);
+    });
+
+    test('rejects an attachment from a different message', () async {
+      final (_, file) = await withAttachment();
+      final welcome = items(await demo.emails(1, 'welcome', 1)).first;
+      await expectLater(
+        demo.downloadAttachment(
+          welcome['id'] as int,
+          file['id'] as int,
+          File('${folder.path}/wrong'),
+        ),
+        throwsA(isA<ArchiveFailure>()),
+      );
+    });
+  });
+
+  test('never opens a network connection', () async {
+    await HttpOverrides.runZoned(() async {
+      final local = await DemoArchive.load(latency: Duration.zero);
+      final accounts = await local.accounts();
+      await local.folders(1);
+      final page = await local.emails(1, 'invoice', 1);
+      await local.emails(2, '', 1, folder: 'INBOX/Orders');
+      await local.stats();
+      for (final mail in items(page)) {
+        await local.message(mail['id'] as int);
+      }
+      expect(accounts, isNotEmpty);
+    }, createHttpClient: _NoNetwork().createHttpClient);
+  });
+
+  test('refuses requests after closing', () async {
+    demo.close();
+    await expectLater(demo.accounts(), throwsA(isA<StateError>()));
+    await expectLater(demo.emails(1, '', 1), throwsA(isA<StateError>()));
+  });
+}
