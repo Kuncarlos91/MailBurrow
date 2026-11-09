@@ -55,7 +55,7 @@ This README is the main documentation index. The [Playbook](docs/PLAYBOOK.md) co
 
 **Development:** [Contributing](CONTRIBUTING.md) · [Setup and CI](docs/development/setup-and-ci.md) · [Documentation rules](docs/development/documentation.md) · [Dart/Flutter dependencies](docs/development/dependencies.md) · [Android native dependencies](docs/development/native-dependencies.md) · [Third-party notices](docs/development/third-party-notices.md) · [iOS native evidence](docs/development/ios-native-evidence.md) · [App icons](docs/development/app-icons.md) · [Android signing](docs/releasing/android.md) · [Repository working instructions](AGENTS.md)
 
-**Security and licenses:** [Privacy notice](PRIVACY.md) · [Security reporting](SECURITY.md) · [Public contacts](docs/security/public-contacts.md) · [Artifact privacy rules](docs/security/artifact-privacy-rules.md) · [Artifact privacy investigation](docs/troubleshooting/artifact-privacy.md) · [Third-party licenses](THIRD_PARTY_NOTICES.md)
+**Security and licenses:** [Code of conduct](CODE_OF_CONDUCT.md) · [Privacy notice](PRIVACY.md) · [Security reporting](SECURITY.md) · [Public contacts](docs/security/public-contacts.md) · [Artifact privacy rules](docs/security/artifact-privacy-rules.md) · [Artifact privacy investigation](docs/troubleshooting/artifact-privacy.md) · [Third-party licenses](THIRD_PARTY_NOTICES.md)
 
 ## Building from source
 
