@@ -73,3 +73,7 @@ Flutter/Dart notices remain in the unchanged root THIRD_PARTY_NOTICES.md. The of
 | org.jspecify:jspecify | 1.0.0 | The Apache License, Version 2.0 |
 
 This inventory does not by itself confirm complete native notices, privacy manifests or artifact contents.
+
+## Direct-POM declaration follow-up
+
+The five missing direct declarations have additional source/SDK provenance in the [Android native license review](android-native-license-review.md). The table above deliberately preserves the observed POM declarations. Guava attribution and Flutter/engine notice inputs are already retained; the exact next release APK still needs packaging and device verification. The fresh pinned graph matched all 63 inventory coordinates without drift.
