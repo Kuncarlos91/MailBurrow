@@ -38,6 +38,8 @@ This Code of Conduct applies within all community spaces, and also applies when 
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the community leaders responsible for enforcement by email through the [MailBurrow support contact](docs/security/public-contacts.md#support-and-privacy). Reports are read only by the maintainer. All complaints will be reviewed and investigated promptly and fairly.
 
+MailBurrow currently has one maintainer, so "community leaders" in this Code of Conduct means the MailBurrow maintainer. If maintainership changes, this section and the reporting contact will be updated.
+
 All community leaders are obligated to respect the privacy and security of the reporter of any incident.
 
 ## Enforcement Guidelines
