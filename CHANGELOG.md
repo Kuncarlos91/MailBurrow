@@ -2,7 +2,16 @@
 
 All notable changes to MailBurrow are recorded here. Versions follow the app version shown in Settings.
 
-## Unreleased: first public release
+## 0.3.0-rc.9 (build23) - preparation
+
+Android candidate for the first public APK prerelease. No APK, tag or release is published by this source change. See the [candidate guide](docs/releasing/android-rc9.md) for draft notes and pending artifact/device gates.
+
+- Advance source version from RC8/build22; preserve the established MailBurrow app ID and signing configuration.
+- Include the shared backend interface and independent backend tests, updated support/privacy destinations, community policies and native-notice provenance now in public source.
+- Enforce canonical LF bytes for bundled notice assets, with checksum regression coverage.
+- No new mail feature, backend, dependency, permission or iOS upload is part of this preparation.
+
+## Initial public source preview
 
 First public source release of MailBurrow, a read-only Android and iOS client for a self-hosted [Mail-Archiver](https://github.com/s1t5/mail-archiver) server.
 

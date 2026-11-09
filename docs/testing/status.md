@@ -1,6 +1,6 @@
 # Project status
 
-[Main index](../../README.md) · [Device testing checklist](device-checklist.md)
+[Main index](../../README.md) · [Device testing checklist](device-checklist.md) · [Android RC9 preparation](../releasing/android-rc9.md)
 
 MailBurrow is an early preview, published as source. There is no public signed APK, IPA or store listing yet.
 
@@ -8,7 +8,7 @@ MailBurrow is an early preview, published as source. There is no public signed A
 | --- | --- |
 | Features | Read-only browsing, search, filters, paging, safe reader, attachment save/open and account switching are implemented. Mail-Archiver is the only supported backend. |
 | Automated checks | Flutter analysis, Flutter host tests, Python helper tests, documentation links and the privacy scan run in [CI](../development/setup-and-ci.md) on pushes and pull requests. |
-| Android | Earlier preview builds were tested on real devices. The newest source changes (the shared backend interface) pass host tests; **device regression is pending**. |
+| Android | Earlier preview builds were tested on real devices. **0.3.0-rc.9/build23 is prepared in source only**; native build, signed-APK inspection and exact-build device regression are pending. |
 | iOS / iPadOS | Builds from source on macOS. **Device regression of the newest changes is pending.** No public TestFlight or App Store build. |
 | Downloads | None yet. Signed releases will be published on the [Releases page](https://github.com/Kuncarlos91/MailBurrow/releases) when ready. |
 
