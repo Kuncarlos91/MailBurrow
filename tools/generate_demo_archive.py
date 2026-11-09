@@ -178,10 +178,10 @@ def build_messages():
         add(1, "Receipts", "Corner Grocer <receipts@corner-grocer.example>", ALEX,
             f"Receipt #{4100 + index}", 9 + index * 17,
             f"Thanks for shopping at Corner Grocer. Total: {18 + index * 3}.{index}5. Paid by card ending 0000.")
-    add(1, "Archive/2021", "Sam Rivera <sam.rivera@example.net>", ALEX, "Moving day photos", 1700,
+    add(1, "Archive/2021", "Sam Rivera <sam.rivera@example.net>", ALEX, "Moving day photos", 1850,
         "Here are the photos from moving day. Can't believe it's been this long!",
         attachments=[("moving-day.png", "image/png")])
-    add(1, "Archive/2021", "Jordan Lee <jordan.lee@example.org>", ALEX, "Welcome to the neighborhood", 1745,
+    add(1, "Archive/2021", "Jordan Lee <jordan.lee@example.org>", ALEX, "Welcome to the neighborhood", 1900,
         "Welcome! We're at number 12 if you ever need anything. Jordan")
     add(1, "Archive", "Corner Reader Books <news@corner-reader.example>", ALEX, "Your 2023 reading recap", 1040,
         "You read 14 books with us in 2023. Here's to another great year of reading!")
