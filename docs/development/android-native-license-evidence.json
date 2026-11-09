@@ -1,0 +1,35 @@
+{
+  "scope": "Android release-runtime source and cached artifact notice review; not final APK clearance",
+  "reviewed_source": "4e91643decb38f12c84ed56b3f6f36de0763be61",
+  "reviewed_date": "2026-11-09",
+  "runtime_coordinates": 63,
+  "resolved_graph_matches_inventory": true,
+  "flutter_engine_revision": "cf636b1dfb818dd6a3ff16e390e93b1a036969c8",
+  "flutter_sdk_license_sha256": "a3a9fd82f800a47377f7d3f60c60a5c91cae0495be8f329031e1448ce0f5dab9",
+  "engine_notice_bundle_sha256": "3c0040023a5789bf56d6bf41fd44f08b21758523d41f128fb7dd6beb398d1191",
+  "engine_notice_bundle_normalized_sha256": "bc93c4fefb726e3d68b5e9b02ed43567c800284c9cafb520a24455ae5c899cb2",
+  "engine_notice_source": "Flutter SDK sky_engine/license; locked Dart inventory and root notice text",
+  "guava_source_archive_sha256": "3d1bd8d4a39b293612a40e547ec51d9ce34fa638d7adeae83871cdbe2923b161",
+  "guava_asset_sha256": "8a6be7c9da3aee06979fc0705292578faa6fa2d28bf993a9201c87e7bafb7caf",
+  "guava_parent": "com.google.guava:guava-parent:26.0-android",
+  "guava_parent_license": "Apache-2.0",
+  "androidx_supplied_license_sha256": "809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0",
+  "androidx_supplied_license_coordinates": [
+    "androidx.annotation:annotation-jvm:1.10.0",
+    "androidx.browser:browser:1.9.0",
+    "androidx.core:core:1.17.0",
+    "androidx.core:core-ktx:1.17.0",
+    "androidx.core:core-viewtree:1.0.0",
+    "androidx.exifinterface:exifinterface:1.4.1"
+  ],
+  "androidx_supplied_license_already_retained_in_root_notices": true,
+  "available_source_archives_inspected": 13,
+  "final_signed_apk_verified": false,
+  "limitations": [
+    "POM declarations and archive searches are not complete legal certification.",
+    "Only locally available source archives were inspected.",
+    "Existing debug notice inspection is not proof for the next release APK.",
+    "No iOS native-license conclusion is made."
+  ],
+  "engine_notice_normalization": "Strip trailing whitespace per line, strip outer whitespace, append one LF; same as dependency_notices.py"
+}

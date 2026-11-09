@@ -10,7 +10,7 @@ Source: [tile](../../lib/third_party_licenses.dart), [Settings integration](../.
 
 ## Verified inventory and remaining scope
 
-Read-only dependency verification matched 80 package rows and 30 distinct normalized retained texts. Android offline releaseRuntimeClasspath resolves 63 external coordinates. Five cached POMs lack license declarations: Guava listenablefuture plus four Flutter embedding/engine coordinates. Lack of a POM field does not establish no license or a violation; upstream license/notice provenance and actual artifact inclusion remain to be reviewed. Package-cache and POM evidence are not a complete native compliance assessment.
+Read-only dependency verification matched 80 package rows and 30 distinct normalized retained texts. Android offline releaseRuntimeClasspath resolves 63 external coordinates. Five cached POMs lack license declarations: Guava listenablefuture plus four Flutter embedding/engine coordinates. Lack of a POM field does not establish no license or a violation. The [Android native review](android-native-license-review.md) records the source/SDK provenance follow-up; exact signed-artifact inclusion remains to be checked. Package-cache and POM evidence are not a complete native compliance assessment.
 
 Do not substitute the root notice document for the runtime registry, or assume the registry includes every native SDK notice. Verify the exact final artifact's NOTICES asset and any separately required native notices. Keep full upstream attribution text, root path and strict privacy rules intact. iOS framework privacy manifests/required-reason APIs, SDK licenses, crypto declarations, copied-code/icon provenance and store disclosures remain open; a passing artifact privacy scan is not that inventory.
 
