@@ -24,8 +24,8 @@ void main() {
       await tester.tap(find.text('Privacy notice'));
       await tester.pumpAndSettle();
       expect(opened.map((uri) => uri.toString()), [
-        'https://mailburrow-at0.pages.dev/',
-        'https://mailburrow-at0.pages.dev/privacy',
+        'https://mailburrow.pages.dev/',
+        'https://mailburrow.pages.dev/privacy',
       ]);
       expect(
         opened.every((uri) => uri.query.isEmpty && uri.userInfo.isEmpty),
