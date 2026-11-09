@@ -62,6 +62,7 @@ class DemoArchive implements ArchiveBackend {
   final List<Map<String, dynamic>> _messages;
   final Map<String, String> _attachmentFiles;
   bool _closed = false;
+  final _transfers = <AttachmentDownload>{};
 
   @override
   Uri get server => demoServer;
@@ -214,16 +215,19 @@ class DemoArchive implements ArchiveBackend {
     if (!belongs || name == null) throw const ArchiveFailure(404);
     final active = transfer ?? AttachmentDownload();
     active.throwIfStopped();
-    final data = await active.wait(
-      _bundle.load('$demoAttachmentDirectory/$name'),
-    );
-    final bytes = Uint8List.sublistView(data);
-    if (bytes.length > maxAttachmentDownloadBytes) {
-      throw const AttachmentTooLarge();
-    }
+    // Registered so close() can stop this copy between chunks.
+    _transfers.add(active);
     RandomAccessFile? output;
     var opened = false, completed = false;
     try {
+      final data = await active.wait(
+        _bundle.load('$demoAttachmentDirectory/$name'),
+      );
+      final bytes = Uint8List.sublistView(data);
+      if (bytes.length > maxAttachmentDownloadBytes) {
+        throw const AttachmentTooLarge();
+      }
+      active.throwIfStopped();
       output = await destination.open(mode: FileMode.write);
       opened = true;
       const chunk = 256;
@@ -232,6 +236,9 @@ class DemoArchive implements ArchiveBackend {
         active.throwIfStopped();
         final end = math.min(received + chunk, bytes.length);
         await output.writeFrom(bytes, received, end);
+        // A cancel or close during the write stops here: no further writes
+        // or progress callbacks.
+        active.throwIfStopped();
         received = end;
         onProgress?.call(received);
         if (_latency > Duration.zero) {
@@ -245,6 +252,7 @@ class DemoArchive implements ArchiveBackend {
       _checkOpen();
       completed = true;
     } finally {
+      _transfers.remove(active);
       if (output != null) {
         try {
           await output.close();
@@ -278,6 +286,13 @@ class DemoArchive implements ArchiveBackend {
   @override
   void cancelEmailRequests() {}
 
+  /// Refuses new requests and stops attachment copies in progress; their
+  /// partial files are deleted.
   @override
-  void close() => _closed = true;
+  void close() {
+    _closed = true;
+    for (final transfer in _transfers.toList()) {
+      transfer.cancel();
+    }
+  }
 }

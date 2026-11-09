@@ -2,8 +2,12 @@
 
 Writes assets/demo/archive.json and small attachment files under
 assets/demo/attachments/. Output is deterministic: no randomness, clock or
-network. Every person, business and address is invented and uses reserved
-example domains. Run with --check to verify committed files are current.
+network. Every person, business and address is invented. Addresses and
+links use only domains reserved for documentation (RFC 2606): example.com,
+example.org, example.net and names under .example, so businesses can have
+distinct, realistic-looking addresses that can never belong to anyone. The
+repository privacy check accepts exactly these. Run with --check to verify
+committed files are current.
 """
 import argparse
 from datetime import datetime, timedelta, timezone
@@ -164,17 +168,18 @@ def build_messages():
     add(1, "INBOX", "Café Lumière <bonjour@cafe-lumiere.example>", ALEX, "Unicode: café, reunión, 日本語", 33,
         para("Merci! Gracias! ありがとう!",
              "This fictional message checks accented and non-Latin text: café, niño, Zürich, 東京."))
-    months = ["October", "September", "August", "July", "June", "May"]
+    months = ["October", "September", "August", "July", "June", "May", "April", "March"]
     books = [("The Lighthouse Keeper's Ledger", "Backyard Wings"), ("Salt and Starlight", "Small Gardens"),
              ("The Quiet Orchard", "Maps of Nowhere"), ("Paper Boats", "The Long Way Round"),
-             ("Winter Bread", "Clockwork Bees"), ("Harbor Lights", "A Year of Soup")]
+             ("Winter Bread", "Clockwork Bees"), ("Harbor Lights", "A Year of Soup"),
+             ("The Kite Maker", "Rain on Tin Roofs"), ("Lantern Season", "Notes from the Pantry")]
     for index, month in enumerate(months):
         book1, book2 = books[index]
         add(1, "Newsletters", "The Corner Reader <news@corner-reader.example>", ALEX,
             f"The Corner Reader: {month} picks", 4 + index * 30,
             f"This month's picks: {book1} and {book2}. See upcoming events on our website.",
             html=NEWSLETTER_HTML.format(month=month, slug=month.lower(), book1=book1, book2=book2))
-    for index in range(1, 9):
+    for index in range(1, 12):
         add(1, "Receipts", "Corner Grocer <receipts@corner-grocer.example>", ALEX,
             f"Receipt #{4100 + index}", 9 + index * 17,
             f"Thanks for shopping at Corner Grocer. Total: {18 + index * 3}.{index}5. Paid by card ending 0000.")
@@ -208,10 +213,14 @@ def build_messages():
         "Apple season price list", 27,
         para("Our apple season price list is attached.", "Honeycrisp and Cortland are available now."),
         attachments=[("price-list.txt", "text/plain")])
-    for index in range(1, 7):
+    for index in range(1, 11):
         add(2, "INBOX/Orders", f"Online Orders <orders@maple-street-bakery.example>", BAKERY,
             f"New online order #{2200 + index}", 1 + index * 6,
             f"New pickup order #{2200 + index}: {index} dozen assorted cookies, pickup tomorrow morning.")
+    add(2, "INBOX", "Sunrise Coffee Roasters <wholesale@sunrise-roasters.example>", BAKERY,
+        "Wholesale coffee samples", 12, "We'd love to send you samples of our house blend for the bakery counter.")
+    add(2, "Invoices", BAKERY, "Taylor Brooks <taylor.brooks@example.com>", "Invoice MSB-0379: birthday cake", 1,
+        "Thanks for your order! Invoice MSB-0379 for the birthday cake: 38.00, paid at pickup.", outgoing=True)
     add(2, "Sent", BAKERY, "Golden Mill Flour <orders@golden-mill.example>", "Re: Invoice GM-2210", 3,
         "Thank you, payment has been scheduled.", outgoing=True)
 
@@ -232,6 +241,15 @@ def build_messages():
     add(3, "INBOX/Events", "Parks Department <events@city-parks.example>", CLUB, "River path planting permit", 24,
         "Your permit for planting along the river path on November 8 has been approved.",
         attachments=[("planting-permit.pdf", "application/pdf")])
+    add(3, "INBOX/Events", "Lee Park <lee.park@example.net>", CLUB, "Bulb planting sign-up", 11,
+        "I can bring two shovels and a wheelbarrow on November 8. Put me down for the morning shift.")
+    add(3, "INBOX", "Riverside Library <events@riverside-library.example>", CLUB, "Talk request: winter composting", 29,
+        "Would someone from the club give a short talk on winter composting at the library in January?")
+    add(3, "Sent", CLUB, "Riverside Library <events@riverside-library.example>",
+        "Re: Talk request: winter composting", 28, "Happy to! Morgan has volunteered. Any Saturday works.",
+        outgoing=True)
+    add(3, "INBOX", "Morgan Ellis <morgan.ellis@example.com>", CLUB, "Hose reel quotes", 35,
+        "Two quotes for new hose reels: 48.00 and 62.00 each. The cheaper one has a shorter warranty.")
     add(3, "Minutes", CLUB, "Members <members@riverside-garden-club.example>", "Minutes: September meeting", 43,
         "Attendance: 11 members. Decisions: fall fair booth confirmed; new members welcomed.", outgoing=True)
 

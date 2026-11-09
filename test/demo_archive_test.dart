@@ -217,6 +217,71 @@ void main() {
       expect(target.existsSync(), isFalse);
     });
 
+    Future<(int, Map<String, dynamic>)> multiChunkAttachment() async {
+      // The boarding pass PDF is larger than one 256-byte copy chunk.
+      final mail = items(await demo.emails(1, 'Harbor City', 1))
+          .firstWhere((m) => m['hasAttachments'] == true);
+      final detail = await demo.message(mail['id'] as int);
+      final file = (detail['attachments'] as List<dynamic>).first
+          as Map<String, dynamic>;
+      expect(file['size'] as int, greaterThan(512));
+      return (mail['id'] as int, file);
+    }
+
+    test('cancelling during a copy stops writing and deletes the file',
+        () async {
+      final (emailId, file) = await multiChunkAttachment();
+      final slow = await DemoArchive.load(
+        latency: const Duration(milliseconds: 50),
+      );
+      final target = File('${folder.path}/cancelled-midway');
+      final transfer = AttachmentDownload();
+      final progress = <int>[];
+      await expectLater(
+        slow.downloadAttachment(
+          emailId,
+          file['id'] as int,
+          target,
+          transfer: transfer,
+          onProgress: (received) {
+            progress.add(received);
+            transfer.cancel();
+          },
+        ),
+        throwsA(isA<AttachmentDownloadCancelled>()),
+      );
+      expect(progress, hasLength(1));
+      expect(target.existsSync(), isFalse);
+    });
+
+    test('closing during a copy stops writing and deletes the file',
+        () async {
+      final (emailId, file) = await multiChunkAttachment();
+      final slow = await DemoArchive.load(
+        latency: const Duration(milliseconds: 50),
+      );
+      final target = File('${folder.path}/closed-midway');
+      final progress = <int>[];
+      await expectLater(
+        slow.downloadAttachment(
+          emailId,
+          file['id'] as int,
+          target,
+          onProgress: (received) {
+            progress.add(received);
+            slow.close();
+          },
+        ),
+        throwsA(anything),
+      );
+      expect(progress, hasLength(1));
+      expect(target.existsSync(), isFalse);
+      await expectLater(
+        slow.downloadAttachment(emailId, file['id'] as int, target),
+        throwsA(isA<StateError>()),
+      );
+    });
+
     test('rejects an attachment from a different message', () async {
       final (_, file) = await withAttachment();
       final welcome = items(await demo.emails(1, 'welcome', 1)).first;
@@ -236,11 +301,27 @@ void main() {
       final local = await DemoArchive.load(latency: Duration.zero);
       final accounts = await local.accounts();
       await local.folders(1);
-      final page = await local.emails(1, 'invoice', 1);
+      final page = await local.emails(2, 'invoice', 1);
       await local.emails(2, '', 1, folder: 'INBOX/Orders');
       await local.stats();
       for (final mail in items(page)) {
         await local.message(mail['id'] as int);
+      }
+      final withFile = items(page).firstWhere((m) => m['hasAttachments'] == true);
+      final detail = await local.message(withFile['id'] as int);
+      final file = (detail['attachments'] as List<dynamic>).first
+          as Map<String, dynamic>;
+      final folder = await Directory.systemTemp.createTemp('demo-offline');
+      try {
+        final target = File('${folder.path}/saved');
+        await local.downloadAttachment(
+          withFile['id'] as int,
+          file['id'] as int,
+          target,
+        );
+        expect(await target.length(), file['size']);
+      } finally {
+        await folder.delete(recursive: true);
       }
       expect(accounts, isNotEmpty);
     }, createHttpClient: _NoNetwork().createHttpClient);

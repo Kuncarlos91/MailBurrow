@@ -80,6 +80,7 @@ class DemoArchiveTests(unittest.TestCase):
             per_account[mail["accountId"]] = per_account.get(mail["accountId"], 0) + 1
         self.assertGreater(per_account[1], 25, "first account needs more than one page")
         self.assertEqual(len(per_account), 3)
+        self.assertGreaterEqual(len(messages), 65, "about 70 messages, as planned")
         for mail in messages:
             if mail["folderName"].endswith("/2021"):
                 self.assertTrue(mail["sentDate"].startswith("2021-"), mail["subject"])

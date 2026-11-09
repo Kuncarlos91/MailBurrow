@@ -47,13 +47,13 @@
    {
     "name": "Receipts",
     "fullPath": "Receipts",
-    "totalCount": 9,
+    "totalCount": 12,
     "children": []
    },
    {
     "name": "Newsletters",
     "fullPath": "Newsletters",
-    "totalCount": 6,
+    "totalCount": 8,
     "children": []
    },
    {
@@ -86,12 +86,12 @@
    {
     "name": "INBOX",
     "fullPath": "INBOX",
-    "totalCount": 1,
+    "totalCount": 2,
     "children": [
      {
       "name": "Orders",
       "fullPath": "INBOX/Orders",
-      "totalCount": 8,
+      "totalCount": 12,
       "children": []
      },
      {
@@ -111,7 +111,7 @@
    {
     "name": "Invoices",
     "fullPath": "Invoices",
-    "totalCount": 1,
+    "totalCount": 2,
     "children": []
    }
   ],
@@ -119,12 +119,12 @@
    {
     "name": "INBOX",
     "fullPath": "INBOX",
-    "totalCount": 1,
+    "totalCount": 3,
     "children": [
      {
       "name": "Events",
       "fullPath": "INBOX/Events",
-      "totalCount": 2,
+      "totalCount": 3,
       "children": []
      }
     ]
@@ -132,7 +132,7 @@
    {
     "name": "Sent",
     "fullPath": "Sent",
-    "totalCount": 1,
+    "totalCount": 2,
     "children": []
    },
    {
@@ -541,6 +541,36 @@
   },
   {
    "accountId": 1,
+   "folderName": "Newsletters",
+   "from": "The Corner Reader <news@corner-reader.example>",
+   "to": "Alex Rivera <alex.rivera@example.com>",
+   "subject": "The Corner Reader: April picks",
+   "sentDate": "2026-04-27T09:15:00Z",
+   "receivedDate": "2026-04-27T09:15:00Z",
+   "isOutgoing": false,
+   "textBody": "This month's picks: The Kite Maker and Rain on Tin Roofs. See upcoming events on our website.",
+   "htmlBody": "<html><body>\n<h2>The Corner Reader &mdash; April picks</h2>\n<p><img src=\"https://images.example.org/newsletter/april.png\" alt=\"Banner\" width=\"600\"></p>\n<p>Hello Alex, here are this month's staff picks from the shop.</p>\n<ul><li><b>The Kite Maker</b> &mdash; a cozy mystery set in a lighthouse.</li>\n<li><b>Rain on Tin Roofs</b> &mdash; field notes from a year of backyard birding.</li></ul>\n<p><a href=\"https://corner-reader.example/events\">See upcoming events</a> &middot;\n<a href=\"http://corner-reader.example/unsubscribe\">Unsubscribe</a></p>\n<p style=\"color:#666\">The image above is a remote resource; MailBurrow blocks it.</p>\n</body></html>",
+   "attachments": [],
+   "id": 25,
+   "hasAttachments": false
+  },
+  {
+   "accountId": 1,
+   "folderName": "Newsletters",
+   "from": "The Corner Reader <news@corner-reader.example>",
+   "to": "Alex Rivera <alex.rivera@example.com>",
+   "subject": "The Corner Reader: March picks",
+   "sentDate": "2026-03-28T09:15:00Z",
+   "receivedDate": "2026-03-28T09:15:00Z",
+   "isOutgoing": false,
+   "textBody": "This month's picks: Lantern Season and Notes from the Pantry. See upcoming events on our website.",
+   "htmlBody": "<html><body>\n<h2>The Corner Reader &mdash; March picks</h2>\n<p><img src=\"https://images.example.org/newsletter/march.png\" alt=\"Banner\" width=\"600\"></p>\n<p>Hello Alex, here are this month's staff picks from the shop.</p>\n<ul><li><b>Lantern Season</b> &mdash; a cozy mystery set in a lighthouse.</li>\n<li><b>Notes from the Pantry</b> &mdash; field notes from a year of backyard birding.</li></ul>\n<p><a href=\"https://corner-reader.example/events\">See upcoming events</a> &middot;\n<a href=\"http://corner-reader.example/unsubscribe\">Unsubscribe</a></p>\n<p style=\"color:#666\">The image above is a remote resource; MailBurrow blocks it.</p>\n</body></html>",
+   "attachments": [],
+   "id": 26,
+   "hasAttachments": false
+  },
+  {
+   "accountId": 1,
    "folderName": "Receipts",
    "from": "Corner Grocer <receipts@corner-grocer.example>",
    "to": "Alex Rivera <alex.rivera@example.com>",
@@ -551,7 +581,7 @@
    "textBody": "Thanks for shopping at Corner Grocer. Total: 21.15. Paid by card ending 0000.",
    "htmlBody": null,
    "attachments": [],
-   "id": 25,
+   "id": 27,
    "hasAttachments": false
   },
   {
@@ -566,7 +596,7 @@
    "textBody": "Thanks for shopping at Corner Grocer. Total: 24.25. Paid by card ending 0000.",
    "htmlBody": null,
    "attachments": [],
-   "id": 26,
+   "id": 28,
    "hasAttachments": false
   },
   {
@@ -581,7 +611,7 @@
    "textBody": "Thanks for shopping at Corner Grocer. Total: 27.35. Paid by card ending 0000.",
    "htmlBody": null,
    "attachments": [],
-   "id": 27,
+   "id": 29,
    "hasAttachments": false
   },
   {
@@ -596,7 +626,7 @@
    "textBody": "Thanks for shopping at Corner Grocer. Total: 30.45. Paid by card ending 0000.",
    "htmlBody": null,
    "attachments": [],
-   "id": 28,
+   "id": 30,
    "hasAttachments": false
   },
   {
@@ -611,7 +641,7 @@
    "textBody": "Thanks for shopping at Corner Grocer. Total: 33.55. Paid by card ending 0000.",
    "htmlBody": null,
    "attachments": [],
-   "id": 29,
+   "id": 31,
    "hasAttachments": false
   },
   {
@@ -626,7 +656,7 @@
    "textBody": "Thanks for shopping at Corner Grocer. Total: 36.65. Paid by card ending 0000.",
    "htmlBody": null,
    "attachments": [],
-   "id": 30,
+   "id": 32,
    "hasAttachments": false
   },
   {
@@ -641,7 +671,7 @@
    "textBody": "Thanks for shopping at Corner Grocer. Total: 39.75. Paid by card ending 0000.",
    "htmlBody": null,
    "attachments": [],
-   "id": 31,
+   "id": 33,
    "hasAttachments": false
   },
   {
@@ -656,7 +686,52 @@
    "textBody": "Thanks for shopping at Corner Grocer. Total: 42.85. Paid by card ending 0000.",
    "htmlBody": null,
    "attachments": [],
-   "id": 32,
+   "id": 34,
+   "hasAttachments": false
+  },
+  {
+   "accountId": 1,
+   "folderName": "Receipts",
+   "from": "Corner Grocer <receipts@corner-grocer.example>",
+   "to": "Alex Rivera <alex.rivera@example.com>",
+   "subject": "Receipt #4109",
+   "sentDate": "2026-05-19T09:15:00Z",
+   "receivedDate": "2026-05-19T09:15:00Z",
+   "isOutgoing": false,
+   "textBody": "Thanks for shopping at Corner Grocer. Total: 45.95. Paid by card ending 0000.",
+   "htmlBody": null,
+   "attachments": [],
+   "id": 35,
+   "hasAttachments": false
+  },
+  {
+   "accountId": 1,
+   "folderName": "Receipts",
+   "from": "Corner Grocer <receipts@corner-grocer.example>",
+   "to": "Alex Rivera <alex.rivera@example.com>",
+   "subject": "Receipt #4110",
+   "sentDate": "2026-05-02T09:15:00Z",
+   "receivedDate": "2026-05-02T09:15:00Z",
+   "isOutgoing": false,
+   "textBody": "Thanks for shopping at Corner Grocer. Total: 48.105. Paid by card ending 0000.",
+   "htmlBody": null,
+   "attachments": [],
+   "id": 36,
+   "hasAttachments": false
+  },
+  {
+   "accountId": 1,
+   "folderName": "Receipts",
+   "from": "Corner Grocer <receipts@corner-grocer.example>",
+   "to": "Alex Rivera <alex.rivera@example.com>",
+   "subject": "Receipt #4111",
+   "sentDate": "2026-04-15T09:15:00Z",
+   "receivedDate": "2026-04-15T09:15:00Z",
+   "isOutgoing": false,
+   "textBody": "Thanks for shopping at Corner Grocer. Total: 51.115. Paid by card ending 0000.",
+   "htmlBody": null,
+   "attachments": [],
+   "id": 37,
    "hasAttachments": false
   },
   {
@@ -678,7 +753,7 @@
      "size": 414
     }
    ],
-   "id": 33,
+   "id": 38,
    "hasAttachments": true
   },
   {
@@ -693,7 +768,7 @@
    "textBody": "Welcome! We're at number 12 if you ever need anything. Jordan",
    "htmlBody": null,
    "attachments": [],
-   "id": 34,
+   "id": 39,
    "hasAttachments": false
   },
   {
@@ -708,7 +783,7 @@
    "textBody": "You read 14 books with us in 2023. Here's to another great year of reading!",
    "htmlBody": null,
    "attachments": [],
-   "id": 35,
+   "id": 40,
    "hasAttachments": false
   },
   {
@@ -723,7 +798,7 @@
    "textBody": "Hi! I'd like to order a chocolate birthday cake for 12 people, pickup Saturday at 10am.\n\nCould it say \"Happy 8th Birthday, Mia\"?\n\nThanks, Taylor",
    "htmlBody": null,
    "attachments": [],
-   "id": 36,
+   "id": 41,
    "hasAttachments": false
   },
   {
@@ -738,7 +813,7 @@
    "textBody": "Confirmed for Saturday at 10am. See you then!",
    "htmlBody": null,
    "attachments": [],
-   "id": 37,
+   "id": 42,
    "hasAttachments": false
   },
   {
@@ -760,7 +835,7 @@
      "size": 740
     }
    ],
-   "id": 38,
+   "id": 43,
    "hasAttachments": true
   },
   {
@@ -782,7 +857,7 @@
      "size": 733
     }
    ],
-   "id": 39,
+   "id": 44,
    "hasAttachments": true
   },
   {
@@ -797,7 +872,7 @@
    "textBody": "Your annual kitchen inspection is scheduled for November 19 at 9am.",
    "htmlBody": null,
    "attachments": [],
-   "id": 40,
+   "id": 45,
    "hasAttachments": false
   },
   {
@@ -812,7 +887,7 @@
    "textBody": "Please continue my standing order: two sourdough loaves every Friday.",
    "htmlBody": null,
    "attachments": [],
-   "id": 41,
+   "id": 46,
    "hasAttachments": false
   },
   {
@@ -834,7 +909,7 @@
      "size": 104
     }
    ],
-   "id": 42,
+   "id": 47,
    "hasAttachments": true
   },
   {
@@ -849,7 +924,7 @@
    "textBody": "New pickup order #2201: 1 dozen assorted cookies, pickup tomorrow morning.",
    "htmlBody": null,
    "attachments": [],
-   "id": 43,
+   "id": 48,
    "hasAttachments": false
   },
   {
@@ -864,7 +939,7 @@
    "textBody": "New pickup order #2202: 2 dozen assorted cookies, pickup tomorrow morning.",
    "htmlBody": null,
    "attachments": [],
-   "id": 44,
+   "id": 49,
    "hasAttachments": false
   },
   {
@@ -879,7 +954,7 @@
    "textBody": "New pickup order #2203: 3 dozen assorted cookies, pickup tomorrow morning.",
    "htmlBody": null,
    "attachments": [],
-   "id": 45,
+   "id": 50,
    "hasAttachments": false
   },
   {
@@ -894,7 +969,7 @@
    "textBody": "New pickup order #2204: 4 dozen assorted cookies, pickup tomorrow morning.",
    "htmlBody": null,
    "attachments": [],
-   "id": 46,
+   "id": 51,
    "hasAttachments": false
   },
   {
@@ -909,7 +984,7 @@
    "textBody": "New pickup order #2205: 5 dozen assorted cookies, pickup tomorrow morning.",
    "htmlBody": null,
    "attachments": [],
-   "id": 47,
+   "id": 52,
    "hasAttachments": false
   },
   {
@@ -924,7 +999,97 @@
    "textBody": "New pickup order #2206: 6 dozen assorted cookies, pickup tomorrow morning.",
    "htmlBody": null,
    "attachments": [],
-   "id": 48,
+   "id": 53,
+   "hasAttachments": false
+  },
+  {
+   "accountId": 2,
+   "folderName": "INBOX/Orders",
+   "from": "Online Orders <orders@maple-street-bakery.example>",
+   "to": "Maple Street Bakery <hello@maple-street-bakery.example>",
+   "subject": "New online order #2207",
+   "sentDate": "2026-09-15T09:15:00Z",
+   "receivedDate": "2026-09-15T09:15:00Z",
+   "isOutgoing": false,
+   "textBody": "New pickup order #2207: 7 dozen assorted cookies, pickup tomorrow morning.",
+   "htmlBody": null,
+   "attachments": [],
+   "id": 54,
+   "hasAttachments": false
+  },
+  {
+   "accountId": 2,
+   "folderName": "INBOX/Orders",
+   "from": "Online Orders <orders@maple-street-bakery.example>",
+   "to": "Maple Street Bakery <hello@maple-street-bakery.example>",
+   "subject": "New online order #2208",
+   "sentDate": "2026-09-09T09:15:00Z",
+   "receivedDate": "2026-09-09T09:15:00Z",
+   "isOutgoing": false,
+   "textBody": "New pickup order #2208: 8 dozen assorted cookies, pickup tomorrow morning.",
+   "htmlBody": null,
+   "attachments": [],
+   "id": 55,
+   "hasAttachments": false
+  },
+  {
+   "accountId": 2,
+   "folderName": "INBOX/Orders",
+   "from": "Online Orders <orders@maple-street-bakery.example>",
+   "to": "Maple Street Bakery <hello@maple-street-bakery.example>",
+   "subject": "New online order #2209",
+   "sentDate": "2026-09-03T09:15:00Z",
+   "receivedDate": "2026-09-03T09:15:00Z",
+   "isOutgoing": false,
+   "textBody": "New pickup order #2209: 9 dozen assorted cookies, pickup tomorrow morning.",
+   "htmlBody": null,
+   "attachments": [],
+   "id": 56,
+   "hasAttachments": false
+  },
+  {
+   "accountId": 2,
+   "folderName": "INBOX/Orders",
+   "from": "Online Orders <orders@maple-street-bakery.example>",
+   "to": "Maple Street Bakery <hello@maple-street-bakery.example>",
+   "subject": "New online order #2210",
+   "sentDate": "2026-08-28T09:15:00Z",
+   "receivedDate": "2026-08-28T09:15:00Z",
+   "isOutgoing": false,
+   "textBody": "New pickup order #2210: 10 dozen assorted cookies, pickup tomorrow morning.",
+   "htmlBody": null,
+   "attachments": [],
+   "id": 57,
+   "hasAttachments": false
+  },
+  {
+   "accountId": 2,
+   "folderName": "INBOX",
+   "from": "Sunrise Coffee Roasters <wholesale@sunrise-roasters.example>",
+   "to": "Maple Street Bakery <hello@maple-street-bakery.example>",
+   "subject": "Wholesale coffee samples",
+   "sentDate": "2026-10-16T09:15:00Z",
+   "receivedDate": "2026-10-16T09:15:00Z",
+   "isOutgoing": false,
+   "textBody": "We'd love to send you samples of our house blend for the bakery counter.",
+   "htmlBody": null,
+   "attachments": [],
+   "id": 58,
+   "hasAttachments": false
+  },
+  {
+   "accountId": 2,
+   "folderName": "Invoices",
+   "from": "Maple Street Bakery <hello@maple-street-bakery.example>",
+   "to": "Taylor Brooks <taylor.brooks@example.com>",
+   "subject": "Invoice MSB-0379: birthday cake",
+   "sentDate": "2026-10-27T09:15:00Z",
+   "receivedDate": "2026-10-27T09:15:00Z",
+   "isOutgoing": true,
+   "textBody": "Thanks for your order! Invoice MSB-0379 for the birthday cake: 38.00, paid at pickup.",
+   "htmlBody": null,
+   "attachments": [],
+   "id": 59,
    "hasAttachments": false
   },
   {
@@ -939,7 +1104,7 @@
    "textBody": "Thank you, payment has been scheduled.",
    "htmlBody": null,
    "attachments": [],
-   "id": 49,
+   "id": 60,
    "hasAttachments": false
   },
   {
@@ -954,7 +1119,7 @@
    "textBody": "Here is the volunteer schedule for the fall fair.\n\nPlease reply if you need to swap a shift.",
    "htmlBody": "<p>Volunteer schedule:</p><table border=\"1\"><tr><th>Shift</th><th>Volunteer</th></tr>\n<tr><td>9-11</td><td>Dana, Lee</td></tr><tr><td>11-1</td><td>Morgan, Priya</td></tr>\n<tr><td>1-3</td><td>Alex, Sam</td></tr></table>",
    "attachments": [],
-   "id": 50,
+   "id": 61,
    "hasAttachments": false
   },
   {
@@ -976,7 +1141,7 @@
      "size": 118
     }
    ],
-   "id": 51,
+   "id": 62,
    "hasAttachments": true
   },
   {
@@ -991,7 +1156,7 @@
    "textBody": "Could we host a seed swap in early spring? I can bring tomato and basil seeds.",
    "htmlBody": null,
    "attachments": [],
-   "id": 52,
+   "id": 63,
    "hasAttachments": false
   },
   {
@@ -1006,7 +1171,7 @@
    "textBody": "Great idea! Let's add it to the next meeting agenda.",
    "htmlBody": null,
    "attachments": [],
-   "id": 53,
+   "id": 64,
    "hasAttachments": false
   },
   {
@@ -1028,8 +1193,68 @@
      "size": 718
     }
    ],
-   "id": 54,
+   "id": 65,
    "hasAttachments": true
+  },
+  {
+   "accountId": 3,
+   "folderName": "INBOX/Events",
+   "from": "Lee Park <lee.park@example.net>",
+   "to": "Riverside Garden Club <volunteers@riverside-garden-club.example>",
+   "subject": "Bulb planting sign-up",
+   "sentDate": "2026-10-17T09:15:00Z",
+   "receivedDate": "2026-10-17T09:15:00Z",
+   "isOutgoing": false,
+   "textBody": "I can bring two shovels and a wheelbarrow on November 8. Put me down for the morning shift.",
+   "htmlBody": null,
+   "attachments": [],
+   "id": 66,
+   "hasAttachments": false
+  },
+  {
+   "accountId": 3,
+   "folderName": "INBOX",
+   "from": "Riverside Library <events@riverside-library.example>",
+   "to": "Riverside Garden Club <volunteers@riverside-garden-club.example>",
+   "subject": "Talk request: winter composting",
+   "sentDate": "2026-09-29T09:15:00Z",
+   "receivedDate": "2026-09-29T09:15:00Z",
+   "isOutgoing": false,
+   "textBody": "Would someone from the club give a short talk on winter composting at the library in January?",
+   "htmlBody": null,
+   "attachments": [],
+   "id": 67,
+   "hasAttachments": false
+  },
+  {
+   "accountId": 3,
+   "folderName": "Sent",
+   "from": "Riverside Garden Club <volunteers@riverside-garden-club.example>",
+   "to": "Riverside Library <events@riverside-library.example>",
+   "subject": "Re: Talk request: winter composting",
+   "sentDate": "2026-09-30T09:15:00Z",
+   "receivedDate": "2026-09-30T09:15:00Z",
+   "isOutgoing": true,
+   "textBody": "Happy to! Morgan has volunteered. Any Saturday works.",
+   "htmlBody": null,
+   "attachments": [],
+   "id": 68,
+   "hasAttachments": false
+  },
+  {
+   "accountId": 3,
+   "folderName": "INBOX",
+   "from": "Morgan Ellis <morgan.ellis@example.com>",
+   "to": "Riverside Garden Club <volunteers@riverside-garden-club.example>",
+   "subject": "Hose reel quotes",
+   "sentDate": "2026-09-23T09:15:00Z",
+   "receivedDate": "2026-09-23T09:15:00Z",
+   "isOutgoing": false,
+   "textBody": "Two quotes for new hose reels: 48.00 and 62.00 each. The cheaper one has a shorter warranty.",
+   "htmlBody": null,
+   "attachments": [],
+   "id": 69,
+   "hasAttachments": false
   },
   {
    "accountId": 3,
@@ -1043,7 +1268,7 @@
    "textBody": "Attendance: 11 members. Decisions: fall fair booth confirmed; new members welcomed.",
    "htmlBody": null,
    "attachments": [],
-   "id": 55,
+   "id": 70,
    "hasAttachments": false
   }
  ],
