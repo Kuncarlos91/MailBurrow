@@ -6,7 +6,7 @@ MailBurrow is an early preview, published as source. There is no public signed A
 
 | Area | Status |
 | --- | --- |
-| Features | Read-only browsing, search, filters, paging, safe reader, attachment save/open and account switching are implemented. Mail-Archiver is the only supported backend. |
+| Features | Read-only browsing, search, filters, paging, safe reader, attachment save/open, account switching and a built-in demo mode with fictional mail are implemented. Mail-Archiver is the only supported backend. |
 | Automated checks | Flutter analysis, Flutter host tests, Python helper tests, documentation links and the privacy scan run in [CI](../development/setup-and-ci.md) on pushes and pull requests. |
 | Android | Earlier preview builds were tested on real devices. The newest source changes (the shared backend interface) pass host tests; **device regression is pending**. |
 | iOS / iPadOS | Builds from source on macOS. **Device regression of the newest changes is pending.** No public TestFlight or App Store build. |
