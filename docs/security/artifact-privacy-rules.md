@@ -42,6 +42,12 @@ For the engine, only eight full attribution strings are recognized by SHA-256. T
 
 Recognized counts are visible through the redacted context report even if no findings remain. Source/history scans never apply these artifact classifications. Notice-inventory matches remain informational only. Provider/API tokens, private keys, literal credentials, private hosts, personal paths and other categories are still scanned across the whole entry.
 
+## Android ABI scope
+
+The reviewed engine attributions are the arm64-v8a (ARMv8) wording only. The armeabi-v7a and x86_64 Flutter engines carry the same upstream author credit in other wording (for example "for ARMv4/NEON" and "for x86_64"), and the 32-bit engine also contains a machine-code byte run that matches the address pattern. These remain **blocking** and are not added to the reviewed list. Public Android release APKs are therefore built for arm64-v8a only. Supporting another ABI requires reviewing its exact strings with pinned upstream evidence first.
+
+The scanner inspects ZIP entries only. An APK signed with the v2/v3 schemes keeps its certificate in the APK signing block, outside any entry, so certificate identity fields must be reviewed separately (for example with `apksigner verify --print-certs`).
+
 ## Signing-page digest classification
 
 One reviewed full-match fingerprint is recognized in signed iOS builds. Recognition additionally requires the exact iOS Dart App.framework binary scope, a valid native layout and a single containing SHA-256 code-page hash slot whose digest the checker recomputes correctly (`origin=verified-sha256-code-page-hash`). It does not exempt arbitrary digests, signatures, binary files, domains, normal addresses or raw copies of the same bytes. The context report counts this case as `reviewed-code-page-hashes`.

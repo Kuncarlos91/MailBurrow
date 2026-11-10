@@ -11,6 +11,7 @@ Android candidate for the first public APK prerelease. No APK, tag or release is
 - Include the merged demo documentation, privacy wording and Android dark-mode screenshots.
 - Include the shared backend interface and independent backend tests, updated support/privacy destinations, community policies and native-notice provenance now in public source.
 - Enforce canonical LF bytes for bundled notice assets, with checksum regression coverage.
+- The release APK targets 64-bit ARM phones only (arm64-v8a). It will not install on 32-bit-only phones or x86 emulators and Chromebooks.
 - No dependency, permission or iOS upload change is included. Signed candidate inspection and exact-artifact device checks remain pending.
 
 ## Initial public source preview

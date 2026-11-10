@@ -35,16 +35,19 @@ After this PR merges, select an exact public `main` commit with both required ch
 Use your existing local signing configuration without copying it into Git or logs. From the repository root, the same single-line command works in PowerShell and POSIX shells:
 
 ```sh
-flutter build apk --release --build-name=0.3.0-rc.9 --build-number=23 --dart-define=MAILSHELF_BUILD_VERSION=0.3.0-rc.9 --dart-define=MAILSHELF_BUILD_NUMBER=23
+flutter build apk --release --target-platform android-arm64 --build-name=0.3.0-rc.9 --build-number=23 --dart-define=MAILSHELF_BUILD_VERSION=0.3.0-rc.9 --dart-define=MAILSHELF_BUILD_NUMBER=23
 ```
 
-Expected output: `build/app/outputs/flutter-apk/app-release.apk`. Building locally is permitted for candidate validation, but a local APK with unresolved personal metadata is not a public release candidate. Freeze the exact APK after inspection; any rebuild needs a new hash and affected checks repeated. Record actual results, never keys, personal certificate fields, private hosts or raw logs in Git.
+Expected output: `build/app/outputs/flutter-apk/app-release.apk`, containing only `lib/arm64-v8a/` native libraries.
+
+**Why 64-bit ARM only.** A clean release build of this source, signed with a throwaway key on a neutral Linux runner, produces two blocking `email-address-review` findings. Both are in the 32-bit ARM and x86_64 Flutter engines: BoringSSL's public CRYPTOGAMS author credits in wording the classifier has not reviewed, plus one machine-code byte run that happens to match the address pattern in the 32-bit engine. The arm64-v8a engine's credits are already reviewed, and the Dart app library passes. Neither finding involves personal data or the maintainer's machine. Shipping arm64-v8a only avoids widening the classifier and covers current Android phones; 32-bit-only phones, some low-memory Android Go devices and x86 emulators or Chromebooks cannot install this APK. Adding those ABIs later requires reviewing their engine strings first; see [artifact privacy rules](../security/artifact-privacy-rules.md#android-abi-scope). Building locally is permitted for candidate validation, but a local APK with unresolved personal metadata is not a public release candidate. Freeze the exact APK after inspection; any rebuild needs a new hash and affected checks repeated. Record actual results, never keys, personal certificate fields, private hosts or raw logs in Git.
 
 ## Artifact gates - pending
 
 - [ ] Freeze exact merged source and passing CI; verify locked dependency/notice inputs. No dependency upgrades are included in this preparation.
 - [ ] Verify release package/version/code and Settings stamp; confirm non-debuggable state and merged permissions (no broad media/storage access).
-- [ ] Verify the release signature against the established trusted certificate. Review the certificate's publicly visible identity fields with the maintainer before public upload; do not replace the key to hide identity.
+- [ ] Verify the release signature against the established trusted certificate with `apksigner verify --print-certs app-release.apk` (Android SDK build-tools). Review the printed certificate DN (name, organization, location, email) before public upload: the APK signing block is not a ZIP entry, so `tools/privacy_check.py` **does not scan the certificate**. Do not replace the key to hide identity; that would break updates for existing installs. `keytool -printcert -jarfile` reads only legacy v1 signatures and may print nothing for this APK.
+- [ ] Confirm the APK contains only `lib/arm64-v8a/` native libraries.
 - [ ] Scan the exact APK for credentials, private hosts, personal build paths and other metadata; investigate every finding privately. Do not weaken the classifier to obtain a pass.
 - [ ] Inspect NOTICES/NOTICES.Z, Flutter/engine entries, required native notices and the Guava asset. Its raw SHA-256 must match committed LF provenance without newline normalization. See the native review for scope and limits.
 - [ ] Calculate SHA-256, record file size and provenance. No tags, Releases assets or automatic uploads are authorized by a successful local build.
@@ -69,7 +72,7 @@ A read-only mobile viewer for your own Mail-Archiver: authorized account/folder 
 
 Tap **Try the demo** on setup to explore 70 fictional messages across three accounts without a server. The demo banner stays visible; Exit returns to setup without changing a saved real connection. Demo attachments save only when requested, and confirmed links open in your browser.
 
-This is a prerelease, not a stable release. Mail-Archiver is the only supported backend. Complex mail may use simplified layout. Links and attachments are not malware-scanned; attachment downloads are limited to 50 MiB and two minutes. No sending/deleting mail, offline mail cache, analytics or automatic crash-report upload. This release contains no iOS download.
+This is a prerelease, not a stable release. Mail-Archiver is the only supported backend. Complex mail may use simplified layout. Links and attachments are not malware-scanned; attachment downloads are limited to 50 MiB and two minutes. No sending/deleting mail, offline mail cache, analytics or automatic crash-report upload. The APK is for 64-bit ARM Android phones (arm64-v8a); it will not install on 32-bit-only phones or x86 emulators and Chromebooks. This release contains no iOS download.
 
 The first signed MailBurrow installation is separate from the old MailShelf app; connect once in the new app. Obtain the APK only from the approved release, compare the supplied SHA-256 and report problems using synthetic steps. Release notes must include the actual source/tag, APK checksum, tested platforms and any remaining known limitations after validation.
 

@@ -9,12 +9,14 @@ For signed builds, create your own keystore outside Git, copy root `keystore.pro
 Build only after signing configuration is ready. Pass the same version and build number to Flutter's native version flags and to the app's Settings stamp, matching `version:` in `pubspec.yaml` (currently `0.3.0-rc.9+23`):
 
 ```sh
-flutter build apk --release --build-name=0.3.0-rc.9 --build-number=23 --dart-define=MAILSHELF_BUILD_VERSION=0.3.0-rc.9 --dart-define=MAILSHELF_BUILD_NUMBER=23
+flutter build apk --release --target-platform android-arm64 --build-name=0.3.0-rc.9 --build-number=23 --dart-define=MAILSHELF_BUILD_VERSION=0.3.0-rc.9 --dart-define=MAILSHELF_BUILD_NUMBER=23
 ```
 
 Use the same flags with `flutter build appbundle --release` for an AAB. APK: `build/app/outputs/flutter-apk/app-release.apk`; AAB: `build/app/outputs/bundle/release/app-release.aab`.
 
 The `MAILSHELF_BUILD_*` defines only control what Settings displays; the legacy name is intentional. Without them, including plain `flutter build apk --release` and debug builds, Settings shows **Build information not supplied** rather than claiming a release identity. Never ship a public release unstamped.
+
+Public release APKs target 64-bit ARM only (`--target-platform android-arm64`); the reason and the limits are in the [RC9 candidate guide](android-rc9.md). Check the signing certificate's identity fields with `apksigner verify --print-certs`, because the privacy scan cannot see the APK signing block.
 
 Never commit or upload local artifacts incidentally. Before public distribution verify signature, package/version, non-debuggable flag, merged permissions, notices, privacy metadata, checksum and signed-update/device tests. Run the [device testing checklist](../testing/device-checklist.md) on the exact APK.
 
