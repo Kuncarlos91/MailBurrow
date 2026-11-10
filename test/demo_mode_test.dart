@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -147,7 +148,22 @@ void main() {
       expect(banner, findsOneWidget);
       expect(find.text('Exit').hitTestable(), findsOneWidget);
       final error = tester.takeException();
-      expect(error is FlutterError ? error.toStringDeep() : error, isNull);
+      final details = <String>[];
+      for (final object in tester.allRenderObjects) {
+        if (object is RenderFlex && object.toString().contains('OVERFLOWING')) {
+          final creator = object.debugCreator;
+          final chain = <String>[];
+          if (creator is DebugCreator) {
+            chain.add(creator.element.widget.runtimeType.toString());
+            creator.element.visitAncestorElements((element) {
+              chain.add(element.widget.runtimeType.toString());
+              return chain.length < 14;
+            });
+          }
+          details.add('${object.size} ${object.constraints} ${chain.join(' < ')}');
+        }
+      }
+      expect(error == null ? null : details.join(' || '), isNull);
     });
   }
 }
