@@ -146,7 +146,8 @@ void main() {
       await startDemo(tester);
       expect(banner, findsOneWidget);
       expect(find.text('Exit').hitTestable(), findsOneWidget);
-      expect(tester.takeException(), isNull);
+      final error = tester.takeException();
+      expect(error is FlutterError ? error.toStringDeep() : error, isNull);
     });
   }
 }
