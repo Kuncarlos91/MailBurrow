@@ -15,21 +15,31 @@ class DemoBanner extends StatelessWidget {
       color: colors.tertiaryContainer,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        child: Row(
+        // Wrap moves Exit onto its own line when large text leaves no room
+        // beside the label, instead of squeezing the label.
+        child: Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
           children: [
-            Icon(Icons.science_outlined, color: colors.onTertiaryContainer),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Semantics(
-                header: true,
-                child: Text(
-                  'Demo · sample mail',
-                  style: TextStyle(
-                    color: colors.onTertiaryContainer,
-                    fontWeight: FontWeight.w600,
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.science_outlined, color: colors.onTertiaryContainer),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: Semantics(
+                    header: true,
+                    child: Text(
+                      'Demo · sample mail',
+                      style: TextStyle(
+                        color: colors.onTertiaryContainer,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
             TextButton(
               onPressed: onExit,
