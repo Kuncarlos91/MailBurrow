@@ -36,6 +36,8 @@ void main() {
       120,
       scrollable: find.byType(Scrollable).first,
     );
+    await tester.ensureVisible(button);
+    await tester.pumpAndSettle();
     await tester.tap(button);
     await tester.pumpAndSettle();
   }
@@ -122,7 +124,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Message'), findsOneWidget);
-    expect(find.textContaining('fictional sample mail'), findsWidgets);
+    expect(find.text('Welcome to the MailBurrow demo'), findsOneWidget);
     expect(banner, findsOneWidget);
     await tester.tap(find.text('Exit'));
     await tester.pumpAndSettle();

@@ -55,6 +55,11 @@ class SetupView extends StatelessWidget {
           onPressed: busy ? null : () => session.connect(),
           child: const Text('Connect to archive'),
         ),
+        if (session.hasSavedConnection)
+          TextButton(
+            onPressed: busy ? null : session.restore,
+            child: const Text('Retry saved connection'),
+          ),
         if (!session.demo) ...[
           const SizedBox(height: 12),
           OutlinedButton.icon(
@@ -69,11 +74,6 @@ class SetupView extends StatelessWidget {
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
-        if (session.hasSavedConnection)
-          TextButton(
-            onPressed: busy ? null : session.restore,
-            child: const Text('Retry saved connection'),
-          ),
         const SizedBox(height: 16),
         const Text(
           'Configure your own server and private-network access. If your server uses Tailscale, connect its app first. Connection details are saved securely on this device.',
