@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mailburrow/demo/demo_archive.dart';
 import 'package:mailburrow/screens/archive_home.dart';
+import 'package:mailburrow/screens/setup_view.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -133,6 +134,60 @@ void main() {
     expect(find.text('Connect to archive'), findsOneWidget);
   });
 
+  Future<void> openConnectionSettings(WidgetTester tester) async {
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Settings'));
+    await tester.pumpAndSettle();
+    final tile = find.text('Connection settings');
+    await tester.scrollUntilVisible(
+      tile,
+      120,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.ensureVisible(tile);
+    await tester.pumpAndSettle();
+    await tester.tap(tile);
+    await tester.pumpAndSettle();
+    expect(find.byType(SetupView), findsOneWidget);
+  }
+
+  testWidgets('Connection settings keeps the banner; Cancel and Exit work', (
+    tester,
+  ) async {
+    await tester.pumpWidget(app());
+    await tester.pumpAndSettle();
+    await startDemo(tester);
+
+    await openConnectionSettings(tester);
+    expect(banner, findsOneWidget);
+    expect(find.text('Try the demo'), findsNothing);
+    final cancel = find.text('Cancel');
+    await tester.scrollUntilVisible(
+      cancel,
+      120,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.ensureVisible(cancel);
+    await tester.pumpAndSettle();
+    await tester.tap(cancel);
+    await tester.pumpAndSettle();
+    expect(banner, findsOneWidget);
+    expect(find.byType(SetupView), findsNothing);
+
+    await openConnectionSettings(tester);
+    expect(banner, findsOneWidget);
+    await tester.tap(find.text('Exit'));
+    await tester.pumpAndSettle();
+    expect(banner, findsNothing);
+    expect(find.text('Connect to archive'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Try the demo'),
+      120,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Try the demo'), findsOneWidget);
+    expect(find.text('Cancel'), findsNothing);
+  });
+
   for (final size in [const Size(320, 640), const Size(780, 360)]) {
     testWidgets('demo entry and banner fit at 3x text in $size', (
       tester,
@@ -146,6 +201,15 @@ void main() {
       await startDemo(tester);
       expect(banner, findsOneWidget);
       expect(find.text('Exit').hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await openConnectionSettings(tester);
+      expect(banner, findsOneWidget);
+      expect(find.text('Exit').hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.text('Exit'));
+      await tester.pumpAndSettle();
+      expect(banner, findsNothing);
       expect(tester.takeException(), isNull);
     });
   }

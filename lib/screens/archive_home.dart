@@ -267,7 +267,9 @@ class _ArchiveHomeState extends State<ArchiveHome> {
       body: SafeArea(
         child: Column(
           children: [
-            if (s.demo && !s.setup)
+            // Shown on every screen while the demo is open, including setup
+            // opened from Settings, so a demo screen is never unlabelled.
+            if (s.demo)
               DemoBanner(onExit: s.accountSwitching ? null : s.exitDemo),
             Expanded(child: _content(context, s, mailView)),
           ],
