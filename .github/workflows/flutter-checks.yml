@@ -59,18 +59,25 @@ jobs:
           code=$?
           python3 - <<'PY'
           import json
-          tests, errors = {}, {}
+          tests, logs, failed = {}, {}, []
           for line in open('/tmp/results.json'):
               try: e = json.loads(line)
               except Exception: continue
-              if e.get('type') == 'testStart':
+              kind = e.get('type')
+              if kind == 'testStart':
                   t = e['test']; tests[t['id']] = (t['name'], t.get('root_url') or t.get('url') or '', t.get('root_line') or t.get('line') or 1)
-              elif e.get('type') == 'error':
-                  errors.setdefault(e['testID'], []).append(e['error'])
-          for tid, errs in list(errors.items())[:10]:
+              elif kind == 'error':
+                  logs.setdefault(e['testID'], []).append(e.get('error', ''))
+              elif kind == 'print' and e.get('testID') is not None:
+                  logs.setdefault(e['testID'], []).append(e.get('message', ''))
+              elif kind == 'testDone' and e.get('result') != 'success' and not e.get('hidden'):
+                  failed.append(e['testID'])
+          for tid in failed[:10]:
               name, url, line = tests.get(tid, ('?', '', 1))
               path = url.split('/MailBurrow/')[-1] if url else 'test'
-              msg = ' | '.join(x.replace('\n', ' ')[:600] for x in errs)[:1500]
+              lines = [l.strip() for l in '\n'.join(logs.get(tid, [])).splitlines()]
+              keep = [l for l in lines if l and not l.startswith(('═', '#', 'When the exception', 'The test description', 'Test failed', 'package:'))]
+              msg = ' | '.join(keep)[:3500].replace('%', '%25').replace('\r', '').replace('\n', ' ')
               print(f"::error file={path},line={line},title={name[:120]}::{msg}")
           PY
           exit $code
