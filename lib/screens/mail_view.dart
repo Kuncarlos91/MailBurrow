@@ -269,7 +269,11 @@ class MailView extends StatelessWidget {
           : null,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute<void>(
-          builder: (_) => MessageReader(api: session.api!, id: mail['id'] as int),
+          builder: (_) => MessageReader(
+            api: session.api!,
+            id: mail['id'] as int,
+            onExitDemo: session.demo ? session.exitDemo : null,
+          ),
         ),
       ),
     );

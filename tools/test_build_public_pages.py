@@ -14,7 +14,7 @@ class PublicPagesTests(unittest.TestCase):
             self.assertNotIn("{{", result)
             self.assertIn("Carlos Diaz", result)
             self.assertNotRegex(result, r"(?i)review draft|not published|planned pages|when this notice is finalized")
-            self.assertIn("November 8, 2026", result)
+            self.assertIn("November 9, 2026", result)
             if path.name == "privacy.html":
                 self.assertIn("Effective November 5, 2026", result)
             self.assertNotRegex(result, r"(?i)<(?:script|iframe|form|img)\b")
@@ -105,6 +105,9 @@ class PublicPackageTests(unittest.TestCase):
         self.assertIn("Each month", privacy)
         self.assertIn("12 months or more", privacy)
         self.assertIn("leave file-operation diagnostic tracing disabled", privacy)
+        self.assertIn("Try the demo", support)
+        self.assertIn("connects to no server", support)
+        self.assertIn("connects to no server, sends nothing over the network", privacy)
         self.assertNotIn("Final SDK", privacy)
         self.assertNotIn("Review still required before publication", privacy)
         for page in (support, privacy):

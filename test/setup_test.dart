@@ -11,6 +11,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Connect to archive'), findsOneWidget);
     expect(find.text('MailBurrow'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Support'),
+      120,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('Support'), findsOneWidget);
     expect(find.text('Privacy notice'), findsOneWidget);
     final fields = tester

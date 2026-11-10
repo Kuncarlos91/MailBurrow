@@ -34,7 +34,9 @@ class SettingsView extends StatelessWidget {
           child: ListTile(
             leading: const Icon(Icons.dns_outlined),
             title: Text(accountAddress(account ?? {})),
-            subtitle: Text(api?.server.host ?? ''),
+            subtitle: Text(
+              session.demo ? 'Built-in demo, no server' : api?.server.host ?? '',
+            ),
             trailing: const Icon(Icons.unfold_more),
             onTap: session.canSwitchAccount ? onChooseAccount : null,
           ),
@@ -44,12 +46,21 @@ class SettingsView extends StatelessWidget {
           trailing: const Icon(Icons.chevron_right),
           onTap: busy ? null : session.openSetup,
         ),
-        const ListTile(
-          title: Text('Server and private network'),
-          subtitle: Text(
-            'You manage your Mail-Archiver server, HTTPS address, API keys and Tailscale setup. This app does not host or configure those services.',
+        if (session.demo)
+          const ListTile(
+            leading: Icon(Icons.science_outlined),
+            title: Text('Demo mode'),
+            subtitle: Text(
+              'Fictional sample mail built into the app. The demo connects to no server, sends nothing over the network and saves no connection or credentials. Saving an attachment or opening a link you confirm works as it does with a real archive.',
+            ),
+          )
+        else
+          const ListTile(
+            title: Text('Server and private network'),
+            subtitle: Text(
+              'You manage your Mail-Archiver server, HTTPS address, API keys and Tailscale setup. This app does not host or configure those services.',
+            ),
           ),
-        ),
         const ListTile(
           title: Text('Appearance'),
           subtitle: Text('Follows system light / dark theme'),
@@ -70,10 +81,16 @@ class SettingsView extends StatelessWidget {
           title: Text('MailBurrow'),
           subtitle: Text(buildInformation),
         ),
-        TextButton(
-          onPressed: busy ? null : session.forgetConnection,
-          child: const Text('Disconnect and forget connection'),
-        ),
+        if (session.demo)
+          TextButton(
+            onPressed: session.accountSwitching ? null : session.exitDemo,
+            child: const Text('Exit demo'),
+          )
+        else
+          TextButton(
+            onPressed: busy ? null : session.forgetConnection,
+            child: const Text('Disconnect and forget connection'),
+          ),
       ],
     );
   }

@@ -4,6 +4,8 @@
 
 MailBurrow is a phone app for reading the mail you already archive with [Mail-Archiver](https://github.com/s1t5/mail-archiver). It talks only to your Mail-Archiver server, over HTTPS, with an API key you create. This guide covers how the pieces fit together and the exact settings each one needs.
 
+To see what the app looks like before setting anything up, tap **Try the demo** on the setup screen: it opens fictional sample mail built into the app, with no server needed.
+
 Checked against Mail-Archiver's [REST API guide](https://github.com/s1t5/mail-archiver/blob/main/doc/API.md), the TrueNAS Mail Archiver and Tailscale apps, and Tailscale's HTTPS and Serve documentation, as of November 2026. Menu names can change between versions.
 
 ## How it works

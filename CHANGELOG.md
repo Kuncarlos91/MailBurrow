@@ -7,9 +7,11 @@ All notable changes to MailBurrow are recorded here. Versions follow the app ver
 Android candidate for the first public APK prerelease. No APK, tag or release is published by this source change. See the [candidate guide](docs/releasing/android-rc9.md) for draft notes and pending artifact/device gates.
 
 - Advance source version from RC8/build22; preserve the established MailBurrow app ID and signing configuration.
+- **Demo mode:** **Try the demo** opens 70 fictional messages across three accounts, with folders, dates and 11 small attachments, without a server. A labelled banner remains visible throughout demo mode, including Connection settings and the reader; exit returns to setup without changing the saved connection.
+- Include the merged demo documentation, privacy wording and Android dark-mode screenshots.
 - Include the shared backend interface and independent backend tests, updated support/privacy destinations, community policies and native-notice provenance now in public source.
 - Enforce canonical LF bytes for bundled notice assets, with checksum regression coverage.
-- No new mail feature, backend, dependency, permission or iOS upload is part of this preparation.
+- No dependency, permission or iOS upload change is included. Signed candidate inspection and exact-artifact device checks remain pending.
 
 ## Initial public source preview
 

@@ -1,2 +1,8 @@
 # Keep bundled third-party notice bytes identical across build hosts.
 assets/licenses/*.txt text eol=lf
+# Generated demo attachments: PDFs and PNGs are binary; text files stay LF.
+assets/demo/attachments/*.pdf binary
+assets/demo/attachments/*.png binary
+assets/demo/attachments/*.txt text eol=lf
+assets/demo/attachments/*.html text eol=lf
+assets/demo/archive.json text eol=lf

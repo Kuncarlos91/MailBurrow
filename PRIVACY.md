@@ -22,6 +22,10 @@ MailBurrow is a read-only phone app for a [Mail-Archiver](https://github.com/s1t
 - Opening a link hands the full address, including any tracking parameters, to another app under that app's policies. Plain-HTTP links get an extra warning; the app's own server requests are always HTTPS.
 - On iOS, permission to reopen a saved file lasts only while you're viewing that message; nothing is saved for later. On Android, the app keeps the read permission the system grants for a saved file while you use it and releases it afterwards where possible; it keeps no history of saved files and asks for no broad media permission.
 
+## Demo mode
+
+**Try the demo** opens fictional sample mail that is built into the app. The demo connects to no server, sends nothing over the network and does not save or change any connection or credentials. If you save a demo attachment, it goes through the normal save dialog to the place you choose, and a demo link you confirm opens in your browser like any other link. Demo addresses and links use reserved documentation domains, not real customer addresses; a demo link may not load or may lead to an informational page rather than a working service.
+
 ## What the app never does
 
 MailBurrow never sends, edits, deletes or uploads mail. It only reads what your API key allows.
