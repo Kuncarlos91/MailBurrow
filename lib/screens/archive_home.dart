@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../account_selector.dart';
 import '../archive_models.dart';
 import '../archive_backend.dart';
+import '../demo/demo_banner.dart';
 import '../pagination.dart';
 import '../search_filters.dart';
 import '../state/archive_session.dart';
@@ -16,14 +17,18 @@ import 'setup_view.dart';
 /// State and requests live in [ArchiveSession]. This widget owns only UI
 /// concerns: dialogs and sheets, snackbars, focus and scrolling.
 class ArchiveHome extends StatefulWidget {
-  const ArchiveHome({super.key, this.apiFactory});
+  const ArchiveHome({super.key, this.apiFactory, this.demoLoader});
   final ArchiveBackend Function(Uri, String)? apiFactory;
+  final Future<ArchiveBackend> Function()? demoLoader;
   @override
   State<ArchiveHome> createState() => _ArchiveHomeState();
 }
 
 class _ArchiveHomeState extends State<ArchiveHome> {
-  late final session = ArchiveSession(apiFactory: widget.apiFactory);
+  late final session = ArchiveSession(
+    apiFactory: widget.apiFactory,
+    demoLoader: widget.demoLoader,
+  );
   final mailScroll = ScrollController();
   final searchFocus = FocusNode();
   final searchFieldKey = GlobalKey();
@@ -260,7 +265,39 @@ class _ArchiveHomeState extends State<ArchiveHome> {
         ],
       ),
       body: SafeArea(
-        child: !s.setup && s.tab != 2
+        child: Column(
+          children: [
+            if (s.demo && !s.setup)
+              DemoBanner(onExit: s.accountSwitching ? null : s.exitDemo),
+            Expanded(child: _content(context, s, mailView)),
+          ],
+        ),
+      ),
+      bottomNavigationBar: s.setup
+          ? null
+          : NavigationBar(
+              selectedIndex: s.tab,
+              onDestinationSelected: s.accountSwitching ? null : selectTab,
+              destinations: const [
+                NavigationDestination(
+                  icon: Icon(Icons.inbox_outlined),
+                  label: 'Mail',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.search),
+                  label: 'Search',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.settings_outlined),
+                  label: 'Settings',
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _content(BuildContext context, ArchiveSession s, Widget mailView) =>
+      !s.setup && s.tab != 2
             ? Column(
                 children: [
                   if (s.accountLoading) const AccountSwitchProgress(),
@@ -294,28 +331,5 @@ class _ArchiveHomeState extends State<ArchiveHome> {
                         : mailView,
                   ),
                 ],
-              ),
-      ),
-      bottomNavigationBar: s.setup
-          ? null
-          : NavigationBar(
-              selectedIndex: s.tab,
-              onDestinationSelected: s.accountSwitching ? null : selectTab,
-              destinations: const [
-                NavigationDestination(
-                  icon: Icon(Icons.inbox_outlined),
-                  label: 'Mail',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.search),
-                  label: 'Search',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.settings_outlined),
-                  label: 'Settings',
-                ),
-              ],
-            ),
-    );
-  }
+              );
 }

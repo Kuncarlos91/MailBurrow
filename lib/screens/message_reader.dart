@@ -4,13 +4,23 @@ import '../archive_errors.dart';
 import '../archive_backend.dart';
 import '../attachments.dart';
 import '../content_safety.dart';
+import '../demo/demo_banner.dart';
 import '../message_body.dart';
 import '../message_date.dart';
 
 class MessageReader extends StatefulWidget {
-  const MessageReader({super.key, required this.api, required this.id});
+  const MessageReader({
+    super.key,
+    required this.api,
+    required this.id,
+    this.onExitDemo,
+  });
   final ArchiveBackend api;
   final int id;
+
+  /// Set while the built-in demo is open: shows the demo banner, whose Exit
+  /// closes this message and then leaves the demo.
+  final VoidCallback? onExitDemo;
   @override
   State<MessageReader> createState() => _MessageReaderState();
 }
@@ -36,7 +46,22 @@ class _MessageReaderState extends State<MessageReader> {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Message')),
     body: SafeArea(
-      child: FutureBuilder<Map<String, dynamic>>(
+      child: Column(
+        children: [
+          if (widget.onExitDemo case final exit?)
+            DemoBanner(
+              onExit: () {
+                Navigator.of(context).pop();
+                exit();
+              },
+            ),
+          Expanded(child: _message(context)),
+        ],
+      ),
+    ),
+  );
+
+  Widget _message(BuildContext context) => FutureBuilder<Map<String, dynamic>>(
         future: result,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
@@ -112,7 +137,5 @@ class _MessageReaderState extends State<MessageReader> {
             ),
           );
         },
-      ),
-    ),
-  );
+      );
 }

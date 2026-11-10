@@ -48,12 +48,21 @@ class DemoArchive implements ArchiveBackend {
   }) async {
     final source = bundle ?? rootBundle;
     final text = await source.loadString(demoArchiveAsset, cache: false);
-    return DemoArchive._(
-      jsonDecode(text) as Map<String, dynamic>,
-      source,
-      latency,
-    );
+    return DemoArchive.parse(text, bundle: source, latency: latency);
   }
+
+  /// Builds a demo archive from already-loaded archive JSON. Attachments are
+  /// still read from [bundle] when saved. Widget tests use this to avoid
+  /// asset I/O inside the fake test clock.
+  static DemoArchive parse(
+    String archiveJson, {
+    AssetBundle? bundle,
+    Duration latency = const Duration(milliseconds: 250),
+  }) => DemoArchive._(
+    jsonDecode(archiveJson) as Map<String, dynamic>,
+    bundle ?? rootBundle,
+    latency,
+  );
 
   final AssetBundle _bundle;
   final Duration _latency;

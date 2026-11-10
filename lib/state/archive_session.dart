@@ -6,11 +6,15 @@ import '../archive_api.dart' show ArchiveApi, validateServer;
 import '../archive_models.dart';
 import '../archive_errors.dart';
 import '../archive_backend.dart';
+import '../demo/demo_archive.dart';
 import '../search_filters.dart';
 import 'connection_store.dart';
 
 /// Creates the backend for a validated server address and key.
 typedef ArchiveApiFactory = ArchiveBackend Function(Uri server, String key);
+
+/// Opens the built-in demo archive.
+typedef DemoArchiveLoader = Future<ArchiveBackend> Function();
 
 /// Connection, account and mailbox state behind the archive home screen.
 ///
@@ -24,11 +28,14 @@ typedef ArchiveApiFactory = ArchiveBackend Function(Uri server, String key);
 class ArchiveSession extends ChangeNotifier {
   ArchiveSession({
     ArchiveApiFactory? apiFactory,
+    DemoArchiveLoader? demoLoader,
     ConnectionStore store = const ConnectionStore(),
   }) : _apiFactory = apiFactory ?? ArchiveApi.new,
+       _demoLoader = demoLoader ?? DemoArchive.load,
        _store = store;
 
   final ArchiveApiFactory _apiFactory;
+  final DemoArchiveLoader _demoLoader;
   final ConnectionStore _store;
   final server = TextEditingController();
   final keyInput = TextEditingController();
@@ -60,6 +67,11 @@ class ArchiveSession extends ChangeNotifier {
   int tab = 0, page = 1, totalPages = 1;
   bool busy = true, setup = true;
   bool hasSavedConnection = false;
+
+  /// True while the built-in demo archive is open. The demo is never saved:
+  /// entering, browsing and exiting it never read, write or delete the saved
+  /// connection, so a real connection saved earlier is kept.
+  bool demo = false;
   bool reloadPending = false;
   bool mailLoading = false;
   int mailRequestId = 0;
@@ -211,6 +223,7 @@ class ArchiveSession extends ChangeNotifier {
       _clearBrowsing();
       api = created;
       adopted = true;
+      demo = false;
       account = selected;
       accountNotice = accountUnavailable
           ? 'Previously selected account is no longer available. Showing an accessible account.'
@@ -264,11 +277,14 @@ class ArchiveSession extends ChangeNotifier {
     mailRequestFailed = false;
     _notify();
     try {
-      await _store.write(
-        server: requestApi.server.toString(),
-        key: requestApi.key,
-        accountId: choice['id'],
-      );
+      // The demo is never saved, so its account choice is not stored either.
+      if (!demo) {
+        await _store.write(
+          server: requestApi.server.toString(),
+          key: requestApi.key,
+          accountId: choice['id'],
+        );
+      }
     } catch (_) {
       if (!_disposed && identical(api, requestApi)) {
         busy = false;
@@ -475,6 +491,10 @@ class ArchiveSession extends ChangeNotifier {
   }
 
   Future<void> forgetConnection() async {
+    if (demo) {
+      exitDemo();
+      return;
+    }
     try {
       await _store.delete();
       if (_disposed) return;
@@ -501,5 +521,83 @@ class ArchiveSession extends ChangeNotifier {
         _notify();
       }
     }
+  }
+
+  /// Opens the built-in demo archive of fictional mail.
+  ///
+  /// Unlike [connect], nothing is validated, sent over the network or saved:
+  /// the saved connection and the setup fields are left as they are.
+  Future<void> startDemo() async {
+    if (demo && !setup) return;
+    mailRequestFailed = false;
+    accountSwitchGeneration++;
+    accountLoading = false;
+    busy = true;
+    error = null;
+    _notify();
+    ArchiveBackend? candidate;
+    var adopted = false;
+    try {
+      final created = candidate = await _demoLoader();
+      final accounts = (await created.accounts()).cast<Map<String, dynamic>>();
+      if (accounts.isEmpty) throw const ArchiveFailure(404);
+      final selected = accounts.first;
+      final result = await created.emails(selected['id'] as int, '', 1);
+      if (_disposed) return;
+      if (!identical(api, created)) api?.close();
+      _invalidateRequests();
+      _clearBrowsing();
+      activeQuery = '';
+      api = created;
+      adopted = true;
+      demo = true;
+      account = selected;
+      accountNotice = null;
+      messages = result['items'] as List<dynamic>;
+      totalPages = (result['totalPages'] as int).clamp(1, 1000000);
+      setup = false;
+      _notify();
+      await loadFolders();
+    } catch (_) {
+      if (!_disposed) {
+        error = 'Could not open the demo. Try again.';
+        _notify();
+      }
+    } finally {
+      if (!adopted) candidate?.close();
+      if (!_disposed && !mailLoading) {
+        busy = false;
+        _notify();
+      }
+    }
+  }
+
+  /// Leaves the demo and returns to setup.
+  ///
+  /// Stops demo requests and attachment copies in progress; their late
+  /// results are ignored. The saved connection is not touched, so
+  /// "Retry saved connection" still works afterwards.
+  void exitDemo() {
+    if (!demo) return;
+    api?.close();
+    _invalidateRequests();
+    _clearBrowsing();
+    activeQuery = '';
+    activeMailPage = 1;
+    searchElapsed = Duration.zero;
+    reloadPending = false;
+    api = null;
+    demo = false;
+    account = null;
+    accountNotice = null;
+    accountLoading = false;
+    accountSwitching = false;
+    accountSwitchGeneration++;
+    mailRequestFailed = false;
+    messages = [];
+    setup = true;
+    busy = false;
+    error = null;
+    _notify();
   }
 }

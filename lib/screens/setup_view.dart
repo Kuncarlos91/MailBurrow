@@ -55,6 +55,20 @@ class SetupView extends StatelessWidget {
           onPressed: busy ? null : () => session.connect(),
           child: const Text('Connect to archive'),
         ),
+        if (!session.demo) ...[
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: busy ? null : session.startDemo,
+            icon: const Icon(Icons.science_outlined),
+            label: const Text('Try the demo'),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Sample mail built into the app. No server needed.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
         if (session.hasSavedConnection)
           TextButton(
             onPressed: busy ? null : session.restore,
