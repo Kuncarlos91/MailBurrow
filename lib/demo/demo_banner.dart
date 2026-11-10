@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 
 /// Label shown on every screen while the built-in demo is open, so a
 /// screenshot or screen recording cannot be mistaken for a real archive.
+///
+/// Like other persistent bars, its text scaling is capped at 2x so that at
+/// the largest accessibility sizes it stays one compact row instead of
+/// taking over the screen; the label may wrap to a second line.
 class DemoBanner extends StatelessWidget {
   const DemoBanner({super.key, required this.onExit});
 
@@ -11,44 +15,40 @@ class DemoBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return Material(
-      color: colors.tertiaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        // Wrap moves Exit onto its own line when large text leaves no room
-        // beside the label, instead of squeezing the label.
-        child: Wrap(
-          alignment: WrapAlignment.spaceBetween,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: 8,
-          children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.science_outlined, color: colors.onTertiaryContainer),
-                const SizedBox(width: 12),
-                Flexible(
-                  child: Semantics(
-                    header: true,
-                    child: Text(
-                      'Demo · sample mail',
-                      style: TextStyle(
-                        color: colors.onTertiaryContainer,
-                        fontWeight: FontWeight.w600,
-                      ),
+    return MediaQuery.withClampedTextScaling(
+      maxScaleFactor: 2,
+      child: Material(
+        color: colors.tertiaryContainer,
+        child: Padding(
+          padding: const EdgeInsets.only(left: 16, right: 8),
+          child: Row(
+            children: [
+              Icon(Icons.science_outlined, color: colors.onTertiaryContainer),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Semantics(
+                  header: true,
+                  child: Text(
+                    'Demo · sample mail',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: colors.onTertiaryContainer,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
-              ],
-            ),
-            TextButton(
-              onPressed: onExit,
-              style: TextButton.styleFrom(
-                foregroundColor: colors.onTertiaryContainer,
               ),
-              child: const Text('Exit'),
-            ),
-          ],
+              TextButton(
+                onPressed: onExit,
+                style: TextButton.styleFrom(
+                  foregroundColor: colors.onTertiaryContainer,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+                child: const Text('Exit'),
+              ),
+            ],
+          ),
         ),
       ),
     );
