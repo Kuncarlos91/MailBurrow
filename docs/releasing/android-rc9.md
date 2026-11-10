@@ -18,7 +18,7 @@
 
 The older MailShelf Flutter Preview release used a different application ID. This first signed MailBurrow build installs beside it and requires entering the connection once. An existing same-ID signed MailBurrow install can update only with compatible signing and a higher version code. Never uninstall a working baseline just to make an update test pass. Debug installs are separate and are not signing/upgrade evidence for this APK.
 
-This candidate allocates an Android build number only. It does not allocate an App Store Connect build number or publish an iOS build; future iOS uploads must use a separately verified increasing native build number.
+This candidate allocates an Android build number only. It does not allocate an App Store Connect build number or publish an iOS build; future iOS uploads must use a separately verified increasing native build number. iOS uploads must also override the source prerelease version with a numeric version such as `--build-name=0.3.0`; [Apple requires three period-separated integers for CFBundleShortVersionString](https://developer.apple.com/documentation/bundleresources/information-property-list/cfbundleshortversionstring), so `0.3.0-rc.9` is not a valid iOS upload version. Keep the Settings build defines consistent with the separately chosen iOS version and build number; do not reuse the Android build23 command for an iOS upload.
 
 ## Included source and remaining validation
 
@@ -44,7 +44,7 @@ Expected output: `build/app/outputs/flutter-apk/app-release.apk`. Building local
 
 - [ ] Freeze exact merged source and passing CI; verify locked dependency/notice inputs. No dependency upgrades are included in this preparation.
 - [ ] Verify release package/version/code and Settings stamp; confirm non-debuggable state and merged permissions (no broad media/storage access).
-- [ ] Verify the release signature against the established trusted certificate. Review the certificate's publicly visible identity fields with the owner before public upload; do not replace the key to hide identity.
+- [ ] Verify the release signature against the established trusted certificate. Review the certificate's publicly visible identity fields with the maintainer before public upload; do not replace the key to hide identity.
 - [ ] Scan the exact APK for credentials, private hosts, personal build paths and other metadata; investigate every finding privately. Do not weaken the classifier to obtain a pass.
 - [ ] Inspect NOTICES/NOTICES.Z, Flutter/engine entries, required native notices and the Guava asset. Its raw SHA-256 must match committed LF provenance without newline normalization. See the native review for scope and limits.
 - [ ] Calculate SHA-256, record file size and provenance. No tags, Releases assets or automatic uploads are authorized by a successful local build.
@@ -67,7 +67,7 @@ Use harmless synthetic content. Record Pass/Fail/Not tested, device/OS and exact
 
 A read-only mobile viewer for your own Mail-Archiver: authorized account/folder browsing, server-side search and filters, paging, simplified message reading, and explicit attachment save/open. Configure your own compatible archive, trusted HTTPS endpoint, scoped API key and private-network access if needed. The project does not provide hosting or mail accounts.
 
-Try **Try the demo** on setup to explore 70 fictional messages across three accounts without a server. The demo banner stays visible; Exit returns to setup without changing a saved real connection. Demo attachments save only when requested, and confirmed links open in your browser.
+Tap **Try the demo** on setup to explore 70 fictional messages across three accounts without a server. The demo banner stays visible; Exit returns to setup without changing a saved real connection. Demo attachments save only when requested, and confirmed links open in your browser.
 
 This is a prerelease, not a stable release. Mail-Archiver is the only supported backend. Complex mail may use simplified layout. Links and attachments are not malware-scanned; attachment downloads are limited to 50 MiB and two minutes. No sending/deleting mail, offline mail cache, analytics or automatic crash-report upload. This release contains no iOS download.
 
