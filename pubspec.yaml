@@ -24,3 +24,5 @@ flutter:
   uses-material-design: true
   assets:
     - assets/licenses/guava-listenablefuture-1.0.txt
+    - assets/demo/
+    - assets/demo/attachments/
