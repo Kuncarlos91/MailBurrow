@@ -53,4 +53,24 @@ jobs:
       - name: Analyze code
         run: flutter analyze --no-pub --fatal-infos
       - name: Run tests
-        run: flutter test --no-pub --reporter github
+        run: |
+          set +e
+          flutter test --no-pub --reporter json > /tmp/results.json
+          code=$?
+          python3 - <<'PY'
+          import json
+          tests, errors = {}, {}
+          for line in open('/tmp/results.json'):
+              try: e = json.loads(line)
+              except Exception: continue
+              if e.get('type') == 'testStart':
+                  t = e['test']; tests[t['id']] = (t['name'], t.get('root_url') or t.get('url') or '', t.get('root_line') or t.get('line') or 1)
+              elif e.get('type') == 'error':
+                  errors.setdefault(e['testID'], []).append(e['error'])
+          for tid, errs in list(errors.items())[:10]:
+              name, url, line = tests.get(tid, ('?', '', 1))
+              path = url.split('/MailBurrow/')[-1] if url else 'test'
+              msg = ' | '.join(x.replace('\n', ' ')[:600] for x in errs)[:1500]
+              print(f"::error file={path},line={line},title={name[:120]}::{msg}")
+          PY
+          exit $code
