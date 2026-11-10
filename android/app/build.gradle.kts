@@ -76,3 +76,8 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // JVM-only regression coverage for saved-document viewer selection.
+    testImplementation("junit:junit:4.13.2")
+}

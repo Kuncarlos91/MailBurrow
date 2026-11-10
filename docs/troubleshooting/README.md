@@ -48,6 +48,7 @@ Save and Open have separate confirmations. There is no malware scanning; do not 
 | Could not save | Check the destination/provider/storage and retry. An incomplete provider file may remain. A new download needs network access. |
 | Unavailable after leaving/reopening the reader | Open handles last only for the reader session. Use Files or save again. Moving/deleting a file or provider permission changes also end access. |
 | Cloud provider (for example Nextcloud) fails to open | Try saving to local storage to compare, and report the provider, file type and whether it failed on the first or a later Open. |
+| Wrong viewers offered for a PDF after repeated Open | Current Android source retains the saved PDF type during the reader session. If it still happens, report build, storage provider, first versus later Open and offered app categories; omit filenames, paths and contents. A PDF extension is not proof of safe content. |
 | No viewer | Use Files or a trusted viewer for the expected format; do not execute an attachment to diagnose it. |
 
 ## Demo mode
