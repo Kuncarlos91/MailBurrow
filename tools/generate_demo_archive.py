@@ -4,9 +4,11 @@ Writes assets/demo/archive.json and small attachment files under
 assets/demo/attachments/. Output is deterministic: no randomness, clock or
 network. Every person, business and address is invented. Addresses and
 links use only domains reserved for documentation (RFC 2606): example.com,
-example.org, example.net and names under .example, so businesses can have
-distinct, realistic-looking addresses that can never belong to anyone. The
-repository privacy check accepts exactly these. Run with --check to verify
+example.org, example.net and names under .example. These are not real
+customer addresses, so the fictional businesses can have distinct,
+realistic-looking addresses; demo links may not load or may reach an
+informational page rather than a working service. The repository privacy
+check accepts exactly these. Run with --check to verify
 committed files are current.
 """
 import argparse

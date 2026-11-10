@@ -24,7 +24,7 @@ MailBurrow is a read-only phone app for a [Mail-Archiver](https://github.com/s1t
 
 ## Demo mode
 
-**Try the demo** opens fictional sample mail that is built into the app. The demo connects to no server, sends nothing over the network and does not save or change any connection or credentials. If you save a demo attachment, it goes through the normal save dialog to the place you choose, and a demo link you confirm opens in your browser like any other link. Demo links point to reserved example addresses that belong to no one.
+**Try the demo** opens fictional sample mail that is built into the app. The demo connects to no server, sends nothing over the network and does not save or change any connection or credentials. If you save a demo attachment, it goes through the normal save dialog to the place you choose, and a demo link you confirm opens in your browser like any other link. Demo addresses and links use reserved documentation domains, not real customer addresses; a demo link may not load or may lead to an informational page rather than a working service.
 
 ## What the app never does
 
