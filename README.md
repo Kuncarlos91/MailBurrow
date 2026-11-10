@@ -6,6 +6,8 @@ MailBurrow is an early source preview. There is no public signed download yet an
 
 <img src="docs/images/setup-screen.png" alt="MailBurrow setup screen with fields for the HTTPS server address and API key, a Connect to archive button, and Support and Privacy notice links" width="270">
 
+> **Just want to look around first?** Tap **Try the demo** on the setup screen. It opens fictional sample mail built into the app, with no server, account or network needed. See [Try it without a server](#try-it-without-a-server).
+
 > **New here? Start with the [setup guide](docs/setup-guide.md).** It shows how MailBurrow, Mail-Archiver and your HTTPS address fit together, with step-by-step settings for Mail-Archiver's API, TrueNAS and Tailscale, and fixes for common connection errors.
 
 ## What you need before connecting
@@ -17,6 +19,14 @@ MailBurrow is a client for an archive you run yourself. It is not a hosted email
 3. If your server is only reachable through **Tailscale**, your own Tailscale account with the Tailscale app connected on your phone. Any other working HTTPS setup is fine too.
 
 The [setup guide](docs/setup-guide.md) explains how the pieces fit together and the exact settings for Mail-Archiver, TrueNAS and Tailscale. The project does not host servers, provide accounts or set up private networks. Server permissions, retention, logs and backups are up to you or your server administrator.
+
+## Try it without a server
+
+The setup screen has a **Try the demo** button. It opens a small archive of made-up mail built into the app: three fictional accounts (a person, a bakery and a garden club) with folders, attachments and several years of messages. Everything works as it would with a real server, including search, filters, paging, the reader, saving attachments and switching accounts.
+
+- A **Demo · sample mail** bar stays on every screen. Tap its **Exit** button, or **Settings → Exit demo**, to leave. Closing the app also leaves the demo.
+- The demo connects to no server, sends nothing over the network and never saves or changes a connection, so a real connection you saved earlier is kept.
+- Saving a demo attachment still uses the normal save dialog, and confirmed links still open in your browser, just as with a real archive.
 
 ## Install
 

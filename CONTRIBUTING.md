@@ -33,7 +33,8 @@ MailBurrow is a **read-only** client for a Mail-Archiver server that users run t
    python tools/privacy_check.py
    ```
 
-5. Use synthetic data only: example addresses under `example.invalid` and placeholder server names. Never commit real mail, credentials, server settings, signing files or APKs.
+5. The demo archive in `assets/demo/` is generated. To change it, edit `tools/generate_demo_archive.py` and run `python tools/generate_demo_archive.py`; the helper tests (`python -m unittest discover -s tools -p 'test_*.py'`) fail if the committed files are out of date or use anything but reserved example domains.
+6. Use synthetic data only: example addresses under `example.invalid` and placeholder server names. Never commit real mail, credentials, server settings, signing files or APKs.
 
 CI runs the same analysis, tests and privacy scan on every pull request.
 

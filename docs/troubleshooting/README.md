@@ -50,6 +50,16 @@ Save and Open have separate confirmations. There is no malware scanning; do not 
 | Cloud provider (for example Nextcloud) fails to open | Try saving to local storage to compare, and report the provider, file type and whether it failed on the first or a later Open. |
 | No viewer | Use Files or a trusted viewer for the expected format; do not execute an attachment to diagnose it. |
 
+## Demo mode
+
+| Symptom | Interpretation/next step |
+| --- | --- |
+| A "Demo · sample mail" bar is showing | You're in the built-in demo: all mail is fictional. Tap **Exit** on the bar, or **Settings → Exit demo**, to return to setup. |
+| Try the demo button is missing | It's hidden while the demo is already open, for example on Connection settings opened from the demo. Exit the demo first. |
+| Could not open the demo | The bundled sample data could not be read. Try again; if it keeps failing, report the app version and device. |
+| My saved server is gone after the demo | The demo never changes a saved connection. On setup, use **Retry saved connection**, or reopen the app to restore it. |
+| A demo link doesn't load | Demo links point to reserved example addresses that don't exist, so the browser shows an error. That's expected. |
+
 ## Settings and persistence
 
 Totals cover all accounts accessible to the key, not only the selected account. Failed information refresh hides stale details until recovery.
