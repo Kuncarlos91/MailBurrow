@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mailburrow/demo/demo_archive.dart';
+import 'package:mailburrow/demo/demo_banner.dart';
 import 'package:mailburrow/screens/archive_home.dart';
 import 'package:mailburrow/screens/settings_view.dart';
 import 'package:mailburrow/screens/setup_view.dart';
@@ -138,6 +139,17 @@ void main() {
   Future<void> openConnectionSettings(WidgetTester tester) async {
     await tester.tap(find.widgetWithText(NavigationDestination, 'Settings'));
     await tester.pumpAndSettle();
+    if (tester.view.physicalSize.width < 1000 &&
+        MediaQuery.of(tester.element(find.byType(SettingsView))).textScaler.scale(10) > 20) {
+      final list = find.descendant(of: find.byType(SettingsView), matching: find.byType(Scrollable)).first;
+      final raw = find.text('Connection settings');
+      final position = tester.state<ScrollableState>(list).position;
+      fail('settings=${tester.getRect(find.byType(SettingsView))} list=${tester.getRect(list)} '
+          'tile=${raw.evaluate().isEmpty ? 'unbuilt' : tester.getRect(raw)} '
+          'nav=${tester.getRect(find.byType(NavigationBar))} banner=${tester.getRect(find.byType(DemoBanner))} '
+          'pixels=${position.pixels} max=${position.maxScrollExtent} viewport=${position.viewportDimension} '
+          'view=${tester.view.physicalSize}');
+    }
     // Scroll until the row can actually be tapped: at large text it can
     // otherwise sit behind the navigation bar.
     final tile = find.text('Connection settings').hitTestable();
