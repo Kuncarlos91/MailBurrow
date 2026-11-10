@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mailburrow/demo/demo_archive.dart';
 import 'package:mailburrow/screens/archive_home.dart';
+import 'package:mailburrow/screens/settings_view.dart';
 import 'package:mailburrow/screens/setup_view.dart';
 
 void main() {
@@ -137,14 +138,19 @@ void main() {
   Future<void> openConnectionSettings(WidgetTester tester) async {
     await tester.tap(find.widgetWithText(NavigationDestination, 'Settings'));
     await tester.pumpAndSettle();
-    final tile = find.text('Connection settings');
+    // Scroll until the row can actually be tapped: at large text it can
+    // otherwise sit behind the navigation bar.
+    final tile = find.text('Connection settings').hitTestable();
     await tester.scrollUntilVisible(
       tile,
-      120,
-      scrollable: find.byType(Scrollable).first,
+      60,
+      scrollable: find
+          .descendant(
+            of: find.byType(SettingsView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
     );
-    await tester.ensureVisible(tile);
-    await tester.pumpAndSettle();
     await tester.tap(tile);
     await tester.pumpAndSettle();
     expect(find.byType(SetupView), findsOneWidget);
@@ -160,14 +166,17 @@ void main() {
     await openConnectionSettings(tester);
     expect(banner, findsOneWidget);
     expect(find.text('Try the demo'), findsNothing);
-    final cancel = find.text('Cancel');
+    final cancel = find.text('Cancel').hitTestable();
     await tester.scrollUntilVisible(
       cancel,
-      120,
-      scrollable: find.byType(Scrollable).first,
+      60,
+      scrollable: find
+          .descendant(
+            of: find.byType(SetupView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
     );
-    await tester.ensureVisible(cancel);
-    await tester.pumpAndSettle();
     await tester.tap(cancel);
     await tester.pumpAndSettle();
     expect(banner, findsOneWidget);
