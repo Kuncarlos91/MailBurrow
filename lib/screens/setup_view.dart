@@ -60,6 +60,20 @@ class SetupView extends StatelessWidget {
             onPressed: busy ? null : session.restore,
             child: const Text('Retry saved connection'),
           ),
+        if (!session.demo) ...[
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: busy ? null : session.startDemo,
+            icon: const Icon(Icons.science_outlined),
+            label: const Text('Try the demo'),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Sample mail built into the app. No server needed.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
         const SizedBox(height: 16),
         const Text(
           'Configure your own server and private-network access. If your server uses Tailscale, connect its app first. Connection details are saved securely on this device.',
