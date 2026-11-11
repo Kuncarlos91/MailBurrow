@@ -43,7 +43,7 @@ def validate_public_content(content):
 def public_files(contact_record):
     files = {
         name: render((ROOT / "site/templates" / name).read_text(encoding="utf-8"), contact_record)
-        for name in ("index.html", "privacy.html")
+        for name in ("index.html", "setup.html", "privacy.html")
     }
     for name in ("styles.css", "_headers"):
         files[name] = (ROOT / "site/assets" / name).read_text(encoding="utf-8")
@@ -71,7 +71,7 @@ def main():
             raise ValueError("Refusing hard-linked output file")
     for name, content in files.items():
         (output / name).write_text(content, encoding="utf-8")
-    print("Rendered four upload-ready website files in build/public-pages; not uploaded or published.")
+    print("Rendered five upload-ready website files in build/public-pages; not uploaded or published.")
 
 
 if __name__ == "__main__":
