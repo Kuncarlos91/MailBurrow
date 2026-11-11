@@ -4,7 +4,7 @@
 
 ## Status and identity
 
-**Preparation only.** No candidate APK has been built, signed, installed, uploaded or approved for publication by this change. All artifact/device gates below start pending. Public source is available; a public binary remains a separate milestone.
+**Local validation only; public upload blocked.** A local signed candidate has been built and installed for testing, but its artifact privacy findings remain unresolved. It has not been uploaded or approved for publication. The replacement-artifact and device gates below remain pending. Public source is available; a public binary remains a separate milestone.
 
 | Item | Intended value |
 | --- | --- |
@@ -24,7 +24,7 @@ This candidate allocates an Android build number only. It does not allocate an A
 
 This candidate includes the merged demo backend, entry/banner/exit flow, documentation/privacy wording and Android demo screenshots. The demo contains 70 fictional messages across three accounts and 11 small attachments; it is available without a server, including in release builds. It never persists a demo connection. Explicit attachment saves and confirmed external links still use the normal file-provider/browser flows.
 
-Android debug-device demo checks have passed, including offline entry, account separation, Connection settings, exit paths, attachment reopening, relaunch and saved-connection recovery, plus largest-text landscape. This is not evidence for the as-yet unbuilt signed RC9 APK. The current demo has not yet passed iPad/iOS device validation; iOS build/upload numbering and any metered signing run require separate verification and approval.
+Android debug-device demo checks have passed, including offline entry, account separation, Connection settings, exit paths, attachment reopening, relaunch and saved-connection recovery, plus largest-text landscape. Those debug results are not evidence that the signed RC9 APK passes; the local signed test build has a separate unresolved privacy gate. The current demo has not yet passed iPad/iOS device validation; iOS build/upload numbering and any metered signing run require separate verification and approval.
 
 The support/privacy templates are updated in source. Their deployment and live-page verification remain separate tasks; merging source does not deploy Cloudflare Pages.
 
@@ -41,6 +41,17 @@ flutter build apk --release --target-platform android-arm64 --build-name=0.3.0-r
 Expected output: `build/app/outputs/flutter-apk/app-release.apk`, containing only `lib/arm64-v8a/` native libraries.
 
 **Why 64-bit ARM only.** A clean release build of this source, signed with a throwaway key on a neutral Linux runner, produces two blocking `email-address-review` findings. Both are in the 32-bit ARM and x86_64 Flutter engines: BoringSSL's public CRYPTOGAMS author credits in wording the classifier has not reviewed, plus one machine-code byte run that happens to match the address pattern in the 32-bit engine. The arm64-v8a engine's credits are already reviewed, and the Dart app library passes. Neither finding involves personal data or the maintainer's machine. Shipping arm64-v8a only avoids widening the classifier and covers current Android phones; 32-bit-only phones, some low-memory Android Go devices and x86 emulators or Chromebooks cannot install this APK. Adding those ABIs later requires reviewing their engine strings first; see [artifact privacy rules](../security/artifact-privacy-rules.md#android-abi-scope). Building locally is permitted for candidate validation, but a local APK with unresolved personal metadata is not a public release candidate. Freeze the exact APK after inspection; any rebuild needs a new hash and affected checks repeated. Record actual results, never keys, personal certificate fields, private hosts or raw logs in Git.
+
+## Known artifact privacy blocker
+
+**Public APK upload is blocked.** Inspection of a local signed RC9 build flagged five archive entries: three Dart app libraries contain the checkout's absolute generated-plugin-registrant URI, and two Flutter engine libraries contain email-shaped matches requiring reviewed classification. Passing source scans, signature checks or Preview device tests does not clear this artifact gate. See the [Android investigation](../troubleshooting/artifact-privacy.md#android-generated-registrant-paths-and-engine-matches).
+
+Before replacing that artifact:
+
+- [ ] Merge the final candidate fixes, including any pending PDF viewer fix, and freeze passing source.
+- [ ] Rebuild from a clean, non-personal checkout path. Confirm the generated registrant URI no longer exposes a user's directory in any packaged CPU architecture. Do not allowlist personal paths or patch a signed binary.
+- [ ] Complete narrowly scoped, provenance-backed handling of the engine attribution/instruction-pattern matches, with negative tests. No whole-file or whole-domain exclusions; unrelated addresses, credentials and private paths must still block.
+- [ ] Rescan the exact replacement signed APK, repeat identity/signature/notices checks and device regression, and record its new checksum privately until approved for release.
 
 ## Artifact gates - pending
 
