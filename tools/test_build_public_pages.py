@@ -14,7 +14,7 @@ class PublicPagesTests(unittest.TestCase):
             self.assertNotIn("{{", result)
             self.assertIn("Carlos Diaz", result)
             self.assertNotRegex(result, r"(?i)review draft|not published|planned pages|when this notice is finalized")
-            self.assertRegex(result, r"Updated November (?:9|10), 2026")
+            self.assertRegex(result, r"Updated November \d{1,2}, 2026")
             if path.name == "privacy.html":
                 self.assertIn("Effective November 5, 2026", result)
             self.assertNotRegex(result, r"(?i)<(?:script|iframe|form|img)\b")
@@ -40,7 +40,7 @@ class PublicPackageTests(unittest.TestCase):
         self.files = public_files(self.contact)
 
     def test_only_reviewed_static_files_are_packaged(self):
-        self.assertEqual(set(self.files), {"index.html", "privacy.html", "styles.css", "_headers"})
+        self.assertEqual(set(self.files), {"index.html", "setup.html", "privacy.html", "styles.css", "_headers"})
         for value in self.files.values():
             validate_public_content(value)
 
@@ -57,7 +57,7 @@ class PublicPackageTests(unittest.TestCase):
                     if key in attrs:
                         self.links.append(attrs[key])
         parsed = {}
-        for name in ("index.html", "privacy.html"):
+        for name in ("index.html", "setup.html", "privacy.html"):
             page = Links()
             page.feed(self.files[name])
             parsed[name] = page
@@ -117,8 +117,18 @@ class PublicPackageTests(unittest.TestCase):
             self.assertNotIn("PUBLIC_", page)
 
 
+    def test_setup_page_keeps_the_service_boundary_and_safety_rules(self):
+        setup = self.files["setup.html"]
+        for phrase in ("Api__Enabled", "2607.3 or later", "inherits the permissions of the user who creates it",
+                       "Self-signed certificates don't work", "No redirects.", "tailscale serve --bg 30315",
+                       "Never paste it into chats", "Try the demo", "is not the official Mail-Archiver or Tailscale app"):
+            self.assertIn(phrase, setup)
+        for name in ("index.html", "setup.html", "privacy.html"):
+            self.assertIn('href="setup.html"', self.files[name])
+        self.assertNotRegex(setup, r"(?i)<(?:script|iframe|form|img)\b")
+
     def test_skip_target_accepts_keyboard_focus(self):
-        for name in ("index.html", "privacy.html"):
+        for name in ("index.html", "setup.html", "privacy.html"):
             self.assertIn('<main id="main" tabindex="-1">', self.files[name])
 
     def test_body_link_and_notice_colors_have_readable_contrast(self):

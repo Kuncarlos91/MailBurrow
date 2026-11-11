@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="description" content="Step-by-step setup for MailBurrow: enable Mail-Archiver's API, create a key, give your server an HTTPS address and connect the app.">
+  <title>Set up MailBurrow</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header><a class="brand" href="index.html">MailBurrow</a><nav aria-label="Main"><a href="index.html">Support</a><a aria-current="page" href="setup.html">Setup</a><a href="privacy.html">Privacy</a><a href="https://github.com/Kuncarlos91/MailBurrow">Source</a></nav></header>
+<main id="main" tabindex="-1">
+  <p class="notice">Updated November 11, 2026 &middot; Checked against Mail-Archiver's <a href="https://github.com/s1t5/mail-archiver/blob/main/doc/API.md">REST API guide</a>, the TrueNAS Mail Archiver and Tailscale apps, and Tailscale's HTTPS and Serve documentation. Menu names can change between versions.</p>
+  <p class="eyebrow">SETUP GUIDE</p>
+  <h1>Connect MailBurrow to your archive.</h1>
+  <p class="lead">Four steps: turn on Mail-Archiver's API, create a key, give the server an HTTPS address, then connect the app.</p>
+  <p>MailBurrow reads the mail you already archive with <a href="https://github.com/s1t5/mail-archiver">Mail-Archiver</a>. It talks only to your Mail-Archiver server, over HTTPS, with an API key you create. Want to look around first? Tap <strong>Try the demo</strong> on the setup screen; it uses fictional mail built into the app and needs no server.</p>
+  <nav class="toc" aria-label="On this page"><a href="#how">How it works</a><a href="#need">What you need</a><a href="#api">1. Turn on the API</a><a href="#key">2. Create a key</a><a href="#https">3. HTTPS address</a><a href="#connect">4. Connect</a><a href="#problems">Problems</a></nav>
+
+  <section id="how"><h2>How it works</h2>
+    <ol class="flow">
+      <li><strong>Your mail providers</strong> (IMAP, Microsoft 365)</li>
+      <li><strong>Mail-Archiver</strong> syncs and stores your mail, on TrueNAS or in Docker</li>
+      <li><strong>An HTTPS front door</strong>, such as Tailscale Serve or a reverse proxy, in front of Mail-Archiver's plain-HTTP port</li>
+      <li><strong>MailBurrow on your phone</strong> reads through that address with your API key</li>
+    </ol>
+    <ul>
+      <li><strong>Mail-Archiver does the archiving.</strong> MailBurrow never connects to Gmail, Outlook or any mail provider, and never sees your mailbox passwords.</li>
+      <li><strong>MailBurrow only reads.</strong> It lists accounts, folders and messages, runs searches and downloads attachments you ask for. It can't change, delete or send mail.</li>
+      <li><strong>Nothing is kept on the phone.</strong> Messages are fetched when you open them and aren't stored for offline reading. Only the server address and API key are saved, in the phone's secure storage.</li>
+      <li><strong>HTTPS is required.</strong> The app checks the server's certificate and refuses plain <code>http://</code> addresses, so your key is never sent unencrypted.</li>
+    </ul>
+  </section>
+
+  <section id="need"><h2>What you need</h2>
+    <div class="table"><table>
+      <thead><tr><th scope="col">Piece</th><th scope="col">Required?</th><th scope="col">What it does</th></tr></thead>
+      <tbody>
+        <tr><td><a href="https://github.com/s1t5/mail-archiver">Mail-Archiver</a> <strong>2607.3 or later</strong></td><td>Yes</td><td>Archives your mail and provides the API. The API is <strong>off by default</strong>.</td></tr>
+        <tr><td>A Mail-Archiver API key</td><td>Yes</td><td>Lets the app read the archive with your user's permissions.</td></tr>
+        <tr><td>An HTTPS address with a <strong>trusted certificate</strong></td><td>Yes</td><td>For example <code>https://archive.example.ts.net</code>. Self-signed certificates don't work.</td></tr>
+        <tr><td><a href="https://tailscale.com/">Tailscale</a> on the server and the phone</td><td>Recommended</td><td>Private access from anywhere, plus a free trusted certificate through Tailscale Serve.</td></tr>
+        <tr><td>TrueNAS</td><td>Optional</td><td>One easy way to run Mail-Archiver, through its community app. Docker on any machine works too.</td></tr>
+        <tr><td>Your own domain and a reverse proxy</td><td>Optional</td><td>An alternative to Tailscale for the HTTPS address.</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="api"><h2>Step 1: Turn on Mail-Archiver's API</h2>
+    <p>The API is controlled by the <code>Api__Enabled</code> setting. While it's off, every <code>/api/</code> address returns &ldquo;not found&rdquo;, and MailBurrow reports <em>Archive API or message unavailable</em>.</p>
+    <h3>TrueNAS app</h3>
+    <ol>
+      <li>Open <strong>Apps</strong>, select <strong>Mail Archiver</strong> and choose <strong>Edit</strong>.</li>
+      <li>Under <strong>Additional Environment Variables</strong>, add <strong>Name</strong> <code>Api__Enabled</code> with <strong>Value</strong> <code>true</code>.</li>
+      <li>Save. The app restarts.</li>
+      <li>Check the app version is 2607.3 or later; update the app if it isn't.</li>
+    </ol>
+    <h3>Docker Compose</h3>
+    <p>Add this to the Mail-Archiver service's <code>environment:</code> list, then recreate the container:</p>
+    <pre><code>      - Api__Enabled=true</code></pre>
+    <p>Optional settings, from Mail-Archiver's <a href="https://github.com/s1t5/mail-archiver/blob/main/doc/Setup.md">setup guide</a>:</p>
+    <ul>
+      <li><code>Api__AllowAttachmentDownloads</code> is <code>true</code> by default. Leave it on, or attachment downloads in the app will fail.</li>
+      <li><code>Api__RateLimitPerMinute</code> is <code>120</code> by default. That's plenty for one phone. If you see <em>Too many requests</em>, wait a minute.</li>
+    </ul>
+  </section>
+
+  <section id="key"><h2>Step 2: Create an API key</h2>
+    <p>A key <strong>inherits the permissions of the user who creates it</strong>. A regular user's key sees only the mail accounts assigned to that user; an administrator's key sees every account on the server. For a phone, use a regular user that has only the accounts you want to read on it.</p>
+    <ol>
+      <li>Sign in to Mail-Archiver's web interface as that user.</li>
+      <li>Open the <strong>API Keys</strong> page and create a key. Give it a clear name such as &ldquo;MailBurrow phone&rdquo;, and an expiry date if you like.</li>
+      <li>Copy the key straight away. It starts with <code>ma_</code> and is shown only once.</li>
+    </ol>
+    <p>Keep the key private. Never paste it into chats, issue reports or screenshots. If your phone is lost, revoke the key on the same <strong>API Keys</strong> page; an administrator can revoke any user's keys.</p>
+  </section>
+
+  <section id="https"><h2>Step 3: Give the server an HTTPS address</h2>
+    <p>Mail-Archiver serves plain HTTP. On TrueNAS the app's default web port is <code>30315</code>. Put one of the following in front of it.</p>
+    <h3 id="tailscale">Option A: Tailscale Serve (recommended)</h3>
+    <p>Tailscale Serve gives your server an address like <code>https://truenas.your-tailnet.ts.net</code> with a certificate phones trust, reachable only from devices signed in to your Tailscale network.</p>
+    <ol>
+      <li>In the <a href="https://login.tailscale.com/admin/dns">Tailscale admin console</a>, open <strong>DNS</strong>, make sure <strong>MagicDNS</strong> is on, and under <strong>HTTPS Certificates</strong> select <strong>Enable HTTPS</strong>.</li>
+      <li>On the server, point Serve at Mail-Archiver's port:
+        <pre><code>tailscale serve --bg 30315</code></pre>
+        Replace <code>30315</code> with your port if it differs. The output shows your HTTPS address. <code>--bg</code> keeps it running in the background.</li>
+      <li>Check it: <code>tailscale serve status</code> should show <code>https://&lt;machine&gt;.&lt;tailnet&gt;.ts.net</code> forwarding to your port.</li>
+    </ol>
+    <p><strong>On TrueNAS</strong> with the Tailscale community app:</p>
+    <ul>
+      <li>Follow <a href="https://tailscale.com/kb/1483/truenas">Tailscale's TrueNAS guide</a> to install the app with an auth key. Then edit the app: <strong>untick Userspace</strong> and <strong>tick Host Network</strong>, so Tailscale can reach the Mail Archiver app's port on the host.</li>
+      <li>The app's form doesn't include a Serve setting, so run <code>tailscale serve --bg 30315</code> in a <strong>shell inside the Tailscale app</strong>, opened from the app's details on the <strong>Apps</strong> page. After the next restart, run <code>tailscale serve status</code> again to check the setting was kept.</li>
+    </ul>
+    <p>The first connection can take a few seconds while Tailscale issues the certificate.</p>
+    <h3 id="proxy">Option B: Your own domain with a reverse proxy</h3>
+    <p>If you already run a reverse proxy such as Caddy, Nginx Proxy Manager or Traefik with Let's Encrypt certificates, add a host like <code>mail.example.com</code> that forwards to Mail-Archiver's port. Some things to watch:</p>
+    <ul>
+      <li>The certificate must be publicly trusted. Let's Encrypt is fine; self-signed certificates and private certificate authorities aren't supported.</li>
+      <li><strong>No redirects.</strong> MailBurrow doesn't follow redirects, so its key is never sent anywhere unexpected. Use the final address, and don't put a login page or single sign-on in front of <code>/api/</code>.</li>
+      <li>If Mail-Archiver lives under a path such as <code>https://example.com/mail</code>, enter that full address in the app; the path is kept.</li>
+      <li>If the address is reachable from the internet, your archive's web interface is too. Consider keeping it private, for example with Tailscale or a VPN, and keep Mail-Archiver updated.</li>
+    </ul>
+    <h3>Addresses that won't work</h3>
+    <div class="table"><table>
+      <thead><tr><th scope="col">Address</th><th scope="col">Why</th></tr></thead>
+      <tbody>
+        <tr><td><code>http://truenas:30315</code> or <code>http://100.x.y.z:30315</code></td><td>Plain HTTP. The app only connects over HTTPS.</td></tr>
+        <tr><td><code>https://192.168.1.10</code> with a self-signed certificate</td><td>The certificate isn't trusted.</td></tr>
+        <tr><td>An address that redirects to another one</td><td>The app doesn't follow redirects. Use the final address.</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="connect"><h2>Step 4: Connect the app</h2>
+    <ol>
+      <li>Install MailBurrow. The signed Android preview is on <a href="https://github.com/Kuncarlos91/MailBurrow/releases">GitHub Releases</a> (64-bit ARM phones); compare the APK's SHA-256 with the one in the release notes. iPhone and iPad builds are from source for now.</li>
+      <li>If you use Tailscale, install the <strong>Tailscale</strong> app on your phone, sign in to the same Tailscale network and turn it on.</li>
+      <li>Optional check: open your HTTPS address in the phone's browser. You should see Mail-Archiver's sign-in page with no certificate warning.</li>
+      <li>Open MailBurrow and enter:
+        <ul>
+          <li><strong>HTTPS server address:</strong> for example <code>truenas.your-tailnet.ts.net</code>. <code>https://</code> is added if you leave it out.</li>
+          <li><strong>API key:</strong> the <code>ma_&hellip;</code> key from step 2.</li>
+        </ul></li>
+      <li>Tap <strong>Connect to archive</strong>.</li>
+    </ol>
+    <p>If the key can see more than one mail account, switch between them from the account row or in Settings. <strong>Disconnect and forget connection</strong> in Settings removes the address and key from the phone; it doesn't revoke the key on the server.</p>
+  </section>
+
+  <section id="problems"><h2>If something goes wrong</h2>
+    <div class="table"><table>
+      <thead><tr><th scope="col">Message in the app</th><th scope="col">Likely cause</th><th scope="col">What to do</th></tr></thead>
+      <tbody>
+        <tr><td>Enter a valid HTTPS server address&hellip;</td><td>The address has <code>http://</code>, a username and password, a query or a fragment</td><td>Enter just the host name, or <code>https://</code> plus host name and optional path</td></tr>
+        <tr><td>Unable to connect. Check your HTTPS address and private network.</td><td>Tailscale is off on the phone, the address is wrong, or Serve or the proxy isn't running</td><td>Turn on Tailscale, open the address in the phone's browser, check <code>tailscale serve status</code></td></tr>
+        <tr><td>The server certificate could not be verified.</td><td>Self-signed or untrusted certificate</td><td>Use Tailscale Serve or a Let's Encrypt certificate</td></tr>
+        <tr><td>Your API key was not accepted.</td><td>Key mistyped, expired or revoked, or its user is inactive</td><td>Create a new key and enter it again</td></tr>
+        <tr><td>Archive API or message unavailable.</td><td>The API isn't enabled, Mail-Archiver is older than 2607.3, the address points at the wrong service, or the message is outside the key's accounts</td><td>Check <code>Api__Enabled=true</code> and the version, then the address</td></tr>
+        <tr><td>Too many requests. Wait and retry.</td><td>More than the rate limit (120 a minute by default)</td><td>Wait a minute</td></tr>
+        <tr><td>The server took too long to respond.</td><td>Slow connection or busy server</td><td>Retry; check the server is running</td></tr>
+      </tbody>
+    </table></div>
+    <p>Still stuck? See <a href="index.html#contact">getting help</a>. When asking, never include your API key, server address or real messages.</p>
+  </section>
+
+  <section id="security"><h2>Privacy and security in short</h2>
+    <ul>
+      <li>Treat the API key as read access to its user's archived mail. Use a regular user, not an administrator, and only the accounts you need.</li>
+      <li>Your server keeps its own access logs. MailBurrow has no analytics or crash reporting. See the <a href="privacy.html">privacy notice</a>.</li>
+      <li>MailBurrow downloads an attachment only when you choose to, and saves it where you pick.</li>
+      <li>Report security problems privately through <a href="https://github.com/Kuncarlos91/MailBurrow/security">the repository's Security tab</a>.</li>
+    </ul>
+    <p>MailBurrow is independent and is not the official Mail-Archiver or Tailscale app.</p>
+  </section>
+</main>
+<footer>MailBurrow &middot; {{PUBLIC_PROVIDER_NAME}} &middot; <a href="setup.html">Setup guide</a> &middot; <a href="privacy.html">Privacy notice</a> &middot; <a href="https://github.com/Kuncarlos91/MailBurrow">Source</a></footer>
+</body>
+</html>

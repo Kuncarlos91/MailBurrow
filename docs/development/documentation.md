@@ -6,7 +6,7 @@
 
 - Root README: main entry point and the only docs index.
 - Playbook: current features, navigation, design rationale, architecture/API map, lifecycle and limits.
-- Setup guide: server, HTTPS and app configuration for users.
+- Setup guide: server, HTTPS and app configuration for users. The website copy, `site/templates/setup.html`, carries the same steps: update both in the same change, and its "Updated" date.
 - Development: CI, dependencies, notices, icons and native evidence.
 - Troubleshooting: symptoms, safe recovery steps, affected components and diagnostic limits.
 - Security: public contacts and artifact-classification rules. Root SECURITY/PRIVACY remain the policies.
