@@ -45,3 +45,7 @@ Release builds supply version/build values to Settings through the `MAILSHELF_BU
 ## Signed Android releases
 
 Signed release APKs are built locally by the maintainer; see [Android signing](../releasing/android.md). The keystore and its passwords never go in Git or CI logs.
+
+## Android saved-file MIME regression tests
+
+After Flutter has prepared the Android project, run `android/gradlew.bat -p android :app:testDebugUnitTest` on Windows, or `android/gradlew -p android :app:testDebugUnitTest` on a POSIX host. The JVM-only `SavedAttachmentTypesTest` covers stable PDF viewer types, provider changes, independent documents and cleanup. JUnit is a test-only dependency and is not included in release runtime dependencies. Native compilation and Downloads/cloud-provider device checks remain necessary; these policy tests do not prove system chooser behavior.

@@ -13,8 +13,10 @@ import java.io.File
 class MainActivity : FlutterActivity() {
     private var pendingSave: MethodChannel.Result? = null
     private var pendingSource: File? = null
+    private var pendingMimeType: String? = null
     private var pendingLocate: MethodChannel.Result? = null
     private val savedUris = mutableMapOf<String, Int>()
+    private val savedTypes = SavedAttachmentTypes()
     private val retainedReadUris = mutableSetOf<Uri>()
     private var diagnosticsEnabled = false
 
@@ -52,6 +54,7 @@ class MainActivity : FlutterActivity() {
             return
         }
         savedUris.remove(location)
+        savedTypes.forget(location)
         releaseRetainedRead(Uri.parse(location))
     }
 
@@ -79,9 +82,13 @@ class MainActivity : FlutterActivity() {
                         } else {
                             pendingSave = result
                             pendingSource = source
+                            pendingMimeType = savedTypes.forSave(
+                                call.argument<String>("name") ?: source.name,
+                                call.argument<String>("type")
+                            )
                             val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                                 addCategory(Intent.CATEGORY_OPENABLE)
-                                type = call.argument<String>("type") ?: "application/octet-stream"
+                                type = pendingMimeType
                                 putExtra(Intent.EXTRA_TITLE, call.argument<String>("name") ?: "attachment")
                             }
                             try {
@@ -89,6 +96,7 @@ class MainActivity : FlutterActivity() {
                             } catch (_: Exception) {
                                 pendingSave = null
                                 pendingSource = null
+                                pendingMimeType = null
                                 result.error("save_unavailable", "File picker unavailable.", null)
                             }
                         }
@@ -122,11 +130,9 @@ class MainActivity : FlutterActivity() {
                         // Do not pre-read cloud documents just to launch a viewer. The
                         // provider may fetch/refresh a document on read. The explicit
                         // viewer owns that I/O; Android still enforces URI read access.
-                        val mimeType = try {
-                            contentResolver.getType(uri) ?: "application/octet-stream"
-                        } catch (_: Exception) {
-                            "application/octet-stream"
-                        }
+                        // Preserve the saved type across chooser cancellations and viewer
+                        // returns. Downloads/cloud providers may later report a generic type.
+                        val mimeType = savedTypes.forOpen(location) { contentResolver.getType(uri) }
                         val intent = Intent(Intent.ACTION_VIEW).apply {
                             setDataAndType(uri, mimeType)
                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -180,8 +186,10 @@ class MainActivity : FlutterActivity() {
         }
         val result = pendingSave ?: return
         val source = pendingSource
+        val mimeType = pendingMimeType ?: "application/octet-stream"
         pendingSave = null
         pendingSource = null
+        pendingMimeType = null
         val uri = data?.data
         if (resultCode != Activity.RESULT_OK || uri == null || source == null) {
             result.success(null)
@@ -194,6 +202,7 @@ class MainActivity : FlutterActivity() {
                 output.use { destination -> source.inputStream().use { it.copyTo(destination) } }
                 runOnUiThread {
                     savedUris[uri.toString()] = (savedUris[uri.toString()] ?: 0) + 1
+                    savedTypes.remember(uri.toString(), mimeType)
                     trace("save_registered")
                     result.success(uri.toString())
                 }

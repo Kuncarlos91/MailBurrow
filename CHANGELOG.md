@@ -9,10 +9,11 @@ Android candidate for the first public APK prerelease. No APK, tag or release is
 - Advance source version from RC8/build22; preserve the established MailBurrow app ID and signing configuration.
 - **Demo mode:** **Try the demo** opens 70 fictional messages across three accounts, with folders, dates and 11 small attachments, without a server. A labelled banner remains visible throughout demo mode, including Connection settings and the reader; exit returns to setup without changing the saved connection.
 - Include the merged demo documentation, privacy wording and Android dark-mode screenshots.
+- Android saved PDFs keep a stable PDF viewer type across repeated opens; document type metadata is held only for the reader session.
 - Include the shared backend interface and independent backend tests, updated support/privacy destinations, community policies and native-notice provenance now in public source.
 - Enforce canonical LF bytes for bundled notice assets, with checksum regression coverage.
 - The release APK targets 64-bit ARM (arm64-v8a) only. Devices without ARM64 execution support, including 32-bit-only phones, cannot install it.
-- No dependency, permission or iOS upload change is included. Signed candidate inspection and exact-artifact device checks remain pending.
+- No runtime dependency, permission or iOS upload change is included. Android MIME regression tests use JUnit only in the JVM test configuration. Signed candidate inspection and exact-artifact device checks remain pending.
 
 ## Initial public source preview
 
