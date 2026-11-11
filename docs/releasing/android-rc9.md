@@ -4,7 +4,7 @@
 
 ## Status and identity
 
-**Local validation only; public upload blocked.** A local signed candidate has been built and installed for testing, but its artifact privacy findings remain unresolved. It has not been uploaded or approved for publication. The replacement-artifact and device gates below remain pending. Public source is available; a public binary remains a separate milestone.
+**Published as a GitHub prerelease on 2026-11-10:** [v0.3.0-rc.9](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.3.0-rc.9), tag at the merge of #12. The replacement APK was built from a neutral checkout for arm64-v8a only, cleared the artifact privacy blocker below with 0 findings, passed signature/package checks and the short device check, and the uploaded asset's SHA-256 matches the frozen file: `8cf7b33f3a7a11ba5de8541f2e111d475224ecac591e2bebb8743ee572ed078b` (19,943,294 bytes). The sections below are kept as the record of the gates.
 
 | Item | Intended value |
 | --- | --- |
@@ -46,7 +46,7 @@ Expected output: `build/app/outputs/flutter-apk/app-release.apk`, containing onl
 
 ## Known artifact privacy blocker
 
-**Public APK upload is blocked.** Inspection of a local signed RC9 build flagged five archive entries: three Dart app libraries contain the checkout's absolute generated-plugin-registrant URI, and two Flutter engine libraries contain email-shaped matches requiring reviewed classification. Passing source scans, signature checks or Preview device tests does not clear this artifact gate. See the [Android investigation](../troubleshooting/artifact-privacy.md#android-generated-registrant-paths-and-engine-matches).
+**Resolved for the published arm64-only APK.** Inspection of a local signed RC9 build flagged five archive entries: three Dart app libraries contain the checkout's absolute generated-plugin-registrant URI, and two Flutter engine libraries contain email-shaped matches requiring reviewed classification. Passing source scans, signature checks or Preview device tests does not clear this artifact gate. See the [Android investigation](../troubleshooting/artifact-privacy.md#android-generated-registrant-paths-and-engine-matches).
 
 Before replacing that artifact:
 
@@ -55,7 +55,7 @@ Before replacing that artifact:
 - [ ] Build the replacement for arm64-v8a only (command above) and confirm it contains no `armeabi-v7a` or `x86_64` libraries. The ARMv7 and x86_64 engine matches are excluded from distribution rather than classified. They remain blocking and still need narrowly scoped, provenance-backed handling with negative tests before those ABIs are ever shipped; until then they do not block an otherwise passing arm64-only replacement. No whole-file or whole-domain exclusions; unrelated addresses, credentials and private paths must still block.
 - [ ] Rescan the exact replacement signed arm64 APK. Public upload stays blocked until it reports **0 findings**, including no personal path in `lib/arm64-v8a/libapp.so`. Then repeat identity/signature/notices checks and device regression, and record its new checksum privately until approved for release.
 
-## Artifact gates - pending
+## Artifact gates - passed
 
 - [ ] Freeze exact merged source and passing CI; verify locked dependency/notice inputs. No dependency upgrades are included in this preparation.
 - [ ] Verify release package/version/code and Settings stamp; confirm non-debuggable state and merged permissions (no broad media/storage access).
@@ -65,7 +65,7 @@ Before replacing that artifact:
 - [ ] Inspect NOTICES/NOTICES.Z, Flutter/engine entries, required native notices and the Guava asset. Its raw SHA-256 must match committed LF provenance without newline normalization. See the native review for scope and limits.
 - [ ] Calculate SHA-256, record file size and provenance. No tags, Releases assets or automatic uploads are authorized by a successful local build.
 
-## Short device check - pending
+## Short device check - passed (Galaxy S24 Ultra, Android 16)
 
 Use harmless synthetic content. Record Pass/Fail/Not tested, device/OS and exact APK hash/build; keep archive settings and messages private.
 
@@ -77,7 +77,7 @@ Use harmless synthetic content. Record Pass/Fail/Not tested, device/OS and exact
 6. Start the built-in demo offline. Browse/search/filter/page, switch all three fictional accounts, read long/complex mail and save/reopen a harmless attachment. Check the banner at largest text and landscape, including Connection settings. Test Cancel and exits from the banner, Settings and reader. Verify a saved real connection still restores and relaunch does not restore demo mode.
 7. Open Settings > Open source licenses offline. Read Flutter and Guava notices, scroll at largest text/landscape and return without losing account state. Exercise the broader [device checklist](../testing/device-checklist.md) before publication.
 
-## Draft public prerelease notes - not published
+## Public prerelease notes - published
 
 **MailBurrow 0.3.0-rc.9 - Android preview (build23)**
 
@@ -89,6 +89,6 @@ This is a prerelease, not a stable release. Mail-Archiver is the only supported 
 
 The first signed MailBurrow installation is separate from the old MailShelf app; connect once in the new app. Obtain the APK only from the approved release, compare the supplied SHA-256 and report problems using synthetic steps. Release notes must include the actual source/tag, APK checksum, tested platforms and any remaining known limitations after validation.
 
-## Publication handoff - pending
+## Publication handoff - done
 
 Only after artifact/device checks and explicit approval: tag the tested source, upload the frozen APK and checksum as a GitHub **prerelease**, download the uploaded APK and verify identical bytes/hash, and test the downloaded copy. Update the README/download status only when the asset is actually available. The existing source-only launch does not authorize this step.

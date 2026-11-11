@@ -2,7 +2,7 @@
 
 A read-only Android and iOS app for browsing your own [Mail-Archiver](https://github.com/s1t5/mail-archiver) server. Browse and search archived mail, filter by folder and date, read messages in a simplified view, and save attachments when you choose to.
 
-MailBurrow is an early source preview. There is no public signed download yet and it is not in the app stores; you can build it yourself from source. See [project status](docs/testing/status.md).
+MailBurrow is an early preview. A signed Android prerelease, [0.3.0-rc.9](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.3.0-rc.9), is available for 64-bit ARM phones; it is not in the app stores, and iPhone/iPad builds are source-only. See [project status](docs/testing/status.md).
 
 <img src="docs/images/setup-screen.jpg" alt="MailBurrow setup in dark mode with empty server and API key fields, Connect to archive, Try the demo, Support and Privacy notice" width="270">
 
@@ -34,13 +34,13 @@ Screenshots from the Android app in dark mode, using fictional demo mail:
 
 ## Install
 
-There is no public signed APK or App Store build yet. To try MailBurrow now:
+MailBurrow is not in the app stores. To try it:
 
 - **Before installing,** set up your server with the [setup guide](docs/setup-guide.md); the app needs it to connect.
-- **Android:** build it from source (see [Building from source](#building-from-source)). `flutter build apk --debug --target-platform android-arm64` produces a debug APK that installs as **MailBurrow Preview**, separately from any signed release.
+- **Android:** download `MailBurrow-0.3.0-rc.9.apk` from the [0.3.0-rc.9 prerelease](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.3.0-rc.9) and compare its SHA-256 with the one in the release notes. It is for 64-bit ARM (arm64-v8a) devices; 32-bit-only phones cannot install it. Not ready to connect a server? Tap **Try the demo** on setup. You can also build it from source (see [Building from source](#building-from-source)): `flutter build apk --debug --target-platform android-arm64` produces a debug APK that installs as **MailBurrow Preview**, separately from the signed release.
 - **iPhone and iPad:** build and run from source on a Mac with Xcode.
 
-When signed releases are published, they will appear on the [Releases page](https://github.com/Kuncarlos91/MailBurrow/releases) and install over each other without losing your saved connection.
+Signed releases are published on the [Releases page](https://github.com/Kuncarlos91/MailBurrow/releases) and install over each other without losing your saved connection.
 
 ## Connect
 
