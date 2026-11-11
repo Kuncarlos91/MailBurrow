@@ -4,7 +4,7 @@
 
 ## Status and identity
 
-**Preparation only.** No candidate APK has been built, signed, installed, uploaded or approved for publication by this change. All artifact/device gates below start pending. Public source is available; a public binary remains a separate milestone.
+**Local validation only; public upload blocked.** A local signed candidate has been built and installed for testing, but its artifact privacy findings remain unresolved. It has not been uploaded or approved for publication. The replacement-artifact and device gates below remain pending. Public source is available; a public binary remains a separate milestone.
 
 | Item | Intended value |
 | --- | --- |
@@ -24,7 +24,7 @@ This candidate allocates an Android build number only. It does not allocate an A
 
 This candidate includes the merged demo backend, entry/banner/exit flow, documentation/privacy wording and Android demo screenshots. The demo contains 70 fictional messages across three accounts and 11 small attachments; it is available without a server, including in release builds. It never persists a demo connection. Explicit attachment saves and confirmed external links still use the normal file-provider/browser flows.
 
-Android debug-device demo checks have passed, including offline entry, account separation, Connection settings, exit paths, attachment reopening, relaunch and saved-connection recovery, plus largest-text landscape. This is not evidence for the as-yet unbuilt signed RC9 APK. The current demo has not yet passed iPad/iOS device validation; iOS build/upload numbering and any metered signing run require separate verification and approval.
+Android debug-device demo checks have passed, including offline entry, account separation, Connection settings, exit paths, attachment reopening, relaunch and saved-connection recovery, plus largest-text landscape. Those debug results are not evidence that the signed RC9 APK passes; the local signed test build has a separate unresolved privacy gate. The current demo has not yet passed iPad/iOS device validation; iOS build/upload numbering and any metered signing run require separate verification and approval.
 
 The support/privacy templates are updated in source. Their deployment and live-page verification remain separate tasks; merging source does not deploy Cloudflare Pages.
 
@@ -35,16 +35,32 @@ After this PR merges, select an exact public `main` commit with both required ch
 Use your existing local signing configuration without copying it into Git or logs. From the repository root, the same single-line command works in PowerShell and POSIX shells:
 
 ```sh
-flutter build apk --release --build-name=0.3.0-rc.9 --build-number=23 --dart-define=MAILSHELF_BUILD_VERSION=0.3.0-rc.9 --dart-define=MAILSHELF_BUILD_NUMBER=23
+flutter build apk --release --target-platform android-arm64 --build-name=0.3.0-rc.9 --build-number=23 --dart-define=MAILSHELF_BUILD_VERSION=0.3.0-rc.9 --dart-define=MAILSHELF_BUILD_NUMBER=23
 ```
 
-Expected output: `build/app/outputs/flutter-apk/app-release.apk`. Building locally is permitted for candidate validation, but a local APK with unresolved personal metadata is not a public release candidate. Freeze the exact APK after inspection; any rebuild needs a new hash and affected checks repeated. Record actual results, never keys, personal certificate fields, private hosts or raw logs in Git.
+Expected output: `build/app/outputs/flutter-apk/app-release.apk`, containing only `lib/arm64-v8a/` native libraries.
+
+**Why 64-bit ARM only.** A probe release build of this source, signed with a throwaway key on a neutral Linux runner, produced two blocking `email-address-review` findings. Both were in the ARMv7 (`armeabi-v7a`) and x86_64 Flutter engines: BoringSSL's public CRYPTOGAMS author credits in wording the classifier has not reviewed, plus one machine-code byte run in the ARMv7 engine that happens to match the address pattern. In that probe, the arm64-v8a engine's credits were already reviewed. Its Dart app libraries passed only because the runner's checkout path contains no personal directory. Shipping arm64-v8a only keeps those two engines out of the APK without widening the classifier. Devices without ARM64 (arm64-v8a) execution support cannot install it, including 32-bit-only phones and x86 emulators or other devices without ARM64 translation. Some Chromebooks and x86 devices can run ARM64 apps through translation; check the specific device. Android Go branding alone does not determine compatibility. Adding another ABI later requires reviewing its engine strings first; see [artifact privacy rules](../security/artifact-privacy-rules.md#android-abi-scope).
+
+**Changing the ABI does not clear the local signed RC9.** Its arm64 app library also embeds the absolute generated-plugin-registrant URI from the personal checkout (see the blocker below). Only a replacement built from a neutral, non-personal checkout directory, then passing the scan, can clear that. Building locally is permitted for candidate validation, but a local APK with unresolved personal metadata is not a public release candidate. Freeze the exact APK after inspection; any rebuild needs a new hash and affected checks repeated. Record actual results, never keys, personal certificate fields, private hosts or raw logs in Git.
+
+## Known artifact privacy blocker
+
+**Public APK upload is blocked.** Inspection of a local signed RC9 build flagged five archive entries: three Dart app libraries contain the checkout's absolute generated-plugin-registrant URI, and two Flutter engine libraries contain email-shaped matches requiring reviewed classification. Passing source scans, signature checks or Preview device tests does not clear this artifact gate. See the [Android investigation](../troubleshooting/artifact-privacy.md#android-generated-registrant-paths-and-engine-matches).
+
+Before replacing that artifact:
+
+- [ ] Merge the final candidate fixes, including any pending PDF viewer fix, and freeze passing source.
+- [ ] Rebuild from a clean, non-personal checkout path. Confirm the generated registrant URI no longer exposes a user's directory in any packaged CPU architecture. Do not allowlist personal paths or patch a signed binary.
+- [ ] Build the replacement for arm64-v8a only (command above) and confirm it contains no `armeabi-v7a` or `x86_64` libraries. The ARMv7 and x86_64 engine matches are excluded from distribution rather than classified. They remain blocking and still need narrowly scoped, provenance-backed handling with negative tests before those ABIs are ever shipped; until then they do not block an otherwise passing arm64-only replacement. No whole-file or whole-domain exclusions; unrelated addresses, credentials and private paths must still block.
+- [ ] Rescan the exact replacement signed arm64 APK. Public upload stays blocked until it reports **0 findings**, including no personal path in `lib/arm64-v8a/libapp.so`. Then repeat identity/signature/notices checks and device regression, and record its new checksum privately until approved for release.
 
 ## Artifact gates - pending
 
 - [ ] Freeze exact merged source and passing CI; verify locked dependency/notice inputs. No dependency upgrades are included in this preparation.
 - [ ] Verify release package/version/code and Settings stamp; confirm non-debuggable state and merged permissions (no broad media/storage access).
-- [ ] Verify the release signature against the established trusted certificate. Review the certificate's publicly visible identity fields with the maintainer before public upload; do not replace the key to hide identity.
+- [ ] Verify the release signature against the established trusted certificate with `apksigner verify --print-certs app-release.apk` (Android SDK build-tools). Review the printed certificate DN (name, organization, location, email) before public upload: the APK signing block is not a ZIP entry, so `tools/privacy_check.py` **does not scan the certificate**. Do not replace the key to hide identity; that would break updates for existing installs. `keytool -printcert -jarfile` reads only legacy v1 signatures and may print nothing for this APK.
+- [ ] Confirm the APK contains only `lib/arm64-v8a/` native libraries.
 - [ ] Scan the exact APK for credentials, private hosts, personal build paths and other metadata; investigate every finding privately. Do not weaken the classifier to obtain a pass.
 - [ ] Inspect NOTICES/NOTICES.Z, Flutter/engine entries, required native notices and the Guava asset. Its raw SHA-256 must match committed LF provenance without newline normalization. See the native review for scope and limits.
 - [ ] Calculate SHA-256, record file size and provenance. No tags, Releases assets or automatic uploads are authorized by a successful local build.
@@ -69,7 +85,7 @@ A read-only mobile viewer for your own Mail-Archiver: authorized account/folder 
 
 Tap **Try the demo** on setup to explore 70 fictional messages across three accounts without a server. The demo banner stays visible; Exit returns to setup without changing a saved real connection. Demo attachments save only when requested, and confirmed links open in your browser.
 
-This is a prerelease, not a stable release. Mail-Archiver is the only supported backend. Complex mail may use simplified layout. Links and attachments are not malware-scanned; attachment downloads are limited to 50 MiB and two minutes. No sending/deleting mail, offline mail cache, analytics or automatic crash-report upload. This release contains no iOS download.
+This is a prerelease, not a stable release. Mail-Archiver is the only supported backend. Complex mail may use simplified layout. Links and attachments are not malware-scanned; attachment downloads are limited to 50 MiB and two minutes. No sending/deleting mail, offline mail cache, analytics or automatic crash-report upload. The APK is for 64-bit ARM (arm64-v8a) Android devices. Devices without ARM64 execution support, including 32-bit-only phones, cannot install it. This release contains no iOS download.
 
 The first signed MailBurrow installation is separate from the old MailShelf app; connect once in the new app. Obtain the APK only from the approved release, compare the supplied SHA-256 and report problems using synthetic steps. Release notes must include the actual source/tag, APK checksum, tested platforms and any remaining known limitations after validation.
 

@@ -12,6 +12,7 @@ Android candidate for the first public APK prerelease. No APK, tag or release is
 - Android saved PDFs keep a stable PDF viewer type across repeated opens; document type metadata is held only for the reader session.
 - Include the shared backend interface and independent backend tests, updated support/privacy destinations, community policies and native-notice provenance now in public source.
 - Enforce canonical LF bytes for bundled notice assets, with checksum regression coverage.
+- The release APK targets 64-bit ARM (arm64-v8a) only. Devices without ARM64 execution support, including 32-bit-only phones, cannot install it.
 - No runtime dependency, permission or iOS upload change is included. Android MIME regression tests use JUnit only in the JVM test configuration. Signed candidate inspection and exact-artifact device checks remain pending.
 
 ## Initial public source preview
