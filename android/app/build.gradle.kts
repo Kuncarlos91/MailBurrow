@@ -67,6 +67,22 @@ android {
     }
 }
 
+// Public release APKs ship 64-bit ARM only; see docs/releasing/android-rc9.md.
+// `flutter build apk --target-platform android-arm64` limits only Flutter's own
+// libraries (libapp.so, libflutter.so). Flutter's Gradle plugin still sets the
+// default ABI list, so plugin native libraries (for example jni's
+// libdartjni.so) would be packaged for armeabi-v7a and x86_64 too. Android would
+// then offer the APK to devices that have no Flutter engine for their ABI, and
+// the app would crash on launch. Exclude every non-arm64 native library from
+// release packaging. Debug builds keep all ABIs for emulators.
+androidComponents {
+    onVariants(selector().withBuildType("release")) { variant ->
+        variant.packaging.jniLibs.excludes.addAll(
+            listOf("**/armeabi-v7a/**", "**/armeabi/**", "**/x86/**", "**/x86_64/**")
+        )
+    }
+}
+
 kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
