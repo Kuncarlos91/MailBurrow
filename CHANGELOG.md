@@ -2,9 +2,9 @@
 
 All notable changes to MailBurrow are recorded here. Versions follow the app version shown in Settings.
 
-## 0.3.0-rc.9 (build23) - preparation
+## 0.3.0-rc.9 (build23) - 2026-11-10
 
-Android candidate for the first public APK prerelease. No APK, tag or release is published by this source change. See the [candidate guide](docs/releasing/android-rc9.md) for draft notes and pending artifact/device gates.
+First public Android APK, published as a [GitHub prerelease](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.3.0-rc.9) from tag `v0.3.0-rc.9`. APK SHA-256 `8cf7b33f3a7a11ba5de8541f2e111d475224ecac591e2bebb8743ee572ed078b`. See the [candidate guide](docs/releasing/android-rc9.md) for the gates it passed.
 
 - Advance source version from RC8/build22; preserve the established MailBurrow app ID and signing configuration.
 - **Demo mode:** **Try the demo** opens 70 fictional messages across three accounts, with folders, dates and 11 small attachments, without a server. A labelled banner remains visible throughout demo mode, including Connection settings and the reader; exit returns to setup without changing the saved connection.
@@ -13,7 +13,8 @@ Android candidate for the first public APK prerelease. No APK, tag or release is
 - Include the shared backend interface and independent backend tests, updated support/privacy destinations, community policies and native-notice provenance now in public source.
 - Enforce canonical LF bytes for bundled notice assets, with checksum regression coverage.
 - The release APK targets 64-bit ARM (arm64-v8a) only. Devices without ARM64 execution support, including 32-bit-only phones, cannot install it.
-- No runtime dependency, permission or iOS upload change is included. Android MIME regression tests use JUnit only in the JVM test configuration. Signed candidate inspection and exact-artifact device checks remain pending.
+- Release APKs package only `arm64-v8a` native libraries, including plugin libraries such as `libdartjni.so`; debug builds keep all ABIs.
+- No runtime dependency, permission or iOS upload change is included. Android MIME regression tests use JUnit only in the JVM test configuration.
 
 ## Initial public source preview
 

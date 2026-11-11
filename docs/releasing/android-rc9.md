@@ -4,7 +4,7 @@
 
 ## Status and identity
 
-**Local validation only; public upload blocked.** A local signed candidate has been built and installed for testing, but its artifact privacy findings remain unresolved. It has not been uploaded or approved for publication. The replacement-artifact and device gates below remain pending. Public source is available; a public binary remains a separate milestone.
+**Published as a GitHub prerelease on 2026-11-10:** [v0.3.0-rc.9](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.3.0-rc.9), tag at the merge of #12. The replacement APK was built from a neutral checkout for arm64-v8a only, cleared the artifact privacy blocker below with 0 findings, passed the recorded signature, package, notice and device checks, and the uploaded asset's SHA-256 matches the frozen file: `8cf7b33f3a7a11ba5de8541f2e111d475224ecac591e2bebb8743ee572ed078b` (19,943,294 bytes). The sections below are kept as the record of the gates.
 
 | Item | Intended value |
 | --- | --- |
@@ -46,26 +46,29 @@ Expected output: `build/app/outputs/flutter-apk/app-release.apk`, containing onl
 
 ## Known artifact privacy blocker
 
-**Public APK upload is blocked.** Inspection of a local signed RC9 build flagged five archive entries: three Dart app libraries contain the checkout's absolute generated-plugin-registrant URI, and two Flutter engine libraries contain email-shaped matches requiring reviewed classification. Passing source scans, signature checks or Preview device tests does not clear this artifact gate. See the [Android investigation](../troubleshooting/artifact-privacy.md#android-generated-registrant-paths-and-engine-matches).
+**Resolved for the published arm64-only APK.** Inspection of a local signed RC9 build flagged five archive entries: three Dart app libraries contain the checkout's absolute generated-plugin-registrant URI, and two Flutter engine libraries contain email-shaped matches requiring reviewed classification. Passing source scans, signature checks or Preview device tests does not clear this artifact gate. See the [Android investigation](../troubleshooting/artifact-privacy.md#android-generated-registrant-paths-and-engine-matches).
 
-Before replacing that artifact:
+Before replacing that artifact (outcome for the published APK `8cf7b33f3a7a…` in each item):
 
-- [ ] Merge the final candidate fixes, including any pending PDF viewer fix, and freeze passing source.
-- [ ] Rebuild from a clean, non-personal checkout path. Confirm the generated registrant URI no longer exposes a user's directory in any packaged CPU architecture. Do not allowlist personal paths or patch a signed binary.
-- [ ] Build the replacement for arm64-v8a only (command above) and confirm it contains no `armeabi-v7a` or `x86_64` libraries. The ARMv7 and x86_64 engine matches are excluded from distribution rather than classified. They remain blocking and still need narrowly scoped, provenance-backed handling with negative tests before those ABIs are ever shipped; until then they do not block an otherwise passing arm64-only replacement. No whole-file or whole-domain exclusions; unrelated addresses, credentials and private paths must still block.
-- [ ] Rescan the exact replacement signed arm64 APK. Public upload stays blocked until it reports **0 findings**, including no personal path in `lib/arm64-v8a/libapp.so`. Then repeat identity/signature/notices checks and device regression, and record its new checksum privately until approved for release.
+- [x] Merge the final candidate fixes, including any pending PDF viewer fix, and freeze passing source. *#9 (PDF) and #12 (arm64 packaging) merged; tag `v0.3.0-rc.9` = `44d5d45`, required CI passed.*
+- [x] Rebuild from a clean, non-personal checkout path. Confirm the generated registrant URI no longer exposes a user's directory in any packaged CPU architecture. Do not allowlist personal paths or patch a signed binary. *Rebuilt from a neutral checkout with the pub cache outside the user profile; no personal-path finding.*
+- [x] Build the replacement for arm64-v8a only (command above) and confirm it contains no `armeabi-v7a` or `x86_64` libraries. *Done: only `lib/arm64-v8a/` `libapp.so`, `libdartjni.so` and `libflutter.so`.* The ARMv7 and x86_64 engine matches are excluded from distribution rather than classified. They remain blocking and still need narrowly scoped, provenance-backed handling with negative tests before those ABIs are ever shipped; until then they do not block an otherwise passing arm64-only replacement. No whole-file or whole-domain exclusions; unrelated addresses, credentials and private paths must still block.
+- [x] Rescan the exact replacement signed arm64 APK. Public upload stays blocked until it reports **0 findings**, including no personal path in `lib/arm64-v8a/libapp.so`. Then repeat identity/signature/notices checks and device regression, and record its new checksum privately until approved for release. *288 entries, 0 items need review, on both the local file and the downloaded release asset. Follow-up checks are recorded below.*
 
-## Artifact gates - pending
+## Artifact gates - results
 
-- [ ] Freeze exact merged source and passing CI; verify locked dependency/notice inputs. No dependency upgrades are included in this preparation.
-- [ ] Verify release package/version/code and Settings stamp; confirm non-debuggable state and merged permissions (no broad media/storage access).
-- [ ] Verify the release signature against the established trusted certificate with `apksigner verify --print-certs app-release.apk` (Android SDK build-tools). Review the printed certificate DN (name, organization, location, email) before public upload: the APK signing block is not a ZIP entry, so `tools/privacy_check.py` **does not scan the certificate**. Do not replace the key to hide identity; that would break updates for existing installs. `keytool -printcert -jarfile` reads only legacy v1 signatures and may print nothing for this APK.
-- [ ] Confirm the APK contains only `lib/arm64-v8a/` native libraries.
-- [ ] Scan the exact APK for credentials, private hosts, personal build paths and other metadata; investigate every finding privately. Do not weaken the classifier to obtain a pass.
-- [ ] Inspect NOTICES/NOTICES.Z, Flutter/engine entries, required native notices and the Guava asset. Its raw SHA-256 must match committed LF provenance without newline normalization. See the native review for scope and limits.
-- [ ] Calculate SHA-256, record file size and provenance. No tags, Releases assets or automatic uploads are authorized by a successful local build.
+- [x] Freeze exact merged source and passing CI; verify locked dependency/notice inputs. *`flutter pub get --enforce-lockfile`; Guava notice input verified below.* No dependency upgrades are included in this preparation.
+- [x] Verify release package/version/code; confirm non-debuggable state and merged permissions (no broad media/storage access). *Maintainer-reviewed `aapt2 dump badging`: `0.3.0-rc.9`/`23`, `native-code: 'arm64-v8a'`, not debuggable, no broad storage or media permissions.*
+- [x] Settings stamp reads `0.3.0-rc.9 (build 23)`. *Maintainer-confirmed on the device; the stamp appears only after connecting or starting the demo.*
+- [x] Verify the release signature against the established trusted certificate with `apksigner verify --print-certs app-release.apk` (Android SDK build-tools). Review the printed certificate DN (name, organization, location, email) before public upload: the APK signing block is not a ZIP entry, so `tools/privacy_check.py` **does not scan the certificate**. Do not replace the key to hide identity; that would break updates for existing installs. `keytool -printcert -jarfile` reads only legacy v1 signatures and may print nothing for this APK. *Maintainer confirmed the established key and reviewed the DN privately; details are not recorded here.*
+- [x] Confirm the APK contains only `lib/arm64-v8a/` native libraries.
+- [x] Scan the exact APK for credentials, private hosts, personal build paths and other metadata; investigate every finding privately. Do not weaken the classifier to obtain a pass.
+- [x] Inspect NOTICES/NOTICES.Z, Flutter/engine entries, required native notices and the Guava asset. Its raw SHA-256 must match committed LF provenance without newline normalization. See the native review for scope and limits. *In the downloaded release asset: `NOTICES.Z` (gzip) holds 1,623 license groups including Flutter, the engine, Dart, Skia, BoringSSL, ICU, zlib, FreeType, HarfBuzz and Apache terms; the Guava entry's raw SHA-256 is `0035edb8…fc1d`, matching the provenance. `version-control-info.textproto` and `app-metadata.properties` contain no personal data.*
+- [x] Calculate SHA-256, record file size and provenance. *`8cf7b33f3a7a11ba5de8541f2e111d475224ecac591e2bebb8743ee572ed078b`, 19,943,294 bytes; the uploaded release asset digest and a re-download match.* No tags, Releases assets or automatic uploads are authorized by a successful local build.
 
-## Short device check - pending
+## Short device check - maintainer-reported pass (Galaxy S24 Ultra, Android 16)
+
+The maintainer installed the frozen APK as an update and reported all seven checks working. Treat the procedure below as the checklist that was run; per-step evidence is not recorded in Git.
 
 Use harmless synthetic content. Record Pass/Fail/Not tested, device/OS and exact APK hash/build; keep archive settings and messages private.
 
@@ -77,7 +80,7 @@ Use harmless synthetic content. Record Pass/Fail/Not tested, device/OS and exact
 6. Start the built-in demo offline. Browse/search/filter/page, switch all three fictional accounts, read long/complex mail and save/reopen a harmless attachment. Check the banner at largest text and landscape, including Connection settings. Test Cancel and exits from the banner, Settings and reader. Verify a saved real connection still restores and relaunch does not restore demo mode.
 7. Open Settings > Open source licenses offline. Read Flutter and Guava notices, scroll at largest text/landscape and return without losing account state. Exercise the broader [device checklist](../testing/device-checklist.md) before publication.
 
-## Draft public prerelease notes - not published
+## Public prerelease notes - published
 
 **MailBurrow 0.3.0-rc.9 - Android preview (build23)**
 
@@ -89,6 +92,6 @@ This is a prerelease, not a stable release. Mail-Archiver is the only supported 
 
 The first signed MailBurrow installation is separate from the old MailShelf app; connect once in the new app. Obtain the APK only from the approved release, compare the supplied SHA-256 and report problems using synthetic steps. Release notes must include the actual source/tag, APK checksum, tested platforms and any remaining known limitations after validation.
 
-## Publication handoff - pending
+## Publication handoff - done
 
 Only after artifact/device checks and explicit approval: tag the tested source, upload the frozen APK and checksum as a GitHub **prerelease**, download the uploaded APK and verify identical bytes/hash, and test the downloaded copy. Update the README/download status only when the asset is actually available. The existing source-only launch does not authorize this step.
