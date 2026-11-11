@@ -4,7 +4,7 @@
 
 ## Status and identity
 
-**Published as a GitHub prerelease on 2026-11-10:** [v0.3.0-rc.9](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.3.0-rc.9), tag at the merge of #12. The replacement APK was built from a neutral checkout for arm64-v8a only, cleared the artifact privacy blocker below with 0 findings, passed the recorded signature, package, notice and device checks (one item remains unrecorded; see the checklists), and the uploaded asset's SHA-256 matches the frozen file: `8cf7b33f3a7a11ba5de8541f2e111d475224ecac591e2bebb8743ee572ed078b` (19,943,294 bytes). The sections below are kept as the record of the gates.
+**Published as a GitHub prerelease on 2026-11-10:** [v0.3.0-rc.9](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.3.0-rc.9), tag at the merge of #12. The replacement APK was built from a neutral checkout for arm64-v8a only, cleared the artifact privacy blocker below with 0 findings, passed the recorded signature, package, notice and device checks, and the uploaded asset's SHA-256 matches the frozen file: `8cf7b33f3a7a11ba5de8541f2e111d475224ecac591e2bebb8743ee572ed078b` (19,943,294 bytes). The sections below are kept as the record of the gates.
 
 | Item | Intended value |
 | --- | --- |
@@ -59,7 +59,7 @@ Before replacing that artifact (outcome for the published APK `8cf7b33f3a7a…` 
 
 - [x] Freeze exact merged source and passing CI; verify locked dependency/notice inputs. *`flutter pub get --enforce-lockfile`; Guava notice input verified below.* No dependency upgrades are included in this preparation.
 - [x] Verify release package/version/code; confirm non-debuggable state and merged permissions (no broad media/storage access). *Maintainer-reviewed `aapt2 dump badging`: `0.3.0-rc.9`/`23`, `native-code: 'arm64-v8a'`, not debuggable, no broad storage or media permissions.*
-- [ ] Settings stamp reads `0.3.0-rc.9 (build 23)`. *Not separately recorded; the stamp appears only after connecting or starting the demo.*
+- [x] Settings stamp reads `0.3.0-rc.9 (build 23)`. *Maintainer-confirmed on the device; the stamp appears only after connecting or starting the demo.*
 - [x] Verify the release signature against the established trusted certificate with `apksigner verify --print-certs app-release.apk` (Android SDK build-tools). Review the printed certificate DN (name, organization, location, email) before public upload: the APK signing block is not a ZIP entry, so `tools/privacy_check.py` **does not scan the certificate**. Do not replace the key to hide identity; that would break updates for existing installs. `keytool -printcert -jarfile` reads only legacy v1 signatures and may print nothing for this APK. *Maintainer confirmed the established key and reviewed the DN privately; details are not recorded here.*
 - [x] Confirm the APK contains only `lib/arm64-v8a/` native libraries.
 - [x] Scan the exact APK for credentials, private hosts, personal build paths and other metadata; investigate every finding privately. Do not weaken the classifier to obtain a pass.
