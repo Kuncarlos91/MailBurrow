@@ -114,7 +114,7 @@ class MemoryBackend implements ArchiveBackend {
 
   @override
   Future<MailMessage> message(String id) async =>
-      MailMessage(id: id, subject: 'From memory');
+      const MailMessage(subject: 'From memory');
 
   @override
   Future<void> downloadAttachment(

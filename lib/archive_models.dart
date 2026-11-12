@@ -157,10 +157,10 @@ class MailAttachment {
   final String contentType;
 }
 
-/// One full message: headers, bodies and attachment details.
+/// One full message: headers, bodies and attachment details. It carries no
+/// ID of its own: callers already hold the ID they asked for.
 class MailMessage {
   const MailMessage({
-    required this.id,
     this.subject,
     this.from,
     this.sentDate,
@@ -177,7 +177,6 @@ class MailMessage {
       throw const FormatException('Invalid message response');
     }
     return MailMessage(
-      id: archiveId(json['id']),
       subject: _text(json['subject']),
       from: _text(json['from']),
       sentDate: _text(json['sentDate']),
@@ -191,7 +190,6 @@ class MailMessage {
     );
   }
 
-  final String id;
   final String? subject, from;
   final String? sentDate, folderName;
   final String htmlBody, textBody;

@@ -51,11 +51,10 @@ class TextIdBackend extends FakeArchiveBackend {
   @override
   Future<MailMessage> message(String id) async {
     requestedMessage = id;
-    return MailMessage(
-      id: id,
+    return const MailMessage(
       subject: 'Opaque ID message',
       textBody: 'Fictional body',
-      attachments: const [MailAttachment(attachmentId, 'sample.txt', 4)],
+      attachments: [MailAttachment(attachmentId, 'sample.txt', 4)],
     );
   }
 }
@@ -107,7 +106,6 @@ void main() {
         reason: '$id',
       );
       expect(() => MailSummary.fromJson({'id': id}), throwsFormatException);
-      expect(() => MailMessage.fromJson({'id': id}), throwsFormatException);
     }
     for (final value in [null, 'text', 7, <Object>[]]) {
       expect(() => ArchiveAccount.fromJson(value), throwsFormatException);
@@ -117,6 +115,18 @@ void main() {
     }
     expect(ArchiveAccount.fromJson({'id': 7}).id, '7');
     expect(MailSummary.fromJson({'id': 0}).id, '0');
+    expect(
+      () => MailMessage.fromJson({
+        'attachments': [
+          {'id': null},
+        ],
+      }),
+      throwsFormatException,
+    );
+    expect(
+      () => MailMessage.fromJson({'attachments': 'none'}),
+      throwsFormatException,
+    );
   });
 
   test('switching to the current account changes nothing', () async {
