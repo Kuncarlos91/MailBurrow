@@ -38,7 +38,15 @@ File imports run once; they are not re-synced. Importing the same zip again may 
 python tools/oa_lab_check.py https://<test-server>:8443 --samples oa-samples --rate-limit
 ```
 
-It asks for an admin key, a reader key and a deleted key without echoing them (on Windows, paste with a right-click). It only sends `GET` requests, always verifies certificates and never follows redirects. It checks key rejection, source isolation on every read surface (listing, email by ID, attachment download, storage paths, search), message and attachment behaviour, search size and attachment text, preserve-original sources, totals and the rate limit. `--samples` saves fictional sample responses for future test fixtures; review them before committing. `--rate-limit` sends about 100 quick requests, so the reader key is rate-limited for about a minute.
+It asks for an admin key, a reader key and, optionally, a deleted key, without echoing them (on Windows, paste with a right-click). It only sends `GET` requests, always verifies certificates and never follows redirects.
+
+**What a result means.** Every check is `PASS`, `FAIL` or `SKIP`, and required or `(optional)`. The last line reads `RESULT: all required checks passed` only when nothing failed **and** no required check was skipped; otherwise it reads `NOT PROVEN` and the script exits with 1. Search checks use known terms from the demo fixtures with positive controls (an admin search that must find the other source's term), so an empty or malformed response never counts as working.
+
+**Required fixtures:** the three demo zips imported as separate sources, and a reader limited to the Alex Rivera source (40 messages). **Optional:** a deleted key, a source imported with **Preserve Original File** (from `riverside-garden-club.zip`), and `--rate-limit`, which sends about 100 quick requests and rate-limits the reader key for about a minute. Optional checks that did not run are listed as `SKIP (optional)`, never as passes.
+
+**What the summary can contain:** statuses, counts, sizes, booleans, and field or header names from fixed allowlists. Server-provided text (error messages, page bodies, header values, unknown field names) is never printed; unknown names are only counted. `--samples` saves fictional sample responses for future test fixtures; review them before committing.
+
+[test_oa_lab_check.py](../../tools/test_oa_lab_check.py) runs the checker against an in-process fake server built from the demo fixtures, with faults injected one at a time: missing fixtures, empty and malformed search responses, leaking results or totals, inline payloads and server error text carrying sentinel secrets.
 
 The reader needs a custom role with two rules, one on its source and one on that source's emails:
 
