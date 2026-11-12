@@ -211,7 +211,7 @@ void main() {
     final saved = jsonDecode(
       (await const FlutterSecureStorage().read(key: 'connection'))!,
     );
-    expect(saved['accountId'], 2);
+    expect(saved['accountId'], '2');
     expect(saved['key'], 'test-only');
     await tester.tap(find.byIcon(Icons.folder_outlined).first);
     await tester.pumpAndSettle();
@@ -297,7 +297,7 @@ void main() {
         jsonDecode(
           (await const FlutterSecureStorage().read(key: 'connection'))!,
         )['accountId'],
-        1,
+        '1',
       );
       expect(tester.takeException(), isNull);
     },
@@ -328,7 +328,7 @@ void main() {
         jsonDecode(
           (await const FlutterSecureStorage().read(key: 'connection'))!,
         )['accountId'],
-        1,
+        '1',
       );
     },
   );

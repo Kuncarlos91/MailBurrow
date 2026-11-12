@@ -8,6 +8,7 @@ import '../archive_errors.dart';
 import '../archive_backend.dart';
 import '../demo/demo_archive.dart';
 import '../search_filters.dart';
+import '../archive_server_type.dart';
 import 'connection_store.dart';
 
 /// Creates the backend for a validated server address and key.
@@ -57,6 +58,10 @@ class ArchiveSession extends ChangeNotifier {
   void Function(bool Function() stillCurrent)? onAccountChanged;
 
   ArchiveBackend? api;
+
+  /// The server type of the current or restored connection. Mail-Archiver is
+  /// the only type so far; it is saved with the connection and never detected.
+  ArchiveServerType serverType = ArchiveServerType.mailArchiver;
   Map<String, dynamic>? account;
   List<ArchiveFolder> folders = [];
   String? selectedFolder;
@@ -142,6 +147,7 @@ class ArchiveSession extends ChangeNotifier {
       if (_disposed) return;
       if (saved != null) {
         hasSavedConnection = true;
+        serverType = saved.serverType;
         server.text = saved.server;
         await connect(saved.key, saved.accountId);
         return;
@@ -160,7 +166,10 @@ class ArchiveSession extends ChangeNotifier {
     }
   }
 
-  Future<void> connect([String? savedKey, int? preferredAccountId]) async {
+  /// Connects with the key entered in setup, or with [savedKey] when restoring.
+  /// [preferredAccountId] is the saved account as text; it is matched against
+  /// each account's ID in its text form.
+  Future<void> connect([String? savedKey, String? preferredAccountId]) async {
     mailRequestFailed = false;
     accountSwitchGeneration++;
     accountLoading = false;
@@ -195,7 +204,7 @@ class ArchiveSession extends ChangeNotifier {
       if (accounts.isEmpty) throw const ArchiveFailure(404);
       final available = accounts.cast<Map<String, dynamic>>();
       final preferred = available
-          .where((item) => item['id'] == preferredAccountId)
+          .where((item) => '${item['id']}' == preferredAccountId)
           .firstOrNull;
       final selected = preferred ?? available.first;
       final accountUnavailable =
@@ -205,6 +214,7 @@ class ArchiveSession extends ChangeNotifier {
       final pages = (result['totalPages'] as int).clamp(1, 1000000);
       try {
         await _store.write(
+          serverType: serverType,
           server: uri.toString(),
           key: key,
           accountId: selected['id'],
@@ -280,6 +290,7 @@ class ArchiveSession extends ChangeNotifier {
       // The demo is never saved, so its account choice is not stored either.
       if (!demo) {
         await _store.write(
+          serverType: serverType,
           server: requestApi.server.toString(),
           key: requestApi.key,
           accountId: choice['id'],
@@ -498,6 +509,7 @@ class ArchiveSession extends ChangeNotifier {
     try {
       await _store.delete();
       if (_disposed) return;
+      serverType = ArchiveServerType.mailArchiver;
       api?.close();
       _invalidateRequests();
       _clearBrowsing();

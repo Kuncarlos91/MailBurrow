@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mailburrow/archive_models.dart';
+import 'package:mailburrow/archive_server_type.dart';
 import 'package:mailburrow/demo/demo_archive.dart';
 import 'package:mailburrow/search_filters.dart';
 import 'package:mailburrow/state/archive_session.dart';
@@ -21,12 +22,18 @@ class RecordingStore extends ConnectionStore {
 
   @override
   Future<void> write({
+    required ArchiveServerType serverType,
     required String server,
     required String key,
     required Object? accountId,
   }) {
     calls.add('write');
-    return super.write(server: server, key: key, accountId: accountId);
+    return super.write(
+      serverType: serverType,
+      server: server,
+      key: key,
+      accountId: accountId,
+    );
   }
 
   @override
