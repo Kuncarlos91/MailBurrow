@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:isolate';
 import 'dart:typed_data';
 import 'archive_backend.dart';
+import 'archive_capabilities.dart';
 import 'archive_models.dart';
 import 'archive_errors.dart';
 import 'search_filters.dart';
@@ -87,6 +88,10 @@ class ArchiveApi implements ArchiveBackend {
   final Uri server;
   @override
   final String key;
+
+  @override
+  ArchiveCapabilities get capabilities => ArchiveCapabilities.full;
+
   // One client per connection lets API calls reuse TLS connections.
   // Attachment downloads keep their own client in [_clients].
   HttpClient? _apiClient;

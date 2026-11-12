@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../archive_api.dart' show flattenFolders;
 import '../archive_backend.dart';
+import '../archive_capabilities.dart';
 import '../archive_errors.dart';
 import '../archive_models.dart';
 import '../attachment_download.dart';
@@ -79,6 +80,9 @@ class DemoArchive implements ArchiveBackend {
   /// Never sent anywhere; present only because the interface requires it.
   @override
   String get key => 'demo';
+
+  @override
+  ArchiveCapabilities get capabilities => ArchiveCapabilities.full;
 
   void _checkOpen() {
     if (_closed) throw StateError('Demo archive closed');

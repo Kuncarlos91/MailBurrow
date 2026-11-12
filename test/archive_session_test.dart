@@ -8,6 +8,7 @@ import 'package:mailburrow/archive_models.dart';
 import 'package:mailburrow/archive_server_type.dart';
 import 'package:mailburrow/archive_errors.dart';
 import 'package:mailburrow/archive_backend.dart';
+import 'package:mailburrow/archive_capabilities.dart';
 import 'package:mailburrow/attachment_download.dart';
 import 'package:mailburrow/search_filters.dart';
 import 'package:mailburrow/state/archive_session.dart';
@@ -89,6 +90,10 @@ class MemoryBackend implements ArchiveBackend {
   final Uri server;
   @override
   final String key;
+
+  @override
+  ArchiveCapabilities get capabilities => ArchiveCapabilities.full;
+
   bool closed = false;
 
   @override
