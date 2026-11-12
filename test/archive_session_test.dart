@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mailburrow/archive_models.dart';
+import 'package:mailburrow/archive_server_type.dart';
 import 'package:mailburrow/archive_errors.dart';
 import 'package:mailburrow/archive_backend.dart';
 import 'package:mailburrow/attachment_download.dart';
@@ -151,6 +152,7 @@ class FailingStore extends ConnectionStore {
   const FailingStore();
   @override
   Future<void> write({
+    required ArchiveServerType serverType,
     required String server,
     required String key,
     required Object? accountId,
@@ -218,7 +220,9 @@ void main() {
     expect(session.keyInput.text, isEmpty);
     final saved = await savedConnection();
     expect(saved?['server'], 'https://archive.example.com');
-    expect(saved?['accountId'], 1);
+    expect(saved?['accountId'], '1');
+    expect(saved?['version'], 2);
+    expect(saved?['serverType'], 'mail-archiver');
   });
 
   test('restore reopens the remembered account', () async {
@@ -233,6 +237,60 @@ void main() {
     expect(session.account?['id'], 2);
     expect(session.accountNotice, isNull);
     expect(subjects(session), ['account 2 mail 0']);
+  });
+
+  test('a saved connection from 0.3.0-rc.9 migrates to version 2', () async {
+    // Version 1: no version or server type, numeric account ID.
+    FlutterSecureStorage.setMockInitialValues({
+      'connection': jsonEncode({
+        'server': 'https://archive.example.com',
+        'key': 'test-only',
+        'accountId': 2,
+      }),
+    });
+    await session.restore();
+    expect(session.account?['id'], 2);
+    expect(session.serverType, ArchiveServerType.mailArchiver);
+    expect(await savedConnection(), {
+      'version': 2,
+      'serverType': 'mail-archiver',
+      'server': 'https://archive.example.com',
+      'key': 'test-only',
+      'accountId': '2',
+    });
+
+    // The migrated value restores the same account after an app restart.
+    session.dispose();
+    session = newSession();
+    await session.restore();
+    expect(session.account?['id'], 2);
+    expect(session.accountNotice, isNull);
+  });
+
+  test('an unknown saved server type is never probed with the saved key',
+      () async {
+    FlutterSecureStorage.setMockInitialValues({
+      'connection': jsonEncode({
+        'version': 2,
+        'serverType': 'some-future-server',
+        'server': 'https://archive.example.com',
+        'key': 'test-only',
+        'accountId': '2',
+      }),
+    });
+    var created = 0;
+    session.dispose();
+    session = ArchiveSession(
+      apiFactory: (server, key) {
+        created++;
+        return api = FakeArchiveApi(server, key);
+      },
+    );
+    await session.restore();
+    expect(created, 0, reason: 'no request is sent with the saved key');
+    expect(session.api, isNull);
+    expect(session.setup, isTrue);
+    expect(session.error, contains('Saved connection unavailable'));
   });
 
   test('restore explains a remembered account that is gone', () async {
@@ -291,7 +349,7 @@ void main() {
       expect(subjects(session), ['account 2 mail 0']);
       expect(session.folders.single.path, 'INBOX-2');
       expect(session.accountLoading, isFalse);
-      expect((await savedConnection())?['accountId'], 2);
+      expect((await savedConnection())?['accountId'], '2');
     },
   );
 

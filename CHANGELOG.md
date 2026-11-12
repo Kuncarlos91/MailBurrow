@@ -2,6 +2,12 @@
 
 All notable changes to MailBurrow are recorded here. Versions follow the app version shown in Settings.
 
+## Unreleased (feature/open-archiver)
+
+Groundwork for a second archive server type; no visible change for Mail-Archiver users.
+
+- The saved connection now records its server type and stores the selected account ID as text (format version 2). Connections saved by 0.3.0-rc.9 and earlier migrate automatically on the next successful connection and keep the selected account.
+
 ## 0.3.0-rc.9 (build23) - 2026-11-10
 
 First public Android APK, published as a [GitHub prerelease](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.3.0-rc.9) from tag `v0.3.0-rc.9`. APK SHA-256 `8cf7b33f3a7a11ba5de8541f2e111d475224ecac591e2bebb8743ee572ed078b`. See the [candidate guide](docs/releasing/android-rc9.md) for the gates it passed.
