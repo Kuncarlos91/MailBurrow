@@ -3,11 +3,13 @@ import 'package:mailburrow/archive_models.dart';
 
 void main() {
   test(
-    'wrong boolean types are rejected and missing flags retain defaults',
+    'attachment flags are strict while account state keeps its display fallback',
     () {
       expect(
-        ArchiveAccount.fromJson({'id': 1, 'isEnabled': 'true'})
-            .archivingEnabled,
+        ArchiveAccount.fromJson({
+          'id': 1,
+          'isEnabled': 'true',
+        }).archivingEnabled,
         isNull,
         reason: 'display-only account fields fall back to "not reported"',
       );

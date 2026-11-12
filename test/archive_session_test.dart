@@ -150,8 +150,7 @@ class FailingStore extends ConnectionStore {
 }
 
 List<String> subjects(ArchiveSession session) => [
-  for (final item in session.messages)
-    item.subject!,
+  for (final item in session.messages) item.subject!,
 ];
 
 Future<Map<String, dynamic>?> savedConnection() async {
@@ -228,6 +227,49 @@ void main() {
     expect(session.accountNotice, isNull);
     expect(subjects(session), ['account 2 mail 0']);
   });
+
+  test(
+    'display-only account fields do not block saved-account restoration',
+    () async {
+      FlutterSecureStorage.setMockInitialValues({
+        'connection': jsonEncode({
+          'server': 'https://archive.example.com',
+          'key': 'test-only',
+          'accountId': 2,
+        }),
+      });
+      session.dispose();
+      session = ArchiveSession(
+        apiFactory: (server, key) {
+          api = FakeArchiveApi(server, key);
+          api.accountList = [
+            {'id': 1, 'emailAddress': 'one@example.com'},
+            {'id': 2, 'emailAddress': [], 'lastSync': 17, 'isEnabled': 'true'},
+          ];
+          return api;
+        },
+      );
+
+      await session.restore();
+
+      expect(session.setup, isFalse);
+      expect(session.error, isNull);
+      expect(session.accountNotice, isNull);
+      expect(session.account?.id, '2');
+      expect(session.account?.address, 'Email address not reported');
+      expect(session.account?.lastSync, isNull);
+      expect(session.account?.archivingEnabled, isNull);
+      expect(subjects(session), ['account 2 mail 0']);
+      expect(session.folders.single.path, 'INBOX-2');
+      expect(await savedConnection(), {
+        'version': 2,
+        'serverType': 'mail-archiver',
+        'server': 'https://archive.example.com',
+        'key': 'test-only',
+        'accountId': '2',
+      });
+    },
+  );
 
   test('a saved connection from 0.3.0-rc.9 migrates to version 2', () async {
     // Version 1: no version or server type, numeric account ID.
@@ -368,7 +410,9 @@ void main() {
       final cancellations = api.cancelledMailRequests;
       var changed = false;
       session.onAccountChanged = (_) => changed = true;
-      await session.switchAccount(ArchiveAccount.fromJson({'id': 2, 'emailAddress': 'two@example.com'}));
+      await session.switchAccount(
+        ArchiveAccount.fromJson({'id': 2, 'emailAddress': 'two@example.com'}),
+      );
 
       slow.complete(FakeArchiveApi.page('stale'));
       await slowLoad;
