@@ -21,7 +21,15 @@ Map<String, dynamic> _object(Object? value, String what) {
   throw FormatException('Invalid $what response');
 }
 
-String? _text(Object? value) => value is String ? value : null;
+String? _text(Object? value) {
+  if (value == null || value is String) return value as String?;
+  throw const FormatException('Invalid archive text field');
+}
+
+bool? _flag(Object? value) {
+  if (value == null || value is bool) return value as bool?;
+  throw const FormatException('Invalid archive boolean field');
+}
 
 int _count(Map<String, dynamic> json, String field) {
   final value = json[field];
@@ -42,12 +50,11 @@ class ArchiveAccount {
 
   factory ArchiveAccount.fromJson(Object? value) {
     final json = _object(value, 'account');
-    final enabled = json['isEnabled'];
     return ArchiveAccount(
       id: archiveId(json['id']),
       emailAddress: _text(json['emailAddress']),
       lastSync: _text(json['lastSync']),
-      archivingEnabled: enabled is bool ? enabled : null,
+      archivingEnabled: _flag(json['isEnabled']),
     );
   }
 
@@ -86,7 +93,7 @@ class MailSummary {
       subject: _text(json['subject']),
       from: _text(json['from']),
       sentDate: _text(json['sentDate']),
-      hasAttachments: json['hasAttachments'] == true,
+      hasAttachments: _flag(json['hasAttachments']) ?? false,
     );
   }
 
@@ -114,8 +121,9 @@ class MailPage {
     final pages = json['totalPages'];
     final total = json['totalItems'];
     if (items is! List<dynamic> ||
-        (page != null && page is! int) ||
+        (page != null && (page is! int || page < 1)) ||
         pages is! int ||
+        pages < 0 ||
         (total != null && (total is! int || total < 0))) {
       throw const FormatException('Invalid message list response');
     }
@@ -145,12 +153,18 @@ class MailAttachment {
     this.size, [
     this.contentType = 'application/octet-stream',
   ]);
-  factory MailAttachment.fromJson(Map<String, dynamic> value) => MailAttachment(
-    archiveId(value['id']),
-    value['fileName'] as String? ?? 'attachment',
-    (value['size'] as num?)?.toInt() ?? 0,
-    value['contentType'] as String? ?? 'application/octet-stream',
-  );
+  factory MailAttachment.fromJson(Map<String, dynamic> value) {
+    final size = value['size'];
+    if (size != null && (size is! num || !size.isFinite)) {
+      throw const FormatException('Invalid attachment size');
+    }
+    return MailAttachment(
+      archiveId(value['id']),
+      _text(value['fileName']) ?? 'attachment',
+      (size as num?)?.toInt() ?? 0,
+      _text(value['contentType']) ?? 'application/octet-stream',
+    );
+  }
   final String id;
   final int size;
   final String name;
