@@ -916,7 +916,12 @@ void main() {
             (await const FlutterSecureStorage().read(key: 'connection'))!,
           ),
           succeeds
-              ? {...jsonDecode(saved) as Map<String, dynamic>, 'accountId': 1}
+              ? {
+                  ...jsonDecode(saved) as Map<String, dynamic>,
+                  'version': 2,
+                  'serverType': 'mail-archiver',
+                  'accountId': '1',
+                }
               : jsonDecode(saved),
         );
       },
@@ -1019,7 +1024,12 @@ void main() {
         jsonDecode(
           (await const FlutterSecureStorage().read(key: 'connection'))!,
         ),
-        {...jsonDecode(saved) as Map<String, dynamic>, 'accountId': 1},
+        {
+          ...jsonDecode(saved) as Map<String, dynamic>,
+          'version': 2,
+          'serverType': 'mail-archiver',
+          'accountId': '1',
+        },
       );
     },
   );
