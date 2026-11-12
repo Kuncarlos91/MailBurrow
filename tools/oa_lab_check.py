@@ -39,7 +39,7 @@ EXPECT = {
     "reader_total": 40,            # Alex Rivera demo account
     "own_term": "clockwork",       # occurs in exactly one Alex message
     "own_term_subject": "The Corner Reader: June picks",
-    "other_term": "sourdough",     # occurs only in Maple Street Bakery mail
+    "other_term": "wholesale",     # only in Maple Street Bakery mail, attachments included
     "attachment_term": "yogurt",   # inside lemon-cake-recipe.txt
     "attachment_term_subject": "Recipe you asked for",
     "filter_subjects": [           # Alex messages with attachments sent in 2026
@@ -397,11 +397,15 @@ def run_checks(lab, admin, reader, deleted, rate_limit=False, samples=None):
     control_hits = dicts(hits_of(control))
     blocked = lab.get("/search", reader, {"keywords": EXPECT["other_term"], "limit": 25})
     b_hits, b_total = hits_of(blocked), total_of(blocked)
+    b_foreign = sum(1 for h in dicts(b_hits) if h.get("ingestionSourceId") != src_a)
     if any(h.get("ingestionSourceId") != src_a for h in control_hits):
+        # Hits from the reader's own source are allowed (a term can also occur in its own
+        # mail or attachment text); any hit, or any count, from another source is a leak.
         lab.check("Reader search cannot find another source's term",
-                  blocked.status == 403 or (blocked.status == 200 and b_hits == [] and b_total in (0, None)),
-                  "admin control %d hits; reader %s, %s hits, total %s" % (
-                      len(control_hits), st(blocked), count(b_hits), number(b_total)))
+                  blocked.status == 403 or (blocked.status == 200 and b_hits is not None and b_foreign == 0
+                                            and b_total in (len(b_hits), None)),
+                  "admin control %d hits; reader %s, %s hits (%d from other sources), total %s" % (
+                      len(control_hits), st(blocked), count(b_hits), b_foreign, number(b_total)))
     else:
         lab.skip("Reader search cannot find another source's term",
                  "admin control search found nothing (%s)" % st(control))

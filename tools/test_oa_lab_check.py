@@ -35,16 +35,23 @@ def load_fixtures():
             atts.append({"id": "att-%d" % a["id"], "filename": a["fileName"], "mimeType": a["contentType"],
                          "sizeBytes": len(data), "storagePath": "%s/att-%d" % (ACCOUNT_SOURCE[m["accountId"]], a["id"]),
                          "_data": data,
-                         "_text": data.decode("utf-8", "replace") if a["contentType"].startswith("text/") else ""})
+                         "_text": re.sub(r"<[^>]+>", " ", data.decode("utf-8", "replace"))
+                         if a["contentType"].startswith("text/") else ""})
         emails["e-%d" % m["id"]] = {
             "id": "e-%d" % m["id"], "ingestionSourceId": ACCOUNT_SOURCE[m["accountId"]],
             "subject": m["subject"], "hasAttachments": bool(atts), "timestamp": ts,
-            "body": " ".join([m.get("textBody") or ""]), "attachments": atts,
+            "body": m.get("textBody") or "", "html": re.sub(r"<[^>]+>", " ", m.get("htmlBody") or ""),
+            "attachments": atts,
         }
     return emails
 
 
 FIXTURES = load_fixtures()
+
+
+def searchable(e):
+    """What Open Archiver indexes: subject, body text and extracted attachment text."""
+    return " ".join([str(e["subject"]), e["body"], e["html"]] + [a["_text"] for a in e["attachments"]]).lower()
 
 
 def stripped_eml(e, inline=False, full=False):
@@ -153,7 +160,7 @@ class FakeOpenArchiver:
             if q.get("searchIn") == "attachment_content":
                 rows = [e for e in rows if any(kw in a["_text"].lower() for a in e["attachments"])]
             else:
-                rows = [e for e in rows if re.search(r"\b%s\b" % re.escape(kw), (str(e["subject"]) + " " + e["body"]).lower())]
+                rows = [e for e in rows if re.search(r"\b%s\b" % re.escape(kw), searchable(e))]
         rows.sort(key=lambda e: -(e["timestamp"] or 0))
         page, limit = int(q.get("page", 1)), int(q.get("limit", 10))
         total = len(rows)
@@ -193,7 +200,7 @@ class ExpectationsMatchFixtures(unittest.TestCase):
         self.assertEqual(len(alex), lab.EXPECT["reader_total"])
 
         def has(e, word):
-            return re.search(r"\b%s\b" % word, (str(e["subject"]) + " " + e["body"]).lower())
+            return re.search(r"\b%s\b" % word, searchable(e))
         own = [e for e in FIXTURES.values() if has(e, lab.EXPECT["own_term"])]
         self.assertEqual([e["subject"] for e in own], [lab.EXPECT["own_term_subject"]])
         other = [e for e in FIXTURES.values() if has(e, lab.EXPECT["other_term"])]
@@ -257,6 +264,18 @@ class CheckerTests(unittest.TestCase):
             self.assertIn("[FAIL]", line(out, name), name)
         # With no admin control hit, the isolation test cannot be proven either way.
         self.assertIn("[SKIP]", line(out, "Reader search cannot find another source's term"))
+
+    def test_other_source_term_may_also_match_own_mail(self):
+        # Regression: "sourdough" is in a bakery email and in the receipt attachment of
+        # an Alex Rivera email. The reader's own hit is not a leak.
+        original = lab.EXPECT["other_term"]
+        lab.EXPECT["other_term"] = "sourdough"
+        try:
+            code, out = run(FakeOpenArchiver())
+        finally:
+            lab.EXPECT["other_term"] = original
+        self.assertEqual(code, 0, out)
+        self.assertIn("1 hits (0 from other sources)", line(out, "Reader search cannot find another source's term"))
 
     def test_inline_payload_is_counted_separately(self):
         code, out = run(FakeOpenArchiver(inline=True))
