@@ -7,6 +7,7 @@ All notable changes to MailBurrow are recorded here. Versions follow the app ver
 Groundwork for a second archive server type; no visible change for Mail-Archiver users.
 
 - The saved connection now records its server type and stores the selected account ID as text (format version 2). Connections saved by 0.3.0-rc.9 and earlier migrate automatically on the next successful connection and keep the selected account.
+- Reject ambiguous saved records with an explicit null version or a server type without a version before creating an API client; preserve the stored record for recovery.
 
 ## 0.3.0-rc.9 (build23) - 2026-11-10
 

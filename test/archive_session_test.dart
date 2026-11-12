@@ -267,31 +267,71 @@ void main() {
     expect(session.accountNotice, isNull);
   });
 
-  test('an unknown saved server type is never probed with the saved key',
+  test(
+    'an unknown saved server type is never probed with the saved key',
+    () async {
+      FlutterSecureStorage.setMockInitialValues({
+        'connection': jsonEncode({
+          'version': 2,
+          'serverType': 'some-future-server',
+          'server': 'https://archive.example.com',
+          'key': 'test-only',
+          'accountId': '2',
+        }),
+      });
+      var created = 0;
+      session.dispose();
+      session = ArchiveSession(
+        apiFactory: (server, key) {
+          created++;
+          return api = FakeArchiveApi(server, key);
+        },
+      );
+      await session.restore();
+      expect(created, 0, reason: 'no request is sent with the saved key');
+      expect(session.api, isNull);
+      expect(session.setup, isTrue);
+      expect(session.error, contains('Saved connection unavailable'));
+    },
+  );
+
+  for (final record in <Map<String, Object?>>[
+    {'serverType': 'some-future-server'},
+    {'serverType': 'mail-archiver'},
+    {'serverType': null},
+    {'version': null},
+    {'version': null, 'serverType': 'some-future-server'},
+  ]) {
+    test(
+      'ambiguous saved format $record is rejected without an API client',
       () async {
-    FlutterSecureStorage.setMockInitialValues({
-      'connection': jsonEncode({
-        'version': 2,
-        'serverType': 'some-future-server',
-        'server': 'https://archive.example.com',
-        'key': 'test-only',
-        'accountId': '2',
-      }),
-    });
-    var created = 0;
-    session.dispose();
-    session = ArchiveSession(
-      apiFactory: (server, key) {
-        created++;
-        return api = FakeArchiveApi(server, key);
+        final encoded = jsonEncode({
+          'server': 'https://archive.example.com',
+          'key': 'test-only',
+          'accountId': 2,
+          ...record,
+        });
+        FlutterSecureStorage.setMockInitialValues({'connection': encoded});
+        var created = 0;
+        session.dispose();
+        session = ArchiveSession(
+          apiFactory: (server, key) {
+            created++;
+            return api = FakeArchiveApi(server, key);
+          },
+        );
+        await session.restore();
+        expect(created, 0);
+        expect(session.api, isNull);
+        expect(session.setup, isTrue);
+        expect(session.error, contains('Saved connection unavailable'));
+        expect(
+          await const FlutterSecureStorage().read(key: 'connection'),
+          encoded,
+        );
       },
     );
-    await session.restore();
-    expect(created, 0, reason: 'no request is sent with the saved key');
-    expect(session.api, isNull);
-    expect(session.setup, isTrue);
-    expect(session.error, contains('Saved connection unavailable'));
-  });
+  }
 
   test('restore explains a remembered account that is gone', () async {
     FlutterSecureStorage.setMockInitialValues({

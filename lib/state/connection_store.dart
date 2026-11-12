@@ -53,7 +53,9 @@ class ConnectionStore {
       throw const FormatException('Saved connection is missing fields.');
     }
     final version = data['version'];
-    if (version == null) {
+    if (!data.containsKey('version') && !data.containsKey('serverType')) {
+      // Only untagged records are legacy. A null version or a serverType
+      // without a version must not bypass the current format validation.
       // Version 1: Mail-Archiver only, numeric account ID.
       final id = data['accountId'];
       return (

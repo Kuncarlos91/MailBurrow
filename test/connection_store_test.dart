@@ -40,7 +40,10 @@ void main() {
     test('round-trips numeric and text account IDs as text', () {
       for (final (input, stored) in [
         (7, '7'),
-        ('aaaaaaaa-0000-4000-8000-000000000001', 'aaaaaaaa-0000-4000-8000-000000000001'),
+        (
+          'aaaaaaaa-0000-4000-8000-000000000001',
+          'aaaaaaaa-0000-4000-8000-000000000001',
+        ),
         (null, null),
       ]) {
         final encoded = ConnectionStore.encode(
@@ -73,6 +76,15 @@ void main() {
       final broken = <Map<String, Object?>>[
         base()..['version'] = 3,
         base()..['version'] = '2',
+        base()..['version'] = null,
+        base()..remove('version'),
+        base()
+          ..remove('version')
+          ..['serverType'] = 'some-future-server',
+        base()
+          ..remove('version')
+          ..['serverType'] = null,
+        (base()..['version'] = null)..remove('serverType'),
         base()..['serverType'] = 'some-future-server',
         base()..remove('serverType'),
         base()..['accountId'] = 1,
@@ -111,8 +123,10 @@ void main() {
 
   test('server type IDs are stable', () {
     expect(ArchiveServerType.mailArchiver.id, 'mail-archiver');
-    expect(ArchiveServerType.fromId('mail-archiver'),
-        ArchiveServerType.mailArchiver);
+    expect(
+      ArchiveServerType.fromId('mail-archiver'),
+      ArchiveServerType.mailArchiver,
+    );
     expect(ArchiveServerType.fromId('Mail-Archiver'), isNull);
     expect(ArchiveServerType.fromId(null), isNull);
   });
