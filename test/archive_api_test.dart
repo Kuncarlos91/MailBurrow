@@ -136,7 +136,7 @@ void main() {
       final client = PendingHttpClient();
       await HttpOverrides.runZoned(() async {
         final api = ArchiveApi(Uri.parse('https://example.com'), 'test-only');
-        final pending = api.emails(1, 'query', 1);
+        final pending = api.emails('1', 'query', 1);
         final completion = expectLater(pending, throwsA(isA<HttpException>()));
         await Future<void>.delayed(Duration.zero);
         api.cancelEmailRequests();
@@ -154,9 +154,9 @@ void main() {
       final client = RoutingHttpClient();
       await HttpOverrides.runZoned(() async {
         final api = ArchiveApi(Uri.parse('https://example.com'), 'test-only');
-        final mail = api.emails(1, 'query', 1);
+        final mail = api.emails('1', 'query', 1);
         final mailDone = expectLater(mail, throwsA(isA<HttpException>()));
-        final folders = api.folders(1);
+        final folders = api.folders('1');
         await Future<void>.delayed(Duration.zero);
         api.cancelEmailRequests();
         await mailDone;
@@ -183,9 +183,9 @@ void main() {
       await HttpOverrides.runZoned(() async {
         final api = ArchiveApi(Uri.parse('https://example.com'), 'test-only');
         final mailBody = StreamingHttpResponse();
-        final mail = api.emails(1, 'query', 1);
+        final mail = api.emails('1', 'query', 1);
         final mailDone = expectLater(mail, throwsA(isA<HttpException>()));
-        final folders = api.folders(1);
+        final folders = api.folders('1');
         client.pending('/api/v1/emails').complete(HeadersArrivedRequest(mailBody));
         await Future<void>.delayed(Duration.zero);
         mailBody.body.add(utf8.encode('{"items": ['));
@@ -219,7 +219,7 @@ void main() {
           responseTimeout: const Duration(milliseconds: 50),
         );
         final mailBody = StreamingHttpResponse();
-        final mail = api.emails(1, 'query', 1);
+        final mail = api.emails('1', 'query', 1);
         final mailDone = expectLater(mail, throwsA(isA<TimeoutException>()));
         client.pending('/api/v1/emails').complete(HeadersArrivedRequest(mailBody));
         await Future<void>.delayed(Duration.zero);
@@ -259,7 +259,7 @@ void main() {
       final client = RoutingHttpClient();
       await HttpOverrides.runZoned(() async {
         final api = ArchiveApi(Uri.parse('https://example.com'), 'test-only');
-        final mail = api.emails(1, 'query', 1);
+        final mail = api.emails('1', 'query', 1);
         final mailDone = expectLater(mail, throwsA(isA<HttpException>()));
         await Future<void>.delayed(Duration.zero);
         api.cancelEmailRequests();

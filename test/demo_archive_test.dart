@@ -45,25 +45,22 @@ void main() {
   });
 
   test('folders flatten with nesting and counts that match the mail', () async {
-    final folders = await demo.folders(1);
+    final folders = await demo.folders('1');
     final family = folders.firstWhere((item) => item.path == 'INBOX/Family');
     expect(family.depth, 1);
     expect(family.name, 'Family');
     final total = folders.fold<int>(0, (sum, item) => sum + item.count);
-    final all = await demo.emails(1, '', 1);
+    final all = await demo.emails('1', '', 1);
     expect(total, all['totalItems']);
-    await expectLater(demo.folders(99), throwsA(isA<ArchiveFailure>()));
+    await expectLater(demo.folders('99'), throwsA(isA<ArchiveFailure>()));
   });
 
   test('pages 25 results at a time, newest first by default', () async {
-    final first = await demo.emails(1, '', 1);
-    final second = await demo.emails(1, '', 2);
+    final first = await demo.emails('1', '', 1);
+    final second = await demo.emails('1', '', 2);
     expect(items(first), hasLength(25));
     expect(first['totalPages'], 2);
-    expect(
-      items(second),
-      hasLength((first['totalItems'] as int) - 25),
-    );
+    expect(items(second), hasLength((first['totalItems'] as int) - 25));
     expect(items(first).first['subject'], 'Welcome to the MailBurrow demo');
     final dates = items(first)
         .map((mail) => mail['sentDate'] as String)
@@ -74,25 +71,25 @@ void main() {
   });
 
   test('search is case-insensitive across subject, people and body', () async {
-    final upper = items(await demo.emails(2, 'INVOICE', 1));
-    final lower = items(await demo.emails(2, 'invoice', 1));
+    final upper = items(await demo.emails('2', 'INVOICE', 1));
+    final lower = items(await demo.emails('2', 'invoice', 1));
     expect(upper, isNotEmpty);
     expect(upper.map((m) => m['id']), lower.map((m) => m['id']));
-    final byBody = items(await demo.emails(1, 'lemon cake', 1));
+    final byBody = items(await demo.emails('1', 'lemon cake', 1));
     expect(byBody.map((m) => m['subject']), contains('Recipe you asked for'));
-    final none = await demo.emails(1, 'no such words anywhere', 1);
+    final none = await demo.emails('1', 'no such words anywhere', 1);
     expect(items(none), isEmpty);
     expect(none['totalPages'], 0);
   });
 
   test('filters by folder, direction and inclusive date range', () async {
-    final receipts = items(await demo.emails(1, '', 1, folder: 'Receipts'));
+    final receipts = items(await demo.emails('1', '', 1, folder: 'Receipts'));
     expect(receipts, isNotEmpty);
     expect(receipts.every((m) => m['folderName'] == 'Receipts'), isTrue);
 
     final sent = items(
       await demo.emails(
-        1,
+        '1',
         '',
         1,
         filters: const SearchFilters(direction: 'outgoing'),
@@ -102,7 +99,7 @@ void main() {
     expect(sent.every((m) => m['isOutgoing'] == true), isTrue);
     final received = items(
       await demo.emails(
-        1,
+        '1',
         '',
         1,
         filters: const SearchFilters(direction: 'incoming'),
@@ -112,7 +109,7 @@ void main() {
 
     final ranged = items(
       await demo.emails(
-        1,
+        '1',
         '',
         1,
         filters: SearchFilters(
@@ -131,7 +128,7 @@ void main() {
   test('sorts by subject in either order', () async {
     final ascending = items(
       await demo.emails(
-        3,
+        '3',
         '',
         1,
         filters: const SearchFilters(sortBy: 'subject', sortOrder: 'asc'),
@@ -140,7 +137,7 @@ void main() {
     expect(ascending, [...ascending]..sort());
     final descending = items(
       await demo.emails(
-        3,
+        '3',
         '',
         1,
         filters: const SearchFilters(sortBy: 'subject'),
@@ -150,11 +147,11 @@ void main() {
   });
 
   test('opens full messages and rejects unknown ones', () async {
-    final welcome = items(await demo.emails(1, 'welcome', 1)).first;
-    final mail = await demo.message(welcome['id'] as int);
+    final welcome = items(await demo.emails('1', 'welcome', 1)).first;
+    final mail = await demo.message(welcome['id'].toString());
     expect(mail['textBody'], contains('fictional sample mail'));
     expect(mail['attachments'], isEmpty);
-    await expectLater(demo.message(99999), throwsA(isA<ArchiveFailure>()));
+    await expectLater(demo.message('99999'), throwsA(isA<ArchiveFailure>()));
   });
 
   test('reports totals across all demo accounts', () async {
@@ -169,13 +166,15 @@ void main() {
     setUp(() async => folder = await Directory.systemTemp.createTemp('demo'));
     tearDown(() async => folder.delete(recursive: true));
 
-    Future<(int, Map<String, dynamic>)> withAttachment() async {
-      final mail = items(await demo.emails(1, 'photos', 1))
-          .firstWhere((m) => m['hasAttachments'] == true);
-      final detail = await demo.message(mail['id'] as int);
-      final file = (detail['attachments'] as List<dynamic>).first
-          as Map<String, dynamic>;
-      return (mail['id'] as int, file);
+    Future<(String, Map<String, dynamic>)> withAttachment() async {
+      final mail = items(
+        await demo.emails('1', 'photos', 1),
+      ).firstWhere((m) => m['hasAttachments'] == true);
+      final detail = await demo.message(mail['id'].toString());
+      final file =
+          (detail['attachments'] as List<dynamic>).first
+              as Map<String, dynamic>;
+      return (mail['id'].toString(), file);
     }
 
     test('saves the exact bundled bytes with progress', () async {
@@ -184,7 +183,7 @@ void main() {
       final progress = <int>[];
       await demo.downloadAttachment(
         emailId,
-        file['id'] as int,
+        file['id'].toString(),
         target,
         onProgress: progress.add,
       );
@@ -208,7 +207,7 @@ void main() {
       await expectLater(
         demo.downloadAttachment(
           emailId,
-          file['id'] as int,
+          file['id'].toString(),
           target,
           transfer: transfer,
         ),
@@ -217,45 +216,48 @@ void main() {
       expect(target.existsSync(), isFalse);
     });
 
-    Future<(int, Map<String, dynamic>)> multiChunkAttachment() async {
+    Future<(String, Map<String, dynamic>)> multiChunkAttachment() async {
       // The boarding pass PDF is larger than one 256-byte copy chunk.
-      final mail = items(await demo.emails(1, 'Harbor City', 1))
-          .firstWhere((m) => m['hasAttachments'] == true);
-      final detail = await demo.message(mail['id'] as int);
-      final file = (detail['attachments'] as List<dynamic>).first
-          as Map<String, dynamic>;
+      final mail = items(
+        await demo.emails('1', 'Harbor City', 1),
+      ).firstWhere((m) => m['hasAttachments'] == true);
+      final detail = await demo.message(mail['id'].toString());
+      final file =
+          (detail['attachments'] as List<dynamic>).first
+              as Map<String, dynamic>;
       expect(file['size'] as int, greaterThan(512));
-      return (mail['id'] as int, file);
+      return (mail['id'].toString(), file);
     }
 
-    test('cancelling during a copy stops writing and deletes the file',
-        () async {
-      final (emailId, file) = await multiChunkAttachment();
-      final slow = await DemoArchive.load(
-        latency: const Duration(milliseconds: 50),
-      );
-      final target = File('${folder.path}/cancelled-midway');
-      final transfer = AttachmentDownload();
-      final progress = <int>[];
-      await expectLater(
-        slow.downloadAttachment(
-          emailId,
-          file['id'] as int,
-          target,
-          transfer: transfer,
-          onProgress: (received) {
-            progress.add(received);
-            transfer.cancel();
-          },
-        ),
-        throwsA(isA<AttachmentDownloadCancelled>()),
-      );
-      expect(progress, hasLength(1));
-      expect(target.existsSync(), isFalse);
-    });
+    test(
+      'cancelling during a copy stops writing and deletes the file',
+      () async {
+        final (emailId, file) = await multiChunkAttachment();
+        final slow = await DemoArchive.load(
+          latency: const Duration(milliseconds: 50),
+        );
+        final target = File('${folder.path}/cancelled-midway');
+        final transfer = AttachmentDownload();
+        final progress = <int>[];
+        await expectLater(
+          slow.downloadAttachment(
+            emailId,
+            file['id'].toString(),
+            target,
+            transfer: transfer,
+            onProgress: (received) {
+              progress.add(received);
+              transfer.cancel();
+            },
+          ),
+          throwsA(isA<AttachmentDownloadCancelled>()),
+        );
+        expect(progress, hasLength(1));
+        expect(target.existsSync(), isFalse);
+      },
+    );
 
-    test('closing during a copy stops writing and deletes the file',
-        () async {
+    test('closing during a copy stops writing and deletes the file', () async {
       final (emailId, file) = await multiChunkAttachment();
       final slow = await DemoArchive.load(
         latency: const Duration(milliseconds: 50),
@@ -265,7 +267,7 @@ void main() {
       await expectLater(
         slow.downloadAttachment(
           emailId,
-          file['id'] as int,
+          file['id'].toString(),
           target,
           onProgress: (received) {
             progress.add(received);
@@ -277,18 +279,18 @@ void main() {
       expect(progress, hasLength(1));
       expect(target.existsSync(), isFalse);
       await expectLater(
-        slow.downloadAttachment(emailId, file['id'] as int, target),
+        slow.downloadAttachment(emailId, file['id'].toString(), target),
         throwsA(isA<StateError>()),
       );
     });
 
     test('rejects an attachment from a different message', () async {
       final (_, file) = await withAttachment();
-      final welcome = items(await demo.emails(1, 'welcome', 1)).first;
+      final welcome = items(await demo.emails('1', 'welcome', 1)).first;
       await expectLater(
         demo.downloadAttachment(
-          welcome['id'] as int,
-          file['id'] as int,
+          welcome['id'].toString(),
+          file['id'].toString(),
           File('${folder.path}/wrong'),
         ),
         throwsA(isA<ArchiveFailure>()),
@@ -300,23 +302,26 @@ void main() {
     await HttpOverrides.runZoned(() async {
       final local = await DemoArchive.load(latency: Duration.zero);
       final accounts = await local.accounts();
-      await local.folders(1);
-      final page = await local.emails(2, 'invoice', 1);
-      await local.emails(2, '', 1, folder: 'INBOX/Orders');
+      await local.folders('1');
+      final page = await local.emails('2', 'invoice', 1);
+      await local.emails('2', '', 1, folder: 'INBOX/Orders');
       await local.stats();
       for (final mail in items(page)) {
-        await local.message(mail['id'] as int);
+        await local.message(mail['id'].toString());
       }
-      final withFile = items(page).firstWhere((m) => m['hasAttachments'] == true);
-      final detail = await local.message(withFile['id'] as int);
-      final file = (detail['attachments'] as List<dynamic>).first
-          as Map<String, dynamic>;
+      final withFile = items(
+        page,
+      ).firstWhere((m) => m['hasAttachments'] == true);
+      final detail = await local.message(withFile['id'].toString());
+      final file =
+          (detail['attachments'] as List<dynamic>).first
+              as Map<String, dynamic>;
       final folder = await Directory.systemTemp.createTemp('demo-offline');
       try {
         final target = File('${folder.path}/saved');
         await local.downloadAttachment(
-          withFile['id'] as int,
-          file['id'] as int,
+          withFile['id'].toString(),
+          file['id'].toString(),
           target,
         );
         expect(await target.length(), file['size']);
@@ -330,6 +335,6 @@ void main() {
   test('refuses requests after closing', () async {
     demo.close();
     await expectLater(demo.accounts(), throwsA(isA<StateError>()));
-    await expectLater(demo.emails(1, '', 1), throwsA(isA<StateError>()));
+    await expectLater(demo.emails('1', '', 1), throwsA(isA<StateError>()));
   });
 }

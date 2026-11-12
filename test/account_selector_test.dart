@@ -23,7 +23,8 @@ class AccountsApi extends ArchiveApi {
       delayFolders = false;
   final pendingMail = Completer<Map<String, dynamic>>();
   final pendingFolders = Completer<List<ArchiveFolder>>();
-  int lastId = 0, lastPage = 0, mailCalls = 0;
+  String lastId = '';
+  int lastPage = 0, mailCalls = 0;
   String lastQuery = '';
   String? lastFolder;
   SearchFilters lastFilters = const SearchFilters();
@@ -47,7 +48,7 @@ class AccountsApi extends ArchiveApi {
 
   @override
   Future<Map<String, dynamic>> emails(
-    int id,
+    String id,
     String query,
     int page, {
     String? folder,
@@ -59,23 +60,23 @@ class AccountsApi extends ArchiveApi {
     lastFolder = folder;
     lastFilters = filters;
     mailCalls++;
-    if (id == 1 && delayMail) {
+    if (id == '1' && delayMail) {
       delayMail = false;
       return pendingMail.future;
     }
-    if (id == 2 && holdSecond) {
+    if (id == '2' && holdSecond) {
       holdSecond = false;
       return secondMail.future;
     }
-    if (id == 2 && failSecond) {
+    if (id == '2' && failSecond) {
       return Future.error(const SocketException('private detail'));
     }
-    return Future.value(response(id, page));
+    return Future.value(response(int.parse(id), page));
   }
 
   @override
-  Future<List<ArchiveFolder>> folders(int id) async {
-    if (id == 1 && delayFolders) {
+  Future<List<ArchiveFolder>> folders(String id) async {
+    if (id == '1' && delayFolders) {
       delayFolders = false;
       return pendingFolders.future;
     }
@@ -200,7 +201,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(api.lastPage, 2);
     await choose(tester, 2);
-    expect(api.lastId, 2);
+    expect(api.lastId, '2');
     expect(api.lastPage, 1);
     expect(api.lastQuery, '');
     expect(api.lastFolder, isNull);
@@ -252,7 +253,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 400));
         expect(find.text('Switching account…').hitTestable(), findsOneWidget);
         expect(find.textContaining('Account 1 message'), findsNothing);
-        expect(api.lastId, 2);
+        expect(api.lastId, '2');
         api.secondMail.complete(api.response(2, 1));
         await tester.pumpAndSettle();
         expect(find.text('Switching account…'), findsNothing);
@@ -281,7 +282,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('account-choice-1')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
-      expect(api.lastId, 1);
+      expect(api.lastId, '1');
       expect(find.text('Switching account…').hitTestable(), findsOneWidget);
       api.secondMail.complete(api.response(2, 1));
       await tester.pump();
@@ -308,7 +309,7 @@ void main() {
     (tester) async {
       final api = AccountsApi();
       await openApp(tester, api, savedId: 2);
-      expect(api.lastId, 2);
+      expect(api.lastId, '2');
       expect(find.text('second@example.com'), findsOneWidget);
       expect(find.text('Account 2 message 0'), findsOneWidget);
     },
@@ -319,7 +320,7 @@ void main() {
     (tester) async {
       final api = AccountsApi();
       await openApp(tester, api, savedId: 99);
-      expect(api.lastId, 1);
+      expect(api.lastId, '1');
       expect(
         find.textContaining('Previously selected account'),
         findsOneWidget,
@@ -348,7 +349,7 @@ void main() {
           {'id': 2, 'emailAddress': 'second@example.com'},
         ];
       await openApp(tester, next, store: {'connection': saved});
-      expect(next.lastId, 2);
+      expect(next.lastId, '2');
       await tester.tap(find.byTooltip('Switch account'));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('account-choice-1')), findsNothing);
@@ -462,7 +463,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('account-choice-2')));
       await tester.pumpAndSettle();
-      expect(api.lastId, 2);
+      expect(api.lastId, '2');
     },
   );
 
@@ -479,7 +480,7 @@ void main() {
       final saved = store['connection'];
       store.fail = true;
       await choose(tester, 2);
-      expect(api.lastId, 1);
+      expect(api.lastId, '1');
       expect(store['connection'], saved);
       expect(find.text('Account 1 message 0'), findsOneWidget);
       expect(
@@ -503,7 +504,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(TextButton, 'second@example.com'));
       await tester.pumpAndSettle();
-      expect(api.lastId, 2);
+      expect(api.lastId, '2');
       expect(find.text('Account 2 message 0'), findsOneWidget);
       await tester.tap(find.byIcon(Icons.settings_outlined).last);
       await tester.pumpAndSettle();
@@ -523,7 +524,7 @@ void main() {
     final api = AccountsApi();
     await openApp(tester, api, largeText: true);
     await choose(tester, 2);
-    expect(api.lastId, 2);
+    expect(api.lastId, '2');
     expect(tester.takeException(), isNull);
   });
 }

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'archive_errors.dart';
 import 'archive_backend.dart';
+import 'archive_models.dart';
 import 'content_safety.dart';
 import 'saved_files.dart';
 import 'attachment_download.dart';
@@ -17,12 +18,13 @@ class MailAttachment {
     this.contentType = 'application/octet-stream',
   ]);
   factory MailAttachment.fromJson(Map<String, dynamic> value) => MailAttachment(
-    value['id'] as int,
+    archiveId(value['id']),
     value['fileName'] as String? ?? 'attachment',
     (value['size'] as num?)?.toInt() ?? 0,
     value['contentType'] as String? ?? 'application/octet-stream',
   );
-  final int id, size;
+  final String id;
+  final int size;
   final String name;
   final String contentType;
 }
@@ -51,7 +53,7 @@ class MessageAttachments extends StatefulWidget {
     required this.attachments,
   });
   final ArchiveBackend api;
-  final int emailId;
+  final String emailId;
   final List<MailAttachment> attachments;
   @override
   State<MessageAttachments> createState() => _MessageAttachmentsState();
@@ -62,8 +64,8 @@ class _MessageAttachmentsState extends State<MessageAttachments> {
   bool choosingDestination = false;
   AttachmentDownload? download;
   String? status;
-  final savedLocations = <int, String>{};
-  final needsReselection = <int>{};
+  final savedLocations = <String, String>{};
+  final needsReselection = <String>{};
   bool opening = false;
 
   @override

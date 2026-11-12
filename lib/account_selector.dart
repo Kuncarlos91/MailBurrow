@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'archive_models.dart';
 import 'archive_errors.dart';
 import 'archive_backend.dart';
 
@@ -12,7 +13,7 @@ String accountAddress(Map<String, dynamic> account) {
 Future<Map<String, dynamic>?> showAccountSelector(
   BuildContext context, {
   required ArchiveBackend api,
-  required int currentAccountId,
+  required String currentAccountId,
 }) => showModalBottomSheet<Map<String, dynamic>>(
   context: context,
   showDragHandle: true,
@@ -26,7 +27,7 @@ Future<Map<String, dynamic>?> showAccountSelector(
 class _AccountSelector extends StatefulWidget {
   const _AccountSelector({required this.api, required this.currentAccountId});
   final ArchiveBackend api;
-  final int currentAccountId;
+  final String currentAccountId;
   @override
   State<_AccountSelector> createState() => _AccountSelectorState();
 }
@@ -38,9 +39,11 @@ class _AccountSelectorState extends State<_AccountSelector> {
     final accounts = await widget.api.accounts();
     return accounts
         .map((value) {
-          if (value is! Map<String, dynamic> || value['id'] is! int) {
+          if (value is! Map<String, dynamic> ||
+              (value['id'] is! int && value['id'] is! String)) {
             throw const FormatException('Invalid account response');
           }
+          archiveId(value['id']);
           return value;
         })
         .toList(growable: false);
@@ -87,13 +90,13 @@ class _AccountSelectorState extends State<_AccountSelector> {
                 key: ValueKey('account-choice-${account['id']}'),
                 leading: const Icon(Icons.account_circle_outlined),
                 title: Text(accountAddress(account)),
-                subtitle: account['id'] == widget.currentAccountId
+                subtitle: account['id'].toString() == widget.currentAccountId
                     ? const Text('Currently browsing')
                     : null,
-                trailing: account['id'] == widget.currentAccountId
+                trailing: account['id'].toString() == widget.currentAccountId
                     ? const Icon(Icons.check)
                     : null,
-                selected: account['id'] == widget.currentAccountId,
+                selected: account['id'].toString() == widget.currentAccountId,
                 onTap: () => Navigator.pop(context, account),
               ),
         ],

@@ -52,10 +52,10 @@ class RealArchive extends FakeArchiveBackend {
     {'id': 7, 'emailAddress': 'owner@example.com'},
   ];
   @override
-  Future<List<ArchiveFolder>> folders(int accountId) async => [];
+  Future<List<ArchiveFolder>> folders(String accountId) async => [];
   @override
   Future<Map<String, dynamic>> emails(
-    int accountId,
+    String accountId,
     String query,
     int page, {
     String? folder,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../account_selector.dart';
+import '../archive_models.dart';
 import '../message_date.dart';
 import '../state/archive_session.dart';
 import 'message_reader.dart';
@@ -271,7 +272,7 @@ class MailView extends StatelessWidget {
         MaterialPageRoute<void>(
           builder: (_) => MessageReader(
             api: session.api!,
-            id: mail['id'] as int,
+            id: archiveId(mail['id']),
             onExitDemo: session.demo ? session.exitDemo : null,
           ),
         ),

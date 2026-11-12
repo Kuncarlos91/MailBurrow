@@ -46,13 +46,13 @@ class FakeArchiveApi extends FakeArchiveBackend {
   }
 
   @override
-  Future<List<ArchiveFolder>> folders(int id) async => [
+  Future<List<ArchiveFolder>> folders(String id) async => [
     ArchiveFolder('Inbox $id', 'INBOX-$id', 1, 0),
   ];
 
   @override
   Future<Map<String, dynamic>> emails(
-    int id,
+    String id,
     String query,
     int page, {
     String? folder,
@@ -97,13 +97,13 @@ class MemoryBackend implements ArchiveBackend {
   ];
 
   @override
-  Future<List<ArchiveFolder>> folders(int accountId) async => const [
+  Future<List<ArchiveFolder>> folders(String accountId) async => const [
     ArchiveFolder('Inbox', 'INBOX', 1, 0),
   ];
 
   @override
   Future<Map<String, dynamic>> emails(
-    int accountId,
+    String accountId,
     String query,
     int page, {
     String? folder,
@@ -117,15 +117,15 @@ class MemoryBackend implements ArchiveBackend {
   };
 
   @override
-  Future<Map<String, dynamic>> message(int id) async => {
+  Future<Map<String, dynamic>> message(String id) async => {
     'id': id,
     'subject': 'From memory',
   };
 
   @override
   Future<void> downloadAttachment(
-    int emailId,
-    int attachmentId,
+    String emailId,
+    String attachmentId,
     File destination, {
     AttachmentDownload? transfer,
     void Function(int receivedBytes)? onProgress,

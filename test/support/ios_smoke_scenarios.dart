@@ -27,7 +27,7 @@ class _SyntheticArchive extends ArchiveApi {
   ];
 
   @override
-  Future<List<ArchiveFolder>> folders(int id) async => [
+  Future<List<ArchiveFolder>> folders(String id) async => [
     const ArchiveFolder('Inbox', 'INBOX', 1, 0),
   ];
 
@@ -40,7 +40,7 @@ class _SyntheticArchive extends ArchiveApi {
 
   @override
   Future<Map<String, dynamic>> emails(
-    int id,
+    String id,
     String query,
     int page, {
     String? folder,
@@ -63,7 +63,7 @@ class _SyntheticArchive extends ArchiveApi {
   }
 
   @override
-  Future<Map<String, dynamic>> message(int id) async => {
+  Future<Map<String, dynamic>> message(String id) async => {
     'id': id,
     'from': 'sender@example.invalid',
     'to': 'smoke@example.invalid',

@@ -209,7 +209,7 @@ class ArchiveSession extends ChangeNotifier {
       final selected = preferred ?? available.first;
       final accountUnavailable =
           preferredAccountId != null && preferred == null;
-      final result = await created.emails(selected['id'] as int, '', 1);
+      final result = await created.emails(archiveId(selected['id']), '', 1);
       final items = result['items'] as List<dynamic>;
       final pages = (result['totalPages'] as int).clamp(1, 1000000);
       try {
@@ -270,7 +270,7 @@ class ArchiveSession extends ChangeNotifier {
     if (requestApi == null ||
         setup ||
         !canSwitchAccount ||
-        choice['id'] is! int ||
+        (choice['id'] is! int && choice['id'] is! String) ||
         choice['id'] == account?['id']) {
       return;
     }
@@ -367,7 +367,7 @@ class ArchiveSession extends ChangeNotifier {
     searchTimer = timer;
     try {
       final result = await requestApi.emails(
-        account!['id'] as int,
+        archiveId(account!['id']),
         query,
         requestedPage,
         folder: selectedFolder,
@@ -422,7 +422,7 @@ class ArchiveSession extends ChangeNotifier {
 
   Future<void> loadFolders() async {
     final requestApi = api;
-    final accountId = account?['id'] as int?;
+    final accountId = account?['id']?.toString();
     if (requestApi == null || accountId == null || foldersBusy) return;
     final requestId = ++folderRequestId;
     bool current() =>
@@ -554,7 +554,7 @@ class ArchiveSession extends ChangeNotifier {
       final accounts = (await created.accounts()).cast<Map<String, dynamic>>();
       if (accounts.isEmpty) throw const ArchiveFailure(404);
       final selected = accounts.first;
-      final result = await created.emails(selected['id'] as int, '', 1);
+      final result = await created.emails(archiveId(selected['id']), '', 1);
       if (_disposed) return;
       if (!identical(api, created)) api?.close();
       _invalidateRequests();
