@@ -12,6 +12,13 @@ const searchSortFields = {
 /// Sort orders the filter sheet offers, keyed by [SearchFilters.sortOrder].
 const searchSortOrders = {'desc': 'Descending', 'asc': 'Ascending'};
 
+/// Direction choices shared by the filter sheet and capability validation.
+const searchDirections = {
+  '': 'All mail',
+  'incoming': 'Incoming',
+  'outgoing': 'Outgoing',
+};
+
 class SearchFilters {
   const SearchFilters({
     this.from,
@@ -180,11 +187,12 @@ class _SearchFiltersSheetState extends State<SearchFiltersSheet> {
           const Text('Sent date range · inclusive'),
           dateField('From', from, true),
           dateField('To', to, false),
-          choice('Direction', direction, {
-            '': 'All mail',
-            'incoming': 'Incoming',
-            'outgoing': 'Outgoing',
-          }, (value) => direction = value),
+          choice(
+            'Direction',
+            direction,
+            searchDirections,
+            (value) => direction = value,
+          ),
           choice(
             'Sort by',
             sortBy,

@@ -7,15 +7,25 @@ import 'search_filters.dart';
 /// Open Archiver plan); until then every backend reports [full] and nothing
 /// changes on screen.
 class ArchiveCapabilities {
-  const ArchiveCapabilities({
+  ArchiveCapabilities({
     required this.folders,
     required this.dateRangeFilter,
     required this.directionFilter,
-    required this.sortFields,
-    required this.sortOrders,
+    required Set<String> sortFields,
+    required Set<String> sortOrders,
     required this.estimatedTotals,
     required this.archiveStats,
-  });
+  }) : sortFields = Set.unmodifiable(sortFields),
+       sortOrders = Set.unmodifiable(sortOrders) {
+    if (!this.sortFields.contains('sentDate') ||
+        !this.sortFields.every(searchSortFields.containsKey)) {
+      throw ArgumentError('Sort fields must be known and include sentDate.');
+    }
+    if (!this.sortOrders.contains('desc') ||
+        !this.sortOrders.every(searchSortOrders.containsKey)) {
+      throw ArgumentError('Sort orders must be known and include desc.');
+    }
+  }
 
   /// Everything the current screens offer: Mail-Archiver and the demo.
   static final full = ArchiveCapabilities(
@@ -52,8 +62,10 @@ class ArchiveCapabilities {
   /// whose server only offers server-wide totals reports false.
   final bool archiveStats;
 
-  /// Whether a search with [filters] uses only what this backend supports.
+  /// Whether [filters] are valid and use only what this backend supports.
   bool allows(SearchFilters filters) =>
+      filters.validationError == null &&
+      searchDirections.containsKey(filters.direction) &&
       (dateRangeFilter || (filters.from == null && filters.to == null)) &&
       (directionFilter || filters.direction.isEmpty) &&
       sortFields.contains(filters.sortBy) &&
