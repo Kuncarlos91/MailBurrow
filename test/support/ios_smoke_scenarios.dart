@@ -22,9 +22,9 @@ class _SyntheticArchive extends ArchiveApi {
       );
 
   @override
-  Future<List<dynamic>> accounts() async => [
+  Future<List<ArchiveAccount>> accounts() async => [
     {'id': 1, 'emailAddress': 'smoke@example.invalid', 'isEnabled': true},
-  ];
+  ].map(ArchiveAccount.fromJson).toList();
 
   @override
   Future<List<ArchiveFolder>> folders(String id) async => [
@@ -32,14 +32,14 @@ class _SyntheticArchive extends ArchiveApi {
   ];
 
   @override
-  Future<Map<String, dynamic>> stats() async => {
+  Future<ArchiveStats> stats() async => ArchiveStats.fromJson({
     'emails': 1,
     'accounts': 1,
     'attachments': 0,
-  };
+  });
 
   @override
-  Future<Map<String, dynamic>> emails(
+  Future<MailPage> emails(
     String id,
     String query,
     int page, {
@@ -47,7 +47,7 @@ class _SyntheticArchive extends ArchiveApi {
     SearchFilters filters = const SearchFilters(),
   }) async {
     lastQuery = query;
-    return {
+    return MailPage.fromJson({
       'items': [
         {
           'id': 1,
@@ -59,18 +59,18 @@ class _SyntheticArchive extends ArchiveApi {
       ],
       'page': 1,
       'totalPages': 1,
-    };
+    });
   }
 
   @override
-  Future<Map<String, dynamic>> message(String id) async => {
+  Future<MailMessage> message(String id) async => MailMessage.fromJson({
     'id': id,
     'from': 'sender@example.invalid',
     'to': 'smoke@example.invalid',
     'subject': 'Simulator test message',
     'textBody': 'Synthetic simulator message body.',
     'attachments': <dynamic>[],
-  };
+  });
 }
 
 Future<void> _settle(WidgetTester tester) async {

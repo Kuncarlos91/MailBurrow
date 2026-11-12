@@ -41,19 +41,19 @@ class AccountsApi extends ArchiveApi {
     'totalPages': 3,
   };
   @override
-  Future<List<dynamic>> accounts() async {
+  Future<List<ArchiveAccount>> accounts() async {
     if (failAccounts) throw const SocketException('private detail');
-    return available;
+    return available.map(ArchiveAccount.fromJson).toList();
   }
 
   @override
-  Future<Map<String, dynamic>> emails(
+  Future<MailPage> emails(
     String id,
     String query,
     int page, {
     String? folder,
     SearchFilters filters = const SearchFilters(),
-  }) {
+  }) async {
     lastId = id;
     lastPage = page;
     lastQuery = query;
@@ -62,16 +62,16 @@ class AccountsApi extends ArchiveApi {
     mailCalls++;
     if (id == '1' && delayMail) {
       delayMail = false;
-      return pendingMail.future;
+      return MailPage.fromJson(await pendingMail.future);
     }
     if (id == '2' && holdSecond) {
       holdSecond = false;
-      return secondMail.future;
+      return MailPage.fromJson(await secondMail.future);
     }
     if (id == '2' && failSecond) {
-      return Future.error(const SocketException('private detail'));
+      throw const SocketException('private detail');
     }
-    return Future.value(response(int.parse(id), page));
+    return MailPage.fromJson(response(int.parse(id), page));
   }
 
   @override
@@ -84,11 +84,11 @@ class AccountsApi extends ArchiveApi {
   }
 
   @override
-  Future<Map<String, dynamic>> stats() async => {
+  Future<ArchiveStats> stats() async => ArchiveStats.fromJson({
     'emails': 40,
     'accounts': 2,
     'attachments': 0,
-  };
+  });
 }
 
 class FailingStore extends MapBase<String, String> {

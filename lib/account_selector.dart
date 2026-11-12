@@ -3,18 +3,15 @@ import 'archive_models.dart';
 import 'archive_errors.dart';
 import 'archive_backend.dart';
 
-String accountAddress(Map<String, dynamic> account) {
-  final value = account['emailAddress'];
-  return value is String && value.trim().isNotEmpty
-      ? value.trim()
-      : 'Email address not reported';
-}
+/// The account's address for display, or a neutral label.
+String accountAddress(ArchiveAccount? account) =>
+    account?.address ?? 'Email address not reported';
 
-Future<Map<String, dynamic>?> showAccountSelector(
+Future<ArchiveAccount?> showAccountSelector(
   BuildContext context, {
   required ArchiveBackend api,
   required String currentAccountId,
-}) => showModalBottomSheet<Map<String, dynamic>>(
+}) => showModalBottomSheet<ArchiveAccount>(
   context: context,
   showDragHandle: true,
   isScrollControlled: true,
@@ -33,23 +30,12 @@ class _AccountSelector extends StatefulWidget {
 }
 
 class _AccountSelectorState extends State<_AccountSelector> {
-  bool _isCurrent(Map<String, dynamic> account) =>
-      archiveIdOrNull(account['id']) == widget.currentAccountId;
+  bool _isCurrent(ArchiveAccount account) =>
+      account.id == widget.currentAccountId;
 
-  late Future<List<Map<String, dynamic>>> result;
+  late Future<List<ArchiveAccount>> result;
 
-  Future<List<Map<String, dynamic>>> fetch() async {
-    final accounts = await widget.api.accounts();
-    return accounts
-        .map((value) {
-          if (value is! Map<String, dynamic> ||
-              archiveIdOrNull(value['id']) == null) {
-            throw const FormatException('Invalid account response');
-          }
-          return value;
-        })
-        .toList(growable: false);
-  }
+  Future<List<ArchiveAccount>> fetch() => widget.api.accounts();
 
   @override
   void initState() {
@@ -63,7 +49,7 @@ class _AccountSelectorState extends State<_AccountSelector> {
 
   @override
   Widget build(BuildContext context) => SafeArea(
-    child: FutureBuilder<List<Map<String, dynamic>>>(
+    child: FutureBuilder<List<ArchiveAccount>>(
       future: result,
       builder: (context, snapshot) => ListView(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
@@ -89,7 +75,7 @@ class _AccountSelectorState extends State<_AccountSelector> {
           ] else
             for (final account in snapshot.data!)
               ListTile(
-                key: ValueKey('account-choice-${account['id']}'),
+                key: ValueKey('account-choice-${account.id}'),
                 leading: const Icon(Icons.account_circle_outlined),
                 title: Text(accountAddress(account)),
                 subtitle: _isCurrent(account)

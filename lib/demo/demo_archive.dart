@@ -90,9 +90,9 @@ class DemoArchive implements ArchiveBackend {
   }
 
   @override
-  Future<List<dynamic>> accounts() async {
+  Future<List<ArchiveAccount>> accounts() async {
     _checkOpen();
-    return [for (final account in _accounts) Map<String, dynamic>.of(account)];
+    return [for (final account in _accounts) ArchiveAccount.fromJson(account)];
   }
 
   @override
@@ -104,7 +104,7 @@ class DemoArchive implements ArchiveBackend {
   }
 
   @override
-  Future<Map<String, dynamic>> emails(
+  Future<MailPage> emails(
     String accountId,
     String query,
     int page, {
@@ -164,47 +164,26 @@ class DemoArchive implements ArchiveBackend {
     final totalItems = matches.length;
     final totalPages = (totalItems + _pageSize - 1) ~/ _pageSize;
     final start = (math.max(page, 1) - 1) * _pageSize;
-    return {
-      'items': [
-        for (final mail in matches.skip(start).take(_pageSize)) _summary(mail),
+    return MailPage(
+      items: [
+        for (final mail in matches.skip(start).take(_pageSize))
+          MailSummary.fromJson(mail),
       ],
-      'page': page,
-      'totalPages': totalPages,
-      'totalItems': totalItems,
-    };
+      page: page,
+      totalPages: totalPages,
+      totalItems: totalItems,
+    );
   }
-
-  Map<String, dynamic> _summary(Map<String, dynamic> mail) => {
-    for (final field in const [
-      'id',
-      'accountId',
-      'subject',
-      'from',
-      'to',
-      'sentDate',
-      'receivedDate',
-      'hasAttachments',
-      'isOutgoing',
-      'folderName',
-    ])
-      field: mail[field],
-  };
 
   Map<String, dynamic>? _find(String id) =>
       _messages.where((mail) => mail['id'].toString() == id).firstOrNull;
 
   @override
-  Future<Map<String, dynamic>> message(String id) async {
+  Future<MailMessage> message(String id) async {
     _checkOpen();
     final mail = _find(id);
     if (mail == null) throw const ArchiveFailure(404);
-    return {
-      ...mail,
-      'attachments': [
-        for (final file in mail['attachments'] as List<dynamic>)
-          Map<String, dynamic>.of(file as Map<String, dynamic>),
-      ],
-    };
+    return MailMessage.fromJson(mail);
   }
 
   @override
@@ -278,16 +257,16 @@ class DemoArchive implements ArchiveBackend {
   }
 
   @override
-  Future<Map<String, dynamic>> stats() async {
+  Future<ArchiveStats> stats() async {
     _checkOpen();
-    return {
-      'emails': _messages.length,
-      'accounts': _accounts.length,
-      'attachments': _messages.fold<int>(
+    return ArchiveStats(
+      _messages.length,
+      _accounts.length,
+      _messages.fold<int>(
         0,
         (total, mail) => total + (mail['attachments'] as List<dynamic>).length,
       ),
-    };
+    );
   }
 
   /// Nothing to cancel: results are computed locally, and the session already

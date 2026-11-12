@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../account_selector.dart';
-import '../archive_models.dart';
 import '../message_date.dart';
 import '../state/archive_session.dart';
 import 'message_reader.dart';
@@ -45,7 +44,7 @@ class MailView extends StatelessWidget {
               ListTile(
                 key: const ValueKey('current-mail-account'),
                 leading: const Icon(Icons.account_circle_outlined),
-                title: Text(accountAddress(s.account ?? {})),
+                title: Text(accountAddress(s.account)),
                 subtitle: const Text('Currently browsing'),
                 trailing: const Icon(Icons.unfold_more),
                 onTap: s.canSwitchAccount ? onChooseAccount : null,
@@ -248,8 +247,8 @@ class MailView extends StatelessWidget {
   }
 
   Widget _messageTile(BuildContext context, int index) {
-    final mail = session.messages[index] as Map<String, dynamic>;
-    final sender = mail['from'] as String? ?? 'Unknown';
+    final mail = session.messages[index];
+    final sender = mail.from ?? 'Unknown';
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       leading: CircleAvatar(
@@ -260,19 +259,19 @@ class MailView extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(mail['subject'] as String? ?? '(No subject)', maxLines: 2),
+          Text(mail.subject ?? '(No subject)', maxLines: 2),
           const SizedBox(height: 4),
-          MessageDate(value: mail['sentDate']),
+          MessageDate(value: mail.sentDate),
         ],
       ),
-      trailing: mail['hasAttachments'] == true
+      trailing: mail.hasAttachments
           ? const Icon(Icons.attach_file, size: 18)
           : null,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => MessageReader(
             api: session.api!,
-            id: archiveId(mail['id']),
+            id: mail.id,
             onExitDemo: session.demo ? session.exitDemo : null,
           ),
         ),

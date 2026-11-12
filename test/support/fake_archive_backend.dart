@@ -14,12 +14,12 @@ class FakeArchiveBackend implements ArchiveBackend {
   @override
   final String key;
   @override
-  Future<List<dynamic>> accounts() => throw UnimplementedError('accounts');
+  Future<List<ArchiveAccount>> accounts() => throw UnimplementedError('accounts');
   @override
   Future<List<ArchiveFolder>> folders(String accountId) =>
       throw UnimplementedError('folders');
   @override
-  Future<Map<String, dynamic>> emails(
+  Future<MailPage> emails(
     String accountId,
     String query,
     int page, {
@@ -27,7 +27,7 @@ class FakeArchiveBackend implements ArchiveBackend {
     SearchFilters filters = const SearchFilters(),
   }) => throw UnimplementedError('emails');
   @override
-  Future<Map<String, dynamic>> message(String id) =>
+  Future<MailMessage> message(String id) =>
       throw UnimplementedError('message');
   @override
   Future<void> downloadAttachment(
@@ -38,7 +38,7 @@ class FakeArchiveBackend implements ArchiveBackend {
     void Function(int receivedBytes)? onProgress,
   }) => throw UnimplementedError('downloadAttachment');
   @override
-  Future<Map<String, dynamic>> stats() => throw UnimplementedError('stats');
+  Future<ArchiveStats> stats() => throw UnimplementedError('stats');
   @override
   void cancelEmailRequests() {}
   @override

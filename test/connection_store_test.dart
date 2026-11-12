@@ -37,9 +37,9 @@ void main() {
   });
 
   group('version 2', () {
-    test('round-trips numeric and text account IDs as text', () {
-      for (final (input, stored) in [
-        (7, '7'),
+    test('round-trips numeric-looking and UUID account IDs as text', () {
+      for (final (input, stored) in <(String?, String?)>[
+        ('7', '7'),
         (
           'aaaaaaaa-0000-4000-8000-000000000001',
           'aaaaaaaa-0000-4000-8000-000000000001',
@@ -111,7 +111,7 @@ void main() {
       serverType: ArchiveServerType.mailArchiver,
       server: 'https://a.example',
       key: 'k',
-      accountId: 3,
+      accountId: '3',
     );
     final raw = await const FlutterSecureStorage().read(key: 'connection');
     expect(jsonDecode(raw!)['version'], 2);

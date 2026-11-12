@@ -167,35 +167,40 @@ class ArchiveApi implements ArchiveBackend {
   }
 
   @override
-  Future<List<dynamic>> accounts() async =>
-      await get('accounts') as List<dynamic>;
+  Future<List<ArchiveAccount>> accounts() async {
+    final result = await get('accounts');
+    if (result is! List<dynamic>) {
+      throw const FormatException('Invalid account response');
+    }
+    return [for (final item in result) ArchiveAccount.fromJson(item)];
+  }
+
   @override
-  Future<Map<String, dynamic>> stats() async =>
-      await get('stats') as Map<String, dynamic>;
+  Future<ArchiveStats> stats() async => ArchiveStats.fromJson(await get('stats'));
   @override
   Future<List<ArchiveFolder>> folders(String id) async => flattenFolders(
     await get('accounts/${_mailArchiverId(id)}/folders') as List<dynamic>,
   );
   @override
-  Future<Map<String, dynamic>> emails(
+  Future<MailPage> emails(
     String id,
     String query,
     int page, {
     String? folder,
     SearchFilters filters = const SearchFilters(),
-  }) async =>
-      await get('emails', {
-            'accountId': _mailArchiverId(id),
-            'q': query,
-            'page': '$page',
-            'pageSize': '25',
-            ...filters.parameters,
-            'folder': ?folder,
-          })
-          as Map<String, dynamic>;
+  }) async => MailPage.fromJson(
+    await get('emails', {
+      'accountId': _mailArchiverId(id),
+      'q': query,
+      'page': '$page',
+      'pageSize': '25',
+      ...filters.parameters,
+      'folder': ?folder,
+    }),
+  );
   @override
-  Future<Map<String, dynamic>> message(String id) async =>
-      await get('emails/${_mailArchiverId(id)}') as Map<String, dynamic>;
+  Future<MailMessage> message(String id) async =>
+      MailMessage.fromJson(await get('emails/${_mailArchiverId(id)}'));
 
   @override
   Future<void> downloadAttachment(

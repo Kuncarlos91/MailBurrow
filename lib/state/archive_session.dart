@@ -62,13 +62,13 @@ class ArchiveSession extends ChangeNotifier {
   /// The server type of the current or restored connection. Mail-Archiver is
   /// the only type so far; it is saved with the connection and never detected.
   ArchiveServerType serverType = ArchiveServerType.mailArchiver;
-  Map<String, dynamic>? account;
+  ArchiveAccount? account;
   List<ArchiveFolder> folders = [];
   String? selectedFolder;
   SearchFilters filters = const SearchFilters();
   String? folderError;
   bool foldersBusy = false;
-  List<dynamic> messages = [];
+  List<MailSummary> messages = [];
   int tab = 0, page = 1, totalPages = 1;
   bool busy = true, setup = true;
   bool hasSavedConnection = false;
@@ -202,22 +202,21 @@ class ArchiveSession extends ChangeNotifier {
       final created = candidate = _apiFactory(uri, key);
       final accounts = await created.accounts();
       if (accounts.isEmpty) throw const ArchiveFailure(404);
-      final available = accounts.cast<Map<String, dynamic>>();
-      final preferred = available
-          .where((item) => archiveIdOrNull(item['id']) == preferredAccountId)
+      final preferred = accounts
+          .where((item) => item.id == preferredAccountId)
           .firstOrNull;
-      final selected = preferred ?? available.first;
+      final selected = preferred ?? accounts.first;
       final accountUnavailable =
           preferredAccountId != null && preferred == null;
-      final result = await created.emails(archiveId(selected['id']), '', 1);
-      final items = result['items'] as List<dynamic>;
-      final pages = (result['totalPages'] as int).clamp(1, 1000000);
+      final result = await created.emails(selected.id, '', 1);
+      final items = result.items;
+      final pages = result.totalPages.clamp(1, 1000000);
       try {
         await _store.write(
           serverType: serverType,
           server: uri.toString(),
           key: key,
-          accountId: archiveId(selected['id']),
+          accountId: selected.id,
         );
       } catch (_) {
         if (!_disposed) {
@@ -265,14 +264,13 @@ class ArchiveSession extends ChangeNotifier {
     }
   }
 
-  Future<void> switchAccount(Map<String, dynamic> choice) async {
+  Future<void> switchAccount(ArchiveAccount choice) async {
     final requestApi = api;
-    final choiceId = archiveIdOrNull(choice['id']);
+    final choiceId = choice.id;
     if (requestApi == null ||
         setup ||
         !canSwitchAccount ||
-        choiceId == null ||
-        choiceId == archiveIdOrNull(account?['id'])) {
+        choiceId == account?.id) {
       return;
     }
     // Invalidate old requests before awaiting storage; they must not reset busy
@@ -311,7 +309,7 @@ class ArchiveSession extends ChangeNotifier {
     }
     if (_disposed || !identical(api, requestApi)) return;
     onAccountChanged?.call(
-      () => !_disposed && archiveIdOrNull(account?['id']) == choiceId,
+      () => !_disposed && account?.id == choiceId,
     );
     _clearBrowsing();
     account = choice;
@@ -370,18 +368,18 @@ class ArchiveSession extends ChangeNotifier {
     searchTimer = timer;
     try {
       final result = await requestApi.emails(
-        archiveId(account!['id']),
+        account!.id,
         query,
         requestedPage,
         folder: selectedFolder,
         filters: filters,
       );
       if (current()) {
-        messages = result['items'] as List<dynamic>;
-        page = result['page'] as int;
-        totalPages = (result['totalPages'] as int).clamp(1, 1000000);
+        messages = result.items;
+        page = result.page;
+        totalPages = result.totalPages.clamp(1, 1000000);
         searchElapsed = watch.elapsed;
-        final total = result['totalItems'] as int?;
+        final total = result.totalItems;
         final count = total == null
             ? '${messages.length} messages on this page'
             : '$total matches';
@@ -425,7 +423,7 @@ class ArchiveSession extends ChangeNotifier {
 
   Future<void> loadFolders() async {
     final requestApi = api;
-    final accountId = archiveIdOrNull(account?['id']);
+    final accountId = account?.id;
     if (requestApi == null || accountId == null || foldersBusy) return;
     final requestId = ++folderRequestId;
     bool current() =>
@@ -554,10 +552,10 @@ class ArchiveSession extends ChangeNotifier {
     var adopted = false;
     try {
       final created = candidate = await _demoLoader();
-      final accounts = (await created.accounts()).cast<Map<String, dynamic>>();
+      final accounts = await created.accounts();
       if (accounts.isEmpty) throw const ArchiveFailure(404);
       final selected = accounts.first;
-      final result = await created.emails(archiveId(selected['id']), '', 1);
+      final result = await created.emails(selected.id, '', 1);
       if (_disposed) return;
       if (!identical(api, created)) api?.close();
       _invalidateRequests();
@@ -568,8 +566,8 @@ class ArchiveSession extends ChangeNotifier {
       demo = true;
       account = selected;
       accountNotice = null;
-      messages = result['items'] as List<dynamic>;
-      totalPages = (result['totalPages'] as int).clamp(1, 1000000);
+      messages = result.items;
+      totalPages = result.totalPages.clamp(1, 1000000);
       setup = false;
       _notify();
       await loadFolders();
