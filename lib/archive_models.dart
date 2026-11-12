@@ -48,13 +48,19 @@ class ArchiveAccount {
     this.archivingEnabled,
   });
 
+  /// The ID must be valid. The other fields are display-only and each has a
+  /// "not reported" fallback, so a wrong type falls back to it rather than
+  /// blocking the connection, as in 0.3.0.
   factory ArchiveAccount.fromJson(Object? value) {
     final json = _object(value, 'account');
+    final email = json['emailAddress'];
+    final lastSync = json['lastSync'];
+    final enabled = json['isEnabled'];
     return ArchiveAccount(
       id: archiveId(json['id']),
-      emailAddress: _text(json['emailAddress']),
-      lastSync: _text(json['lastSync']),
-      archivingEnabled: _flag(json['isEnabled']),
+      emailAddress: email is String ? email : null,
+      lastSync: lastSync is String ? lastSync : null,
+      archivingEnabled: enabled is bool ? enabled : null,
     );
   }
 

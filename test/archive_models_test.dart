@@ -6,8 +6,10 @@ void main() {
     'wrong boolean types are rejected and missing flags retain defaults',
     () {
       expect(
-        () => ArchiveAccount.fromJson({'id': 1, 'isEnabled': 'true'}),
-        throwsFormatException,
+        ArchiveAccount.fromJson({'id': 1, 'isEnabled': 'true'})
+            .archivingEnabled,
+        isNull,
+        reason: 'display-only account fields fall back to "not reported"',
       );
       expect(
         () => MailSummary.fromJson({'id': 1, 'hasAttachments': 1}),
@@ -92,12 +94,14 @@ void main() {
         throwsFormatException,
       );
     }
-    for (final field in ['emailAddress', 'lastSync']) {
-      expect(
-        () => ArchiveAccount.fromJson({'id': 1, field: []}),
-        throwsFormatException,
-      );
-    }
+    // Display-only account fields keep 0.3.0's "not reported" fallback.
+    final odd = ArchiveAccount.fromJson({
+      'id': 1,
+      'emailAddress': <Object>[],
+      'lastSync': 5,
+    });
+    expect(odd.address, 'Email address not reported');
+    expect(odd.lastSync, isNull);
     expect(MailMessage.fromJson(<String, dynamic>{}).htmlBody, '');
     expect(MailMessage.fromJson({'textBody': null}).textBody, '');
     expect(MailSummary.fromJson({'id': 1}).subject, isNull);
