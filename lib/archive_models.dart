@@ -7,6 +7,11 @@ String archiveId(Object? value) {
   throw const FormatException('Invalid archive identifier.');
 }
 
+/// Like [archiveId], but returns null instead of throwing, for comparisons and
+/// guards that must not turn a malformed result into an apparent identifier.
+String? archiveIdOrNull(Object? value) =>
+    value is int || (value is String && value.isNotEmpty) ? '$value' : null;
+
 /// Shared folder metadata supplied by an archive backend.
 class ArchiveFolder {
   const ArchiveFolder(this.name, this.path, this.count, this.depth);

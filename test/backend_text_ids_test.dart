@@ -90,6 +90,35 @@ void main() {
       expect(() => archiveId(value), throwsFormatException);
     }
     expect(() => MailAttachment.fromJson({'id': null}), throwsFormatException);
+    expect(archiveIdOrNull(7), '7');
+    expect(archiveIdOrNull(firstId), firstId);
+    for (final value in [null, true, 1.5, '', <Object>[], <String, Object>{}]) {
+      expect(archiveIdOrNull(value), isNull);
+    }
+  });
+
+  test('account switching ignores malformed or unchanged IDs', () async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final backend = TextIdBackend(
+      Uri.parse('https://archive.example'),
+      'test-only',
+    );
+    final session = ArchiveSession(apiFactory: (_, _) => backend);
+    session.server.text = backend.server.toString();
+    session.keyInput.text = backend.key;
+    await session.connect();
+    expect(session.account?['id'], firstId);
+    final before = await const FlutterSecureStorage().read(key: 'connection');
+    for (final id in [null, '', true, <Object>[], firstId]) {
+      await session.switchAccount({'id': id, 'emailAddress': 'x@example.com'});
+      expect(session.account?['id'], firstId);
+      expect(
+        await const FlutterSecureStorage().read(key: 'connection'),
+        before,
+        reason: 'a rejected switch must not rewrite the saved connection',
+      );
+    }
+    session.dispose();
   });
 
   test(

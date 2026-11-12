@@ -33,6 +33,9 @@ class _AccountSelector extends StatefulWidget {
 }
 
 class _AccountSelectorState extends State<_AccountSelector> {
+  bool _isCurrent(Map<String, dynamic> account) =>
+      archiveIdOrNull(account['id']) == widget.currentAccountId;
+
   late Future<List<Map<String, dynamic>>> result;
 
   Future<List<Map<String, dynamic>>> fetch() async {
@@ -40,10 +43,9 @@ class _AccountSelectorState extends State<_AccountSelector> {
     return accounts
         .map((value) {
           if (value is! Map<String, dynamic> ||
-              (value['id'] is! int && value['id'] is! String)) {
+              archiveIdOrNull(value['id']) == null) {
             throw const FormatException('Invalid account response');
           }
-          archiveId(value['id']);
           return value;
         })
         .toList(growable: false);
@@ -90,13 +92,13 @@ class _AccountSelectorState extends State<_AccountSelector> {
                 key: ValueKey('account-choice-${account['id']}'),
                 leading: const Icon(Icons.account_circle_outlined),
                 title: Text(accountAddress(account)),
-                subtitle: account['id'].toString() == widget.currentAccountId
+                subtitle: _isCurrent(account)
                     ? const Text('Currently browsing')
                     : null,
-                trailing: account['id'].toString() == widget.currentAccountId
+                trailing: _isCurrent(account)
                     ? const Icon(Icons.check)
                     : null,
-                selected: account['id'].toString() == widget.currentAccountId,
+                selected: _isCurrent(account),
                 onTap: () => Navigator.pop(context, account),
               ),
         ],

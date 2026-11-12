@@ -204,7 +204,7 @@ class ArchiveSession extends ChangeNotifier {
       if (accounts.isEmpty) throw const ArchiveFailure(404);
       final available = accounts.cast<Map<String, dynamic>>();
       final preferred = available
-          .where((item) => '${item['id']}' == preferredAccountId)
+          .where((item) => archiveIdOrNull(item['id']) == preferredAccountId)
           .firstOrNull;
       final selected = preferred ?? available.first;
       final accountUnavailable =
@@ -217,7 +217,7 @@ class ArchiveSession extends ChangeNotifier {
           serverType: serverType,
           server: uri.toString(),
           key: key,
-          accountId: selected['id'],
+          accountId: archiveId(selected['id']),
         );
       } catch (_) {
         if (!_disposed) {
@@ -267,11 +267,12 @@ class ArchiveSession extends ChangeNotifier {
 
   Future<void> switchAccount(Map<String, dynamic> choice) async {
     final requestApi = api;
+    final choiceId = archiveIdOrNull(choice['id']);
     if (requestApi == null ||
         setup ||
         !canSwitchAccount ||
-        (choice['id'] is! int && choice['id'] is! String) ||
-        choice['id'] == account?['id']) {
+        choiceId == null ||
+        choiceId == archiveIdOrNull(account?['id'])) {
       return;
     }
     // Invalidate old requests before awaiting storage; they must not reset busy
@@ -293,7 +294,7 @@ class ArchiveSession extends ChangeNotifier {
           serverType: serverType,
           server: requestApi.server.toString(),
           key: requestApi.key,
-          accountId: choice['id'],
+          accountId: choiceId,
         );
       }
     } catch (_) {
@@ -309,7 +310,9 @@ class ArchiveSession extends ChangeNotifier {
       return;
     }
     if (_disposed || !identical(api, requestApi)) return;
-    onAccountChanged?.call(() => !_disposed && account?['id'] == choice['id']);
+    onAccountChanged?.call(
+      () => !_disposed && archiveIdOrNull(account?['id']) == choiceId,
+    );
     _clearBrowsing();
     account = choice;
     accountNotice = null;
@@ -422,7 +425,7 @@ class ArchiveSession extends ChangeNotifier {
 
   Future<void> loadFolders() async {
     final requestApi = api;
-    final accountId = account?['id']?.toString();
+    final accountId = archiveIdOrNull(account?['id']);
     if (requestApi == null || accountId == null || foldersBusy) return;
     final requestId = ++folderRequestId;
     bool current() =>
