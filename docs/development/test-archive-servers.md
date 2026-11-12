@@ -30,6 +30,25 @@ Open Archiver's **EML Import** accepts exactly this layout: a zip of `.eml` file
 
 File imports run once; they are not re-synced. Importing the same zip again may be skipped or deduplicated, depending on the server's duplicate handling (fixed `Message-ID`s make duplicates detectable). To start over, delete the test source and import it again.
 
+## Check an Open Archiver test server
+
+[oa_lab_check.py](../../tools/oa_lab_check.py) runs read-only API checks against a test Open Archiver holding only the demo mail, and prints a summary with no keys, addresses or message content:
+
+```
+python tools/oa_lab_check.py https://<test-server>:8443 --samples oa-samples --rate-limit
+```
+
+It asks for an admin key, a reader key and a deleted key without echoing them (on Windows, paste with a right-click). It only sends `GET` requests, always verifies certificates and never follows redirects. It checks key rejection, source isolation on every read surface (listing, email by ID, attachment download, storage paths, search), message and attachment behaviour, search size and attachment text, preserve-original sources, totals and the rate limit. `--samples` saves fictional sample responses for future test fixtures; review them before committing. `--rate-limit` sends about 100 quick requests, so the reader key is rate-limited for about a minute.
+
+The reader needs a custom role with two rules, one on its source and one on that source's emails:
+
+```json
+[
+  {"action": ["read", "search"], "subject": "ingestion", "conditions": {"id": {"$in": ["<source id>"]}}},
+  {"action": ["read", "search"], "subject": "archive", "conditions": {"ingestionSourceId": {"$in": ["<source id>"]}}}
+]
+```
+
 ## What this does not prove
 
 A successful export only proves the files match the demo data. Whether the server ingested every message and attachment, how it stores and returns them, and whether a restricted key is isolated from other sources are separate checks, run against the live test server. Record them with the server's exact version.
