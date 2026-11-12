@@ -91,8 +91,8 @@ class _ArchiveHomeState extends State<ArchiveHome> {
 
   Future<void> chooseAccount() async {
     final requestApi = session.api;
-    final id = session.account?['id'];
-    if (requestApi == null || id is! int || !session.canSwitchAccount) return;
+    final id = archiveIdOrNull(session.account?['id']);
+    if (requestApi == null || id == null || !session.canSwitchAccount) return;
     final choice = await showAccountSelector(
       context,
       api: requestApi,

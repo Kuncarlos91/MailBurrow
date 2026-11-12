@@ -16,7 +16,7 @@ class MessageReader extends StatefulWidget {
     this.onExitDemo,
   });
   final ArchiveBackend api;
-  final int id;
+  final String id;
 
   /// Set while the built-in demo is open: shows the demo banner, whose Exit
   /// closes this message and then leaves the demo.

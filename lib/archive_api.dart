@@ -13,6 +13,15 @@ import 'attachment_download.dart';
 export 'archive_models.dart';
 export 'archive_errors.dart';
 
+// Mail-Archiver uses numeric wire IDs. Keep that restriction in its adapter,
+// rather than imposing it on every backend or interpolating opaque path input.
+String _mailArchiverId(String id) {
+  if (!RegExp(r'^(0|[1-9][0-9]*)$').hasMatch(id)) {
+    throw const FormatException('Invalid Mail-Archiver identifier.');
+  }
+  return id;
+}
+
 Uri validateServer(String value) {
   final input = value.trim();
   if (input.isEmpty || RegExp(r'\s').hasMatch(input)) {
@@ -164,18 +173,19 @@ class ArchiveApi implements ArchiveBackend {
   Future<Map<String, dynamic>> stats() async =>
       await get('stats') as Map<String, dynamic>;
   @override
-  Future<List<ArchiveFolder>> folders(int id) async =>
-      flattenFolders(await get('accounts/$id/folders') as List<dynamic>);
+  Future<List<ArchiveFolder>> folders(String id) async => flattenFolders(
+    await get('accounts/${_mailArchiverId(id)}/folders') as List<dynamic>,
+  );
   @override
   Future<Map<String, dynamic>> emails(
-    int id,
+    String id,
     String query,
     int page, {
     String? folder,
     SearchFilters filters = const SearchFilters(),
   }) async =>
       await get('emails', {
-            'accountId': '$id',
+            'accountId': _mailArchiverId(id),
             'q': query,
             'page': '$page',
             'pageSize': '25',
@@ -184,18 +194,20 @@ class ArchiveApi implements ArchiveBackend {
           })
           as Map<String, dynamic>;
   @override
-  Future<Map<String, dynamic>> message(int id) async =>
-      await get('emails/$id') as Map<String, dynamic>;
+  Future<Map<String, dynamic>> message(String id) async =>
+      await get('emails/${_mailArchiverId(id)}') as Map<String, dynamic>;
 
   @override
   Future<void> downloadAttachment(
-    int emailId,
-    int attachmentId,
+    String emailId,
+    String attachmentId,
     File destination, {
     AttachmentDownload? transfer,
     void Function(int receivedBytes)? onProgress,
   }) async {
     if (_closed) throw StateError('Archive connection closed');
+    _mailArchiverId(emailId);
+    _mailArchiverId(attachmentId);
     validateServer(server.toString());
     if (attachmentByteLimit < 1 ||
         attachmentDeadline <= Duration.zero ||

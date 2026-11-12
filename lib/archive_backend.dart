@@ -13,6 +13,10 @@ import 'search_filters.dart';
 /// contract. Another backend would adapt its responses to those shapes until
 /// typed models and capability flags replace them; see the completion plan's
 /// note on other archive backends.
+/// Method parameters use opaque text IDs for accounts, messages and attachments.
+/// Callers must not parse them as integers. During the result-model transition,
+/// numeric IDs in legacy JSON maps are normalized with `archiveId`; adapters
+/// own their wire-format constraints (Mail-Archiver requires numeric wire IDs).
 ///
 /// Every implementation must keep MailBurrow's safety rules: HTTPS with
 /// certificate validation, no redirects, read-only requests, bounded
@@ -30,12 +34,12 @@ abstract interface class ArchiveBackend {
   Future<List<dynamic>> accounts();
 
   /// The folders of one account, flattened for display.
-  Future<List<ArchiveFolder>> folders(int accountId);
+  Future<List<ArchiveFolder>> folders(String accountId);
 
   /// One page of an account's messages matching [query], [folder] and
   /// [filters], newest first unless the filters say otherwise.
   Future<Map<String, dynamic>> emails(
-    int accountId,
+    String accountId,
     String query,
     int page, {
     String? folder,
@@ -43,13 +47,13 @@ abstract interface class ArchiveBackend {
   });
 
   /// One full message, including bodies and attachment details.
-  Future<Map<String, dynamic>> message(int id);
+  Future<Map<String, dynamic>> message(String id);
 
   /// Streams one attachment to [destination], within the app's size and time
   /// limits, only when the user asks for it.
   Future<void> downloadAttachment(
-    int emailId,
-    int attachmentId,
+    String emailId,
+    String attachmentId,
     File destination, {
     AttachmentDownload? transfer,
     void Function(int receivedBytes)? onProgress,

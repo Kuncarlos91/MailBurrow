@@ -16,23 +16,23 @@ class FakeArchiveBackend implements ArchiveBackend {
   @override
   Future<List<dynamic>> accounts() => throw UnimplementedError('accounts');
   @override
-  Future<List<ArchiveFolder>> folders(int accountId) =>
+  Future<List<ArchiveFolder>> folders(String accountId) =>
       throw UnimplementedError('folders');
   @override
   Future<Map<String, dynamic>> emails(
-    int accountId,
+    String accountId,
     String query,
     int page, {
     String? folder,
     SearchFilters filters = const SearchFilters(),
   }) => throw UnimplementedError('emails');
   @override
-  Future<Map<String, dynamic>> message(int id) =>
+  Future<Map<String, dynamic>> message(String id) =>
       throw UnimplementedError('message');
   @override
   Future<void> downloadAttachment(
-    int emailId,
-    int attachmentId,
+    String emailId,
+    String attachmentId,
     File destination, {
     AttachmentDownload? transfer,
     void Function(int receivedBytes)? onProgress,

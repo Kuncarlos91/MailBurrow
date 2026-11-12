@@ -26,14 +26,14 @@ class RecoveryApi extends ArchiveApi {
 
   @override
   Future<Map<String, dynamic>> emails(
-    int id,
+    String id,
     String query,
     int page, {
     String? folder,
     dynamic filters,
   }) async => {'items': <dynamic>[], 'page': 1, 'totalPages': 1};
   @override
-  Future<List<ArchiveFolder>> folders(int id) async => [];
+  Future<List<ArchiveFolder>> folders(String id) async => [];
 }
 
 class ReaderApi extends FakeArchiveBackend {
@@ -41,7 +41,7 @@ class ReaderApi extends FakeArchiveBackend {
   final response = Completer<Map<String, dynamic>>();
   int requests = 0;
   @override
-  Future<Map<String, dynamic>> message(int id) {
+  Future<Map<String, dynamic>> message(String id) {
     requests++;
     return requests == 1
         ? Future.error(const ArchiveFailure(401))
@@ -55,7 +55,7 @@ class LandscapeApi extends RecoveryApi {
   }
   @override
   Future<Map<String, dynamic>> emails(
-    int id,
+    String id,
     String query,
     int page, {
     String? folder,
@@ -82,7 +82,7 @@ class SearchApi extends LandscapeApi {
   int? lastPage;
   @override
   Future<Map<String, dynamic>> emails(
-    int id,
+    String id,
     String query,
     int page, {
     String? folder,
@@ -98,12 +98,12 @@ class SearchApi extends LandscapeApi {
 class DelayedSearchApi extends SearchApi {
   final pending = Completer<Map<String, dynamic>>();
   @override
-  Future<List<ArchiveFolder>> folders(int id) async => [
+  Future<List<ArchiveFolder>> folders(String id) async => [
     const ArchiveFolder('Inbox', 'INBOX', 30, 0),
   ];
   @override
   Future<Map<String, dynamic>> emails(
-    int id,
+    String id,
     String query,
     int page, {
     String? folder,
@@ -126,7 +126,7 @@ class SwitchingArchiveApi extends RecoveryApi {
   bool closed = false;
   final delayedFolders = Completer<List<ArchiveFolder>>();
   @override
-  Future<List<ArchiveFolder>> folders(int id) async => delayFolders
+  Future<List<ArchiveFolder>> folders(String id) async => delayFolders
       ? delayedFolders.future
       : [ArchiveFolder(folderName, folderName, 1, 0)];
   @override
@@ -164,7 +164,7 @@ class PagingApi extends LandscapeApi {
   };
   @override
   Future<Map<String, dynamic>> emails(
-    int id,
+    String id,
     String query,
     int page, {
     String? folder,
@@ -186,7 +186,7 @@ class SectionRecoveryApi extends PagingApi {
   bool mailDenied = false;
   @override
   Future<Map<String, dynamic>> emails(
-    int id,
+    String id,
     String query,
     int page, {
     String? folder,
@@ -200,7 +200,7 @@ class SectionRecoveryApi extends PagingApi {
   }
 
   @override
-  Future<List<ArchiveFolder>> folders(int id) async {
+  Future<List<ArchiveFolder>> folders(String id) async {
     if (networkOffline) throw const SocketException('private detail');
     return [];
   }
@@ -1055,7 +1055,7 @@ void main() {
               builder: (context) => TextButton(
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => MessageReader(api: api, id: 1),
+                    builder: (_) => MessageReader(api: api, id: '1'),
                   ),
                 ),
                 child: const Text('Read message'),

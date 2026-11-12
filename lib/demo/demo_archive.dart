@@ -96,30 +96,30 @@ class DemoArchive implements ArchiveBackend {
   }
 
   @override
-  Future<List<ArchiveFolder>> folders(int accountId) async {
+  Future<List<ArchiveFolder>> folders(String accountId) async {
     _checkOpen();
-    final tree = _folders['$accountId'] as List<dynamic>?;
+    final tree = _folders[accountId] as List<dynamic>?;
     if (tree == null) throw const ArchiveFailure(404);
     return flattenFolders(tree);
   }
 
   @override
   Future<Map<String, dynamic>> emails(
-    int accountId,
+    String accountId,
     String query,
     int page, {
     String? folder,
     SearchFilters filters = const SearchFilters(),
   }) async {
     await _pause();
-    if (!_accounts.any((account) => account['id'] == accountId)) {
+    if (!_accounts.any((account) => account['id'].toString() == accountId)) {
       throw const ArchiveFailure(404);
     }
     final needle = query.trim().toLowerCase();
     final from = filters.from == null ? null : dateLabel(filters.from!);
     final to = filters.to == null ? null : dateLabel(filters.to!);
     final matches = _messages.where((mail) {
-      if (mail['accountId'] != accountId) return false;
+      if (mail['accountId'].toString() != accountId) return false;
       if (folder != null && mail['folderName'] != folder) return false;
       if (filters.direction == 'incoming' && mail['isOutgoing'] == true) {
         return false;
@@ -190,11 +190,11 @@ class DemoArchive implements ArchiveBackend {
       field: mail[field],
   };
 
-  Map<String, dynamic>? _find(int id) =>
-      _messages.where((mail) => mail['id'] == id).firstOrNull;
+  Map<String, dynamic>? _find(String id) =>
+      _messages.where((mail) => mail['id'].toString() == id).firstOrNull;
 
   @override
-  Future<Map<String, dynamic>> message(int id) async {
+  Future<Map<String, dynamic>> message(String id) async {
     _checkOpen();
     final mail = _find(id);
     if (mail == null) throw const ArchiveFailure(404);
@@ -209,8 +209,8 @@ class DemoArchive implements ArchiveBackend {
 
   @override
   Future<void> downloadAttachment(
-    int emailId,
-    int attachmentId,
+    String emailId,
+    String attachmentId,
     File destination, {
     AttachmentDownload? transfer,
     void Function(int receivedBytes)? onProgress,
@@ -218,9 +218,9 @@ class DemoArchive implements ArchiveBackend {
     _checkOpen();
     final mail = _find(emailId);
     final belongs = (mail?['attachments'] as List<dynamic>? ?? []).any(
-      (file) => (file as Map<String, dynamic>)['id'] == attachmentId,
+      (file) => (file as Map<String, dynamic>)['id'].toString() == attachmentId,
     );
-    final name = _attachmentFiles['$attachmentId'];
+    final name = _attachmentFiles[attachmentId];
     if (!belongs || name == null) throw const ArchiveFailure(404);
     final active = transfer ?? AttachmentDownload();
     active.throwIfStopped();

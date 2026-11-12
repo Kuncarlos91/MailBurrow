@@ -21,10 +21,10 @@ class DatedApi extends ArchiveApi {
     {'id': 1},
   ];
   @override
-  Future<List<ArchiveFolder>> folders(int id) async => [];
+  Future<List<ArchiveFolder>> folders(String id) async => [];
   @override
   Future<Map<String, dynamic>> emails(
-    int id,
+    String id,
     String query,
     int page, {
     String? folder,
@@ -35,7 +35,7 @@ class DatedApi extends ArchiveApi {
     'totalPages': 1,
   };
   @override
-  Future<Map<String, dynamic>> message(int id) async => mail;
+  Future<Map<String, dynamic>> message(String id) async => mail;
 }
 
 void main() {
