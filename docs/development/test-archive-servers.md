@@ -30,6 +30,33 @@ Open Archiver's **EML Import** accepts exactly this layout: a zip of `.eml` file
 
 File imports run once; they are not re-synced. Importing the same zip again may be skipped or deduplicated, depending on the server's duplicate handling (fixed `Message-ID`s make duplicates detectable). To start over, delete the test source and import it again.
 
+## Check an Open Archiver test server
+
+[oa_lab_check.py](../../tools/oa_lab_check.py) runs read-only API checks against a test Open Archiver holding only the demo mail, and prints a summary with no keys, addresses or message content:
+
+```
+python tools/oa_lab_check.py https://<test-server>:8443 --samples oa-samples --rate-limit
+```
+
+It asks for an admin key, a reader key and, optionally, a deleted key, without echoing them (on Windows, paste with a right-click). It only sends `GET` requests, always verifies certificates and never follows redirects.
+
+**What a result means.** Every check is `PASS`, `FAIL` or `SKIP`, and required or `(optional)`. The last line reads `RESULT: all required checks passed` only when nothing failed **and** no required check was skipped; otherwise it reads `NOT PROVEN` and the script exits with 1. Search checks use known terms from the demo fixtures with positive controls (an admin search that must find the other source's term), so an empty or malformed response never counts as working.
+
+**Required fixtures:** the three demo zips imported as separate sources, and a reader limited to the Alex Rivera source (40 messages). **Optional:** a deleted key, a source imported with **Preserve Original File** (from `riverside-garden-club.zip`), and `--rate-limit`, which sends about 100 quick requests and rate-limits the reader key for about a minute. Optional checks that did not run are listed as `SKIP (optional)`, never as passes.
+
+**What the summary can contain:** statuses, counts, sizes, booleans, and field or header names from fixed allowlists. Server-provided text (error messages, page bodies, header values, unknown field names) is never printed; unknown names are only counted. `--samples` saves fictional sample responses for future test fixtures; review them before committing.
+
+[test_oa_lab_check.py](../../tools/test_oa_lab_check.py) runs the checker against an in-process fake server built from the demo fixtures, with faults injected one at a time: missing fixtures, empty and malformed search responses, leaking results or totals, inline payloads and server error text carrying sentinel secrets.
+
+The reader needs a custom role with two rules, one on its source and one on that source's emails:
+
+```json
+[
+  {"action": ["read", "search"], "subject": "ingestion", "conditions": {"id": {"$in": ["<source id>"]}}},
+  {"action": ["read", "search"], "subject": "archive", "conditions": {"ingestionSourceId": {"$in": ["<source id>"]}}}
+]
+```
+
 ## What this does not prove
 
 A successful export only proves the files match the demo data. Whether the server ingested every message and attachment, how it stores and returns them, and whether a restricted key is isolated from other sources are separate checks, run against the live test server. Record them with the server's exact version.
