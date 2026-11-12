@@ -17,25 +17,25 @@ class DatedApi extends ArchiveApi {
     'hasAttachments': true,
   };
   @override
-  Future<List<dynamic>> accounts() async => [
+  Future<List<ArchiveAccount>> accounts() async => [
     {'id': 1},
-  ];
+  ].map(ArchiveAccount.fromJson).toList();
   @override
   Future<List<ArchiveFolder>> folders(String id) async => [];
   @override
-  Future<Map<String, dynamic>> emails(
+  Future<MailPage> emails(
     String id,
     String query,
     int page, {
     String? folder,
     dynamic filters,
-  }) async => {
+  }) async => MailPage.fromJson({
     'items': [mail],
     'page': 1,
     'totalPages': 1,
-  };
+  });
   @override
-  Future<Map<String, dynamic>> message(String id) async => mail;
+  Future<MailMessage> message(String id) async => MailMessage.fromJson(mail);
 }
 
 void main() {

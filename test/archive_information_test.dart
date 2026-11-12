@@ -36,7 +36,7 @@ void main() {
           body: SingleChildScrollView(
             child: ArchiveInformation(
               api: StatsApi(),
-              account: const {'id': 1},
+              account: const ArchiveAccount(id: '1'),
             ),
           ),
         ),
@@ -67,7 +67,7 @@ void main() {
         ),
         home: Scaffold(
           body: SingleChildScrollView(
-            child: ArchiveInformation(api: api, account: const {'id': 1}),
+            child: ArchiveInformation(api: api, account: const ArchiveAccount(id: '1')),
           ),
         ),
       ),
@@ -158,15 +158,15 @@ void main() {
 class StatsApi extends ArchiveApi {
   StatsApi() : super(Uri.parse('https://example.com'), 'test-only');
   @override
-  Future<Map<String, dynamic>> stats() async => {
+  Future<ArchiveStats> stats() async => ArchiveStats.fromJson({
     'emails': 123,
     'accounts': 1,
     'attachments': 5,
-  };
+  });
   @override
-  Future<List<dynamic>> accounts() async => [
+  Future<List<ArchiveAccount>> accounts() async => [
     {'id': 1, 'isEnabled': true, 'lastSync': null},
-  ];
+  ].map(ArchiveAccount.fromJson).toList();
 }
 
 class MutableAccountsApi extends StatsApi {
@@ -176,8 +176,8 @@ class MutableAccountsApi extends StatsApi {
     {'id': 2, 'emailAddress': 'second@example.com'},
   ];
   @override
-  Future<List<dynamic>> accounts() async {
+  Future<List<ArchiveAccount>> accounts() async {
     if (offline) throw const SocketException('private detail');
-    return available;
+    return available.map(ArchiveAccount.fromJson).toList();
   }
 }

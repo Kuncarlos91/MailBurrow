@@ -1,27 +1,10 @@
 import 'package:flutter/material.dart';
 import 'archive_errors.dart';
+import 'archive_models.dart';
 import 'archive_backend.dart';
 import 'account_selector.dart';
 
-class ArchiveStats {
-  const ArchiveStats(this.emails, this.accounts, this.attachments);
-  final int emails, accounts, attachments;
-  factory ArchiveStats.fromJson(Map<String, dynamic> json) {
-    int count(String field) {
-      final value = json[field];
-      if (value is! int || value < 0) {
-        throw const FormatException('Invalid archive count');
-      }
-      return value;
-    }
-
-    return ArchiveStats(
-      count('emails'),
-      count('accounts'),
-      count('attachments'),
-    );
-  }
-}
+export 'archive_models.dart' show ArchiveStats;
 
 class ArchiveInformation extends StatefulWidget {
   const ArchiveInformation({
@@ -32,17 +15,17 @@ class ArchiveInformation extends StatefulWidget {
     this.onAccountSelected,
   });
   final ArchiveBackend api;
-  final Map<String, dynamic> account;
+  final ArchiveAccount account;
   final VoidCallback? onRefreshed;
-  final ValueChanged<Map<String, dynamic>>? onAccountSelected;
+  final ValueChanged<ArchiveAccount>? onAccountSelected;
   @override
   State<ArchiveInformation> createState() => _ArchiveInformationState();
 }
 
 class _ArchiveInformationState extends State<ArchiveInformation> {
   ArchiveStats? stats;
-  List<Map<String, dynamic>> accessibleAccounts = [];
-  late Map<String, dynamic> account;
+  List<ArchiveAccount> accessibleAccounts = [];
+  late ArchiveAccount account;
   bool busy = true;
   String? error;
   @override
@@ -58,14 +41,12 @@ class _ArchiveInformationState extends State<ArchiveInformation> {
       error = null;
     });
     try {
-      final response = await widget.api.stats();
-      final accounts = await widget.api.accounts();
-      final available = accounts.cast<Map<String, dynamic>>().toList();
+      final totals = await widget.api.stats();
+      final available = await widget.api.accounts();
       final updated = available
-          .where((item) => item['id'] == widget.account['id'])
+          .where((item) => item.id == widget.account.id)
           .firstOrNull;
       if (updated == null) throw const ArchiveFailure(404);
-      final totals = ArchiveStats.fromJson(response);
       if (mounted) {
         setState(() {
           stats = totals;
@@ -88,7 +69,7 @@ class _ArchiveInformationState extends State<ArchiveInformation> {
   }
 
   String syncLabel(BuildContext context) {
-    final value = account['lastSync'] as String?;
+    final value = account.lastSync;
     if (value == null || value.isEmpty) return 'Not reported';
     final parsed = DateTime.tryParse(
       value.endsWith('Z') || RegExp(r'[+-]\d\d:\d\d$').hasMatch(value)
@@ -135,11 +116,11 @@ class _ArchiveInformationState extends State<ArchiveInformation> {
               subtitle: Text(syncLabel(context)),
             ),
             Text(
-              'Archiving: ${account['isEnabled'] == true
-                  ? 'Enabled'
-                  : account['isEnabled'] == false
-                  ? 'Disabled'
-                  : 'Not reported'}',
+              'Archiving: ${switch (account.archivingEnabled) {
+                true => 'Enabled',
+                false => 'Disabled',
+                null => 'Not reported',
+              }}',
             ),
             const Divider(height: 28),
             const Text('Totals across all accounts accessible to this API key'),
@@ -187,7 +168,7 @@ class _ArchiveInformationState extends State<ArchiveInformation> {
                       )
                     else
                       Text(accountAddress(item)),
-                    if (item['id'] == account['id'])
+                    if (item.id == account.id)
                       Text(
                         'Currently browsing',
                         style: Theme.of(context).textTheme.bodySmall,

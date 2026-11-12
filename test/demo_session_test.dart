@@ -25,7 +25,7 @@ class RecordingStore extends ConnectionStore {
     required ArchiveServerType serverType,
     required String server,
     required String key,
-    required Object? accountId,
+    required String? accountId,
   }) {
     calls.add('write');
     return super.write(
@@ -48,25 +48,25 @@ class RealArchive extends FakeArchiveBackend {
   RealArchive(super.server, super.key);
   bool closedByApp = false;
   @override
-  Future<List<dynamic>> accounts() async => [
+  Future<List<ArchiveAccount>> accounts() async => [
     {'id': 7, 'emailAddress': 'owner@example.com'},
-  ];
+  ].map(ArchiveAccount.fromJson).toList();
   @override
   Future<List<ArchiveFolder>> folders(String accountId) async => [];
   @override
-  Future<Map<String, dynamic>> emails(
+  Future<MailPage> emails(
     String accountId,
     String query,
     int page, {
     String? folder,
     SearchFilters filters = const SearchFilters(),
-  }) async => {
+  }) async => MailPage.fromJson({
     'items': [
       {'id': 70, 'subject': 'Real archive message', 'from': 'a@example.com'},
     ],
     'page': page,
     'totalPages': 1,
-  };
+  });
   @override
   void close() => closedByApp = true;
 }
@@ -119,7 +119,7 @@ void main() {
     expect(session.busy, isFalse);
     expect(session.error, isNull);
     expect(session.api!.server.host, 'demo.mailburrow.invalid');
-    expect(session.account!['id'], 1);
+    expect(session.account!.id, '1');
     expect(session.messages, hasLength(25));
     expect(session.totalPages, 2);
     expect(session.folders, isNotEmpty);
@@ -138,8 +138,8 @@ void main() {
     store.calls.clear();
 
     await session.startDemo();
-    await session.switchAccount({'id': 2, 'emailAddress': 'bakery'});
-    expect(session.account!['id'], 2);
+    await session.switchAccount(ArchiveAccount.fromJson({'id': 2, 'emailAddress': 'bakery'}));
+    expect(session.account!.id, '2');
     expect(session.messages, isNotEmpty);
     await session.applyFilters(const SearchFilters(direction: 'outgoing'));
     session.exitDemo();
@@ -206,7 +206,7 @@ void main() {
       () async {
     latency = const Duration(milliseconds: 40);
     await session.startDemo();
-    final pending = session.switchAccount({'id': 3, 'emailAddress': 'club'});
+    final pending = session.switchAccount(ArchiveAccount.fromJson({'id': 3, 'emailAddress': 'club'}));
     await Future<void>.delayed(Duration.zero);
     session.exitDemo();
     await pending;
@@ -228,7 +228,7 @@ void main() {
 
     expect(session.demo, isFalse);
     expect(session.api, isA<RealArchive>());
-    expect(session.account!['id'], 7);
+    expect(session.account!.id, '7');
     await expectLater(demo.accounts(), throwsA(isA<StateError>()));
     expect(store.calls, ['write']);
     expect(

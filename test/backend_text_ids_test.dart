@@ -23,10 +23,10 @@ class TextIdBackend extends FakeArchiveBackend {
   String? requestedMessage;
 
   @override
-  Future<List<dynamic>> accounts() async => [
+  Future<List<ArchiveAccount>> accounts() async => [
     {'id': firstId, 'emailAddress': 'one@example.com'},
     {'id': secondId, 'emailAddress': 'two@example.com'},
-  ];
+  ].map(ArchiveAccount.fromJson).toList();
 
   @override
   Future<List<ArchiveFolder>> folders(String accountId) async {
@@ -35,7 +35,7 @@ class TextIdBackend extends FakeArchiveBackend {
   }
 
   @override
-  Future<Map<String, dynamic>> emails(
+  Future<MailPage> emails(
     String accountId,
     String query,
     int page, {
@@ -43,26 +43,20 @@ class TextIdBackend extends FakeArchiveBackend {
     SearchFilters filters = const SearchFilters(),
   }) async {
     requestedAccounts.add(accountId);
-    return {
-      'items': [
-        {'id': messageId, 'subject': 'Opaque ID message'},
-      ],
-      'page': 1,
-      'totalPages': 1,
-    };
+    return const MailPage(
+      items: [MailSummary(id: messageId, subject: 'Opaque ID message')],
+    );
   }
 
   @override
-  Future<Map<String, dynamic>> message(String id) async {
+  Future<MailMessage> message(String id) async {
     requestedMessage = id;
-    return {
-      'id': id,
-      'subject': 'Opaque ID message',
-      'textBody': 'Fictional body',
-      'attachments': [
-        {'id': attachmentId, 'fileName': 'sample.txt', 'size': 4},
-      ],
-    };
+    return MailMessage(
+      id: id,
+      subject: 'Opaque ID message',
+      textBody: 'Fictional body',
+      attachments: const [MailAttachment(attachmentId, 'sample.txt', 4)],
+    );
   }
 }
 
@@ -72,9 +66,9 @@ class NumericAccountBackend extends TextIdBackend {
   final Object accountId;
 
   @override
-  Future<List<dynamic>> accounts() async => [
+  Future<List<ArchiveAccount>> accounts() async => [
     {'id': accountId, 'emailAddress': 'one@example.com'},
-  ];
+  ].map(ArchiveAccount.fromJson).toList();
 }
 
 class RecordingWireApi extends ArchiveApi {
@@ -86,7 +80,9 @@ class RecordingWireApi extends ArchiveApi {
   Future<dynamic> get(String path, [Map<String, String>? query]) async {
     this.path = path;
     this.query = query;
-    return path.endsWith('/folders') ? <dynamic>[] : <String, dynamic>{};
+    if (path.endsWith('/folders')) return <dynamic>[];
+    if (path == 'emails') return {'items': <dynamic>[], 'totalPages': 1};
+    return {'id': 42};
   }
 }
 
@@ -101,14 +97,29 @@ void main() {
       expect(() => archiveId(value), throwsFormatException);
     }
     expect(() => MailAttachment.fromJson({'id': null}), throwsFormatException);
-    expect(archiveIdOrNull(7), '7');
-    expect(archiveIdOrNull(firstId), firstId);
-    for (final value in [null, true, 1.5, '', <Object>[], <String, Object>{}]) {
-      expect(archiveIdOrNull(value), isNull);
-    }
   });
 
-  test('account switching ignores malformed or unchanged IDs', () async {
+  test('typed results reject malformed IDs and shapes', () {
+    for (final id in [null, '', true, 1.5, <Object>[], <String, Object>{}]) {
+      expect(
+        () => ArchiveAccount.fromJson({'id': id}),
+        throwsFormatException,
+        reason: '$id',
+      );
+      expect(() => MailSummary.fromJson({'id': id}), throwsFormatException);
+      expect(() => MailMessage.fromJson({'id': id}), throwsFormatException);
+    }
+    for (final value in [null, 'text', 7, <Object>[]]) {
+      expect(() => ArchiveAccount.fromJson(value), throwsFormatException);
+      expect(() => MailPage.fromJson(value), throwsFormatException);
+      expect(() => MailMessage.fromJson(value), throwsFormatException);
+      expect(() => ArchiveStats.fromJson(value), throwsFormatException);
+    }
+    expect(ArchiveAccount.fromJson({'id': 7}).id, '7');
+    expect(MailSummary.fromJson({'id': 0}).id, '0');
+  });
+
+  test('switching to the current account changes nothing', () async {
     FlutterSecureStorage.setMockInitialValues({});
     final backend = TextIdBackend(
       Uri.parse('https://archive.example'),
@@ -118,17 +129,18 @@ void main() {
     session.server.text = backend.server.toString();
     session.keyInput.text = backend.key;
     await session.connect();
-    expect(session.account?['id'], firstId);
+    expect(session.account?.id, firstId);
     final before = await const FlutterSecureStorage().read(key: 'connection');
-    for (final id in [null, '', true, <Object>[], firstId]) {
-      await session.switchAccount({'id': id, 'emailAddress': 'x@example.com'});
-      expect(session.account?['id'], firstId);
-      expect(
-        await const FlutterSecureStorage().read(key: 'connection'),
-        before,
-        reason: 'a rejected switch must not rewrite the saved connection',
-      );
-    }
+    await session.switchAccount(
+      const ArchiveAccount(id: firstId, emailAddress: 'x@example.com'),
+    );
+    expect(session.account?.id, firstId);
+    expect(session.account?.emailAddress, 'one@example.com');
+    expect(
+      await const FlutterSecureStorage().read(key: 'connection'),
+      before,
+      reason: 'an unchanged switch must not rewrite the saved connection',
+    );
     session.dispose();
   });
 
@@ -150,10 +162,10 @@ void main() {
       var accountChanges = 0;
       session.onAccountChanged = (_) => accountChanges++;
 
-      await session.switchAccount({
+      await session.switchAccount(ArchiveAccount.fromJson({
         'id': originalId is int ? '1' : 1,
         'emailAddress': 'replacement@example.com',
-      });
+      }));
 
       expect(identical(session.account, originalAccount), isTrue);
       expect(backend.requestedAccounts, originalRequests);
@@ -178,12 +190,12 @@ void main() {
       session.server.text = backend.server.toString();
       session.keyInput.text = backend.key;
       await session.connect();
-      expect(session.account?['id'], firstId);
-      await session.switchAccount({
+      expect(session.account?.id, firstId);
+      await session.switchAccount(ArchiveAccount.fromJson({
         'id': secondId,
         'emailAddress': 'two@example.com',
-      });
-      expect(session.account?['id'], secondId);
+      }));
+      expect(session.account?.id, secondId);
       expect(backend.requestedAccounts, containsAll([firstId, secondId]));
       final saved = jsonDecode(
         (await const FlutterSecureStorage().read(key: 'connection'))!,
@@ -192,7 +204,7 @@ void main() {
       session.dispose();
       session = create();
       await session.restore();
-      expect(session.account?['id'], secondId);
+      expect(session.account?.id, secondId);
       session.dispose();
     },
   );

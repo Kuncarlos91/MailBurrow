@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mailburrow/archive_errors.dart';
+import 'package:mailburrow/archive_models.dart';
 import 'package:mailburrow/attachment_download.dart';
 import 'package:mailburrow/demo/demo_archive.dart';
 import 'package:mailburrow/search_filters.dart';
@@ -22,8 +23,14 @@ void main() {
     demo = await DemoArchive.load(latency: Duration.zero);
   });
 
-  List<Map<String, dynamic>> items(Map<String, dynamic> page) =>
-      (page['items'] as List<dynamic>).cast<Map<String, dynamic>>();
+  List<MailSummary> items(MailPage page) => page.items;
+
+  // Demo account addresses, for checking sent mail by its sender.
+  const addresses = {
+    '1': 'alex.rivera@example.com',
+    '2': 'hello@maple-street-bakery.example',
+    '3': 'volunteers@riverside-garden-club.example',
+  };
 
   test('identifies itself as a reserved, unreachable demo address', () {
     expect(demo.server.scheme, 'https');
@@ -32,10 +39,11 @@ void main() {
   });
 
   test('lists three fictional accounts on reserved domains', () async {
-    final accounts = (await demo.accounts()).cast<Map<String, dynamic>>();
-    expect(accounts.map((item) => item['id']), [1, 2, 3]);
+    final accounts = await demo.accounts();
+    expect(accounts.map((item) => item.id), ['1', '2', '3']);
     for (final account in accounts) {
-      final address = account['emailAddress'] as String;
+      final address = account.emailAddress!;
+      expect(addresses[account.id], address);
       expect(
         address.endsWith('@example.com') || address.endsWith('.example'),
         isTrue,
@@ -51,7 +59,7 @@ void main() {
     expect(family.name, 'Family');
     final total = folders.fold<int>(0, (sum, item) => sum + item.count);
     final all = await demo.emails('1', '', 1);
-    expect(total, all['totalItems']);
+    expect(total, all.totalItems);
     await expectLater(demo.folders('99'), throwsA(isA<ArchiveFailure>()));
   });
 
@@ -59,33 +67,34 @@ void main() {
     final first = await demo.emails('1', '', 1);
     final second = await demo.emails('1', '', 2);
     expect(items(first), hasLength(25));
-    expect(first['totalPages'], 2);
-    expect(items(second), hasLength((first['totalItems'] as int) - 25));
-    expect(items(first).first['subject'], 'Welcome to the MailBurrow demo');
+    expect(first.totalPages, 2);
+    expect(items(second), hasLength(first.totalItems! - 25));
+    expect(items(first).first.subject, 'Welcome to the MailBurrow demo');
     final dates = items(first)
-        .map((mail) => mail['sentDate'] as String)
+        .map((mail) => mail.sentDate ?? '')
         .where((date) => date.isNotEmpty)
         .toList();
     expect(dates, [...dates]..sort((a, b) => b.compareTo(a)));
-    expect(items(first).first.containsKey('textBody'), isFalse);
   });
 
   test('search is case-insensitive across subject, people and body', () async {
     final upper = items(await demo.emails('2', 'INVOICE', 1));
     final lower = items(await demo.emails('2', 'invoice', 1));
     expect(upper, isNotEmpty);
-    expect(upper.map((m) => m['id']), lower.map((m) => m['id']));
+    expect(upper.map((m) => m.id), lower.map((m) => m.id));
     final byBody = items(await demo.emails('1', 'lemon cake', 1));
-    expect(byBody.map((m) => m['subject']), contains('Recipe you asked for'));
+    expect(byBody.map((m) => m.subject), contains('Recipe you asked for'));
     final none = await demo.emails('1', 'no such words anywhere', 1);
     expect(items(none), isEmpty);
-    expect(none['totalPages'], 0);
+    expect(none.totalPages, 0);
   });
 
   test('filters by folder, direction and inclusive date range', () async {
     final receipts = items(await demo.emails('1', '', 1, folder: 'Receipts'));
     expect(receipts, isNotEmpty);
-    expect(receipts.every((m) => m['folderName'] == 'Receipts'), isTrue);
+    for (final mail in receipts) {
+      expect((await demo.message(mail.id)).folderName, 'Receipts');
+    }
 
     final sent = items(
       await demo.emails(
@@ -96,7 +105,10 @@ void main() {
       ),
     );
     expect(sent, isNotEmpty);
-    expect(sent.every((m) => m['isOutgoing'] == true), isTrue);
+    expect(
+      sent.every((m) => m.from?.contains(addresses['1']!) ?? false),
+      isTrue,
+    );
     final received = items(
       await demo.emails(
         '1',
@@ -105,7 +117,11 @@ void main() {
         filters: const SearchFilters(direction: 'incoming'),
       ),
     );
-    expect(received.any((m) => m['isOutgoing'] == true), isFalse);
+    expect(received, isNotEmpty);
+    expect(
+      received.any((m) => m.from?.contains(addresses['1']!) ?? false),
+      isFalse,
+    );
 
     final ranged = items(
       await demo.emails(
@@ -120,7 +136,7 @@ void main() {
     );
     expect(ranged, isNotEmpty);
     expect(
-      ranged.every((m) => (m['sentDate'] as String).startsWith('2021-')),
+      ranged.every((m) => m.sentDate!.startsWith('2021-')),
       isTrue,
     );
   });
@@ -133,7 +149,7 @@ void main() {
         1,
         filters: const SearchFilters(sortBy: 'subject', sortOrder: 'asc'),
       ),
-    ).map((m) => (m['subject'] as String).toLowerCase()).toList();
+    ).map((m) => m.subject!.toLowerCase()).toList();
     expect(ascending, [...ascending]..sort());
     final descending = items(
       await demo.emails(
@@ -142,23 +158,23 @@ void main() {
         1,
         filters: const SearchFilters(sortBy: 'subject'),
       ),
-    ).map((m) => (m['subject'] as String).toLowerCase()).toList();
+    ).map((m) => m.subject!.toLowerCase()).toList();
     expect(descending, ascending.reversed.toList());
   });
 
   test('opens full messages and rejects unknown ones', () async {
     final welcome = items(await demo.emails('1', 'welcome', 1)).first;
-    final mail = await demo.message(welcome['id'].toString());
-    expect(mail['textBody'], contains('fictional sample mail'));
-    expect(mail['attachments'], isEmpty);
+    final mail = await demo.message(welcome.id);
+    expect(mail.textBody, contains('fictional sample mail'));
+    expect(mail.attachments, isEmpty);
     await expectLater(demo.message('99999'), throwsA(isA<ArchiveFailure>()));
   });
 
   test('reports totals across all demo accounts', () async {
     final stats = await demo.stats();
-    expect(stats['accounts'], 3);
-    expect(stats['emails'], greaterThanOrEqualTo(50));
-    expect(stats['attachments'], greaterThanOrEqualTo(10));
+    expect(stats.accounts, 3);
+    expect(stats.emails, greaterThanOrEqualTo(50));
+    expect(stats.attachments, greaterThanOrEqualTo(10));
   });
 
   group('attachments', () {
@@ -166,15 +182,13 @@ void main() {
     setUp(() async => folder = await Directory.systemTemp.createTemp('demo'));
     tearDown(() async => folder.delete(recursive: true));
 
-    Future<(String, Map<String, dynamic>)> withAttachment() async {
+    Future<(String, MailAttachment)> withAttachment() async {
       final mail = items(
         await demo.emails('1', 'photos', 1),
-      ).firstWhere((m) => m['hasAttachments'] == true);
-      final detail = await demo.message(mail['id'].toString());
-      final file =
-          (detail['attachments'] as List<dynamic>).first
-              as Map<String, dynamic>;
-      return (mail['id'].toString(), file);
+      ).firstWhere((m) => m.hasAttachments);
+      final detail = await demo.message(mail.id);
+      final file = detail.attachments.first;
+      return (mail.id, file);
     }
 
     test('saves the exact bundled bytes with progress', () async {
@@ -183,12 +197,12 @@ void main() {
       final progress = <int>[];
       await demo.downloadAttachment(
         emailId,
-        file['id'].toString(),
+        file.id,
         target,
         onProgress: progress.add,
       );
       final bundled = await rootBundle.load(
-        '$demoAttachmentDirectory/${file['fileName']}',
+        '$demoAttachmentDirectory/${file.name}',
       );
       expect(
         await target.readAsBytes(),
@@ -197,7 +211,7 @@ void main() {
           bundled.lengthInBytes,
         ),
       );
-      expect(progress.last, file['size']);
+      expect(progress.last, file.size);
     });
 
     test('a cancelled save leaves no file', () async {
@@ -207,7 +221,7 @@ void main() {
       await expectLater(
         demo.downloadAttachment(
           emailId,
-          file['id'].toString(),
+          file.id,
           target,
           transfer: transfer,
         ),
@@ -216,17 +230,15 @@ void main() {
       expect(target.existsSync(), isFalse);
     });
 
-    Future<(String, Map<String, dynamic>)> multiChunkAttachment() async {
+    Future<(String, MailAttachment)> multiChunkAttachment() async {
       // The boarding pass PDF is larger than one 256-byte copy chunk.
       final mail = items(
         await demo.emails('1', 'Harbor City', 1),
-      ).firstWhere((m) => m['hasAttachments'] == true);
-      final detail = await demo.message(mail['id'].toString());
-      final file =
-          (detail['attachments'] as List<dynamic>).first
-              as Map<String, dynamic>;
-      expect(file['size'] as int, greaterThan(512));
-      return (mail['id'].toString(), file);
+      ).firstWhere((m) => m.hasAttachments);
+      final detail = await demo.message(mail.id);
+      final file = detail.attachments.first;
+      expect(file.size, greaterThan(512));
+      return (mail.id, file);
     }
 
     test(
@@ -242,7 +254,7 @@ void main() {
         await expectLater(
           slow.downloadAttachment(
             emailId,
-            file['id'].toString(),
+            file.id,
             target,
             transfer: transfer,
             onProgress: (received) {
@@ -267,7 +279,7 @@ void main() {
       await expectLater(
         slow.downloadAttachment(
           emailId,
-          file['id'].toString(),
+          file.id,
           target,
           onProgress: (received) {
             progress.add(received);
@@ -279,7 +291,7 @@ void main() {
       expect(progress, hasLength(1));
       expect(target.existsSync(), isFalse);
       await expectLater(
-        slow.downloadAttachment(emailId, file['id'].toString(), target),
+        slow.downloadAttachment(emailId, file.id, target),
         throwsA(isA<StateError>()),
       );
     });
@@ -289,8 +301,8 @@ void main() {
       final welcome = items(await demo.emails('1', 'welcome', 1)).first;
       await expectLater(
         demo.downloadAttachment(
-          welcome['id'].toString(),
-          file['id'].toString(),
+          welcome.id,
+          file.id,
           File('${folder.path}/wrong'),
         ),
         throwsA(isA<ArchiveFailure>()),
@@ -307,24 +319,22 @@ void main() {
       await local.emails('2', '', 1, folder: 'INBOX/Orders');
       await local.stats();
       for (final mail in items(page)) {
-        await local.message(mail['id'].toString());
+        await local.message(mail.id);
       }
       final withFile = items(
         page,
-      ).firstWhere((m) => m['hasAttachments'] == true);
-      final detail = await local.message(withFile['id'].toString());
-      final file =
-          (detail['attachments'] as List<dynamic>).first
-              as Map<String, dynamic>;
+      ).firstWhere((m) => m.hasAttachments);
+      final detail = await local.message(withFile.id);
+      final file = detail.attachments.first;
       final folder = await Directory.systemTemp.createTemp('demo-offline');
       try {
         final target = File('${folder.path}/saved');
         await local.downloadAttachment(
-          withFile['id'].toString(),
-          file['id'].toString(),
+          withFile.id,
+          file.id,
           target,
         );
-        expect(await target.length(), file['size']);
+        expect(await target.length(), file.size);
       } finally {
         await folder.delete(recursive: true);
       }

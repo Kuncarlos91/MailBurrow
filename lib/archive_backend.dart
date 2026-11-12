@@ -9,14 +9,12 @@ import 'search_filters.dart';
 /// The app talks to its server only through this interface. `ArchiveApi`
 /// implements it for Mail-Archiver, currently the only supported backend.
 ///
-/// Results use Mail-Archiver's JSON shapes, described in the Playbook's API
-/// contract. Another backend would adapt its responses to those shapes until
-/// typed models and capability flags replace them; see the completion plan's
-/// note on other archive backends.
-/// Method parameters use opaque text IDs for accounts, messages and attachments.
-/// Callers must not parse them as integers. During the result-model transition,
-/// numeric IDs in legacy JSON maps are normalized with `archiveId`; adapters
-/// own their wire-format constraints (Mail-Archiver requires numeric wire IDs).
+/// Results are the typed models in `archive_models.dart`. Each backend
+/// converts its own responses into them and rejects malformed responses with
+/// a [FormatException]; screens never read a backend's wire format.
+/// IDs are opaque text for accounts, messages and attachments. Callers must
+/// not parse them as integers; adapters own their wire-format constraints
+/// (Mail-Archiver requires numeric wire IDs).
 ///
 /// Every implementation must keep MailBurrow's safety rules: HTTPS with
 /// certificate validation, no redirects, read-only requests, bounded
@@ -31,14 +29,14 @@ abstract interface class ArchiveBackend {
   String get key;
 
   /// Mail accounts the key can read.
-  Future<List<dynamic>> accounts();
+  Future<List<ArchiveAccount>> accounts();
 
   /// The folders of one account, flattened for display.
   Future<List<ArchiveFolder>> folders(String accountId);
 
   /// One page of an account's messages matching [query], [folder] and
   /// [filters], newest first unless the filters say otherwise.
-  Future<Map<String, dynamic>> emails(
+  Future<MailPage> emails(
     String accountId,
     String query,
     int page, {
@@ -47,7 +45,7 @@ abstract interface class ArchiveBackend {
   });
 
   /// One full message, including bodies and attachment details.
-  Future<Map<String, dynamic>> message(String id);
+  Future<MailMessage> message(String id);
 
   /// Streams one attachment to [destination], within the app's size and time
   /// limits, only when the user asks for it.
@@ -60,7 +58,7 @@ abstract interface class ArchiveBackend {
   });
 
   /// Archive totals for the accounts the key can read.
-  Future<Map<String, dynamic>> stats();
+  Future<ArchiveStats> stats();
 
   /// Stops mail list and search requests that are still running; other
   /// requests continue.

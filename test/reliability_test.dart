@@ -16,22 +16,20 @@ class RecoveryApi extends ArchiveApi {
   bool offline = true;
   int accountRequests = 0;
   @override
-  Future<List<dynamic>> accounts() async {
+  Future<List<ArchiveAccount>> accounts() async {
     accountRequests++;
     if (offline) throw const SocketException('private server detail');
-    return [
-      {'id': 1, 'emailAddress': 'test@example.com'},
-    ];
+    return const [ArchiveAccount(id: '1', emailAddress: 'test@example.com')];
   }
 
   @override
-  Future<Map<String, dynamic>> emails(
+  Future<MailPage> emails(
     String id,
     String query,
     int page, {
     String? folder,
     dynamic filters,
-  }) async => {'items': <dynamic>[], 'page': 1, 'totalPages': 1};
+  }) async => const MailPage(items: []);
   @override
   Future<List<ArchiveFolder>> folders(String id) async => [];
 }
@@ -41,11 +39,11 @@ class ReaderApi extends FakeArchiveBackend {
   final response = Completer<Map<String, dynamic>>();
   int requests = 0;
   @override
-  Future<Map<String, dynamic>> message(String id) {
+  Future<MailMessage> message(String id) {
     requests++;
     return requests == 1
         ? Future.error(const ArchiveFailure(401))
-        : response.future;
+        : response.future.then(MailMessage.fromJson);
   }
 }
 
@@ -54,26 +52,28 @@ class LandscapeApi extends RecoveryApi {
     offline = false;
   }
   @override
-  Future<Map<String, dynamic>> emails(
+  Future<MailPage> emails(
     String id,
     String query,
     int page, {
     String? folder,
     dynamic filters,
-  }) async => {
+  }) async => MailPage.fromJson({
     'items': List.generate(
       30,
       (i) => {'id': i, 'from': 'Sender $i', 'subject': 'Landscape message $i'},
     ),
     'page': 1,
     'totalPages': 2,
-  };
+  });
 }
 
 class StartupApi extends RecoveryApi {
   final pendingAccounts = Completer<List<dynamic>>();
   @override
-  Future<List<dynamic>> accounts() => pendingAccounts.future;
+  Future<List<ArchiveAccount>> accounts() => pendingAccounts.future.then(
+    (accounts) => accounts.map(ArchiveAccount.fromJson).toList(),
+  );
 }
 
 class SearchApi extends LandscapeApi {
@@ -81,7 +81,7 @@ class SearchApi extends LandscapeApi {
   String? lastFolder;
   int? lastPage;
   @override
-  Future<Map<String, dynamic>> emails(
+  Future<MailPage> emails(
     String id,
     String query,
     int page, {
@@ -102,7 +102,7 @@ class DelayedSearchApi extends SearchApi {
     const ArchiveFolder('Inbox', 'INBOX', 30, 0),
   ];
   @override
-  Future<Map<String, dynamic>> emails(
+  Future<MailPage> emails(
     String id,
     String query,
     int page, {
@@ -111,7 +111,7 @@ class DelayedSearchApi extends SearchApi {
   }) {
     if (query == 'slow') {
       lastQuery = query;
-      return pending.future;
+      return pending.future.then(MailPage.fromJson);
     }
     return super.emails(id, query, page, folder: folder, filters: filters);
   }
@@ -130,11 +130,11 @@ class SwitchingArchiveApi extends RecoveryApi {
       ? delayedFolders.future
       : [ArchiveFolder(folderName, folderName, 1, 0)];
   @override
-  Future<Map<String, dynamic>> stats() async => {
+  Future<ArchiveStats> stats() async => ArchiveStats.fromJson({
     'emails': 0,
     'accounts': 1,
     'attachments': 0,
-  };
+  });
   @override
   void close() {
     closed = true;
@@ -163,7 +163,7 @@ class PagingApi extends LandscapeApi {
     'totalPages': pageCount,
   };
   @override
-  Future<Map<String, dynamic>> emails(
+  Future<MailPage> emails(
     String id,
     String query,
     int page, {
@@ -175,9 +175,9 @@ class PagingApi extends LandscapeApi {
     pageRequests++;
     if (holdNext) {
       holdNext = false;
-      return pendingPage.future;
+      return pendingPage.future.then(MailPage.fromJson);
     }
-    return Future.value(response(page));
+    return Future.value(MailPage.fromJson(response(page)));
   }
 }
 
@@ -185,7 +185,7 @@ class SectionRecoveryApi extends PagingApi {
   bool networkOffline = false;
   bool mailDenied = false;
   @override
-  Future<Map<String, dynamic>> emails(
+  Future<MailPage> emails(
     String id,
     String query,
     int page, {
@@ -206,9 +206,9 @@ class SectionRecoveryApi extends PagingApi {
   }
 
   @override
-  Future<Map<String, dynamic>> stats() async {
+  Future<ArchiveStats> stats() async {
     if (networkOffline) throw const SocketException('private detail');
-    return {'emails': 30, 'accounts': 1, 'attachments': 0};
+    return const ArchiveStats(30, 1, 0);
   }
 }
 

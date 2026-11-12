@@ -89,22 +89,22 @@ class ConnectionStore {
     required ArchiveServerType serverType,
     required String server,
     required String key,
-    required Object? accountId,
+    required String? accountId,
   }) => jsonEncode({
     'version': currentVersion,
     'serverType': serverType.id,
     'server': server,
     'key': key,
-    'accountId': accountId?.toString(),
+    'accountId': accountId,
   });
 
-  /// Saves a connection in the current format. [accountId] may be a
-  /// Mail-Archiver number or a text ID; it is stored as text.
+  /// Saves a connection in the current format. [accountId] is the selected
+  /// account's opaque text ID, or null when none is selected.
   Future<void> write({
     required ArchiveServerType serverType,
     required String server,
     required String key,
-    required Object? accountId,
+    required String? accountId,
   }) => _storage.write(
     key: _entry,
     value: encode(

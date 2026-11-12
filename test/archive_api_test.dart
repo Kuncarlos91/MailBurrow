@@ -15,9 +15,7 @@ void main() {
           Uri.parse('https://example.com/archive'),
           'test-only',
         );
-        expect(await api.accounts(), [
-          {'id': 1},
-        ]);
+        expect((await api.accounts()).map((account) => account.id), ['1']);
         expect(
           client.url.toString(),
           'https://example.com/archive/api/v1/accounts',

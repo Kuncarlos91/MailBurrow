@@ -33,7 +33,7 @@ class SettingsView extends StatelessWidget {
         Card(
           child: ListTile(
             leading: const Icon(Icons.dns_outlined),
-            title: Text(accountAddress(account ?? {})),
+            title: Text(accountAddress(account)),
             subtitle: Text(
               session.demo ? 'Built-in demo, no server' : api?.server.host ?? '',
             ),

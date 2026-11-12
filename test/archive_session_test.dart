@@ -40,9 +40,9 @@ class FakeArchiveApi extends FakeArchiveBackend {
   };
 
   @override
-  Future<List<dynamic>> accounts() async {
+  Future<List<ArchiveAccount>> accounts() async {
     if (failAccounts) throw const ArchiveFailure(500);
-    return accountList;
+    return accountList.map(ArchiveAccount.fromJson).toList();
   }
 
   @override
@@ -51,19 +51,19 @@ class FakeArchiveApi extends FakeArchiveBackend {
   ];
 
   @override
-  Future<Map<String, dynamic>> emails(
+  Future<MailPage> emails(
     String id,
     String query,
     int page, {
     String? folder,
     dynamic filters,
-  }) {
+  }) async {
     mailRequests++;
-    if (failMail) return Future.error(const ArchiveFailure(500));
+    if (failMail) throw const ArchiveFailure(500);
     final hold = held['$id:$query'];
-    if (hold != null) return hold.future;
+    if (hold != null) return MailPage.fromJson(await hold.future);
     final label = query.isEmpty ? 'mail' : query;
-    return Future.value(FakeArchiveApi.page('account $id $label'));
+    return MailPage.fromJson(FakeArchiveApi.page('account $id $label'));
   }
 
   @override
@@ -92,8 +92,8 @@ class MemoryBackend implements ArchiveBackend {
   bool closed = false;
 
   @override
-  Future<List<dynamic>> accounts() async => [
-    {'id': 7, 'emailAddress': 'memory@example.com'},
+  Future<List<ArchiveAccount>> accounts() async => const [
+    ArchiveAccount(id: '7', emailAddress: 'memory@example.com'),
   ];
 
   @override
@@ -102,25 +102,19 @@ class MemoryBackend implements ArchiveBackend {
   ];
 
   @override
-  Future<Map<String, dynamic>> emails(
+  Future<MailPage> emails(
     String accountId,
     String query,
     int page, {
     String? folder,
     SearchFilters filters = const SearchFilters(),
-  }) async => {
-    'items': [
-      {'id': 1, 'subject': 'From memory'},
-    ],
-    'page': 1,
-    'totalPages': 1,
-  };
+  }) async => const MailPage(
+    items: [MailSummary(id: '1', subject: 'From memory')],
+  );
 
   @override
-  Future<Map<String, dynamic>> message(String id) async => {
-    'id': id,
-    'subject': 'From memory',
-  };
+  Future<MailMessage> message(String id) async =>
+      MailMessage(id: id, subject: 'From memory');
 
   @override
   Future<void> downloadAttachment(
@@ -132,11 +126,7 @@ class MemoryBackend implements ArchiveBackend {
   }) async {}
 
   @override
-  Future<Map<String, dynamic>> stats() async => {
-    'emails': 1,
-    'accounts': 1,
-    'attachments': 0,
-  };
+  Future<ArchiveStats> stats() async => const ArchiveStats(1, 1, 0);
 
   @override
   void cancelEmailRequests() {}
@@ -155,13 +145,13 @@ class FailingStore extends ConnectionStore {
     required ArchiveServerType serverType,
     required String server,
     required String key,
-    required Object? accountId,
+    required String? accountId,
   }) async => throw Exception('storage unavailable');
 }
 
 List<String> subjects(ArchiveSession session) => [
   for (final item in session.messages)
-    (item as Map<String, dynamic>)['subject'] as String,
+    item.subject!,
 ];
 
 Future<Map<String, dynamic>?> savedConnection() async {
@@ -214,7 +204,7 @@ void main() {
     await connectFresh();
     expect(session.setup, isFalse);
     expect(session.busy, isFalse);
-    expect(session.account?['id'], 1);
+    expect(session.account?.id, '1');
     expect(subjects(session), ['account 1 mail 0']);
     expect(session.folders.single.path, 'INBOX-1');
     expect(session.keyInput.text, isEmpty);
@@ -234,7 +224,7 @@ void main() {
       }),
     });
     await session.restore();
-    expect(session.account?['id'], 2);
+    expect(session.account?.id, '2');
     expect(session.accountNotice, isNull);
     expect(subjects(session), ['account 2 mail 0']);
   });
@@ -249,7 +239,7 @@ void main() {
       }),
     });
     await session.restore();
-    expect(session.account?['id'], 2);
+    expect(session.account?.id, '2');
     expect(session.serverType, ArchiveServerType.mailArchiver);
     expect(await savedConnection(), {
       'version': 2,
@@ -263,7 +253,7 @@ void main() {
     session.dispose();
     session = newSession();
     await session.restore();
-    expect(session.account?['id'], 2);
+    expect(session.account?.id, '2');
     expect(session.accountNotice, isNull);
   });
 
@@ -342,7 +332,7 @@ void main() {
       }),
     });
     await session.restore();
-    expect(session.account?['id'], 1);
+    expect(session.account?.id, '1');
     expect(session.accountNotice, contains('no longer available'));
   });
 
@@ -378,13 +368,13 @@ void main() {
       final cancellations = api.cancelledMailRequests;
       var changed = false;
       session.onAccountChanged = (_) => changed = true;
-      await session.switchAccount({'id': 2, 'emailAddress': 'two@example.com'});
+      await session.switchAccount(ArchiveAccount.fromJson({'id': 2, 'emailAddress': 'two@example.com'}));
 
       slow.complete(FakeArchiveApi.page('stale'));
       await slowLoad;
       expect(changed, isTrue);
       expect(api.cancelledMailRequests, greaterThan(cancellations));
-      expect(session.account?['id'], 2);
+      expect(session.account?.id, '2');
       expect(session.search.text, isEmpty);
       expect(subjects(session), ['account 2 mail 0']);
       expect(session.folders.single.path, 'INBOX-2');
@@ -506,7 +496,7 @@ void main() {
     session.keyInput.text = 'test-only';
     await session.connect();
     expect(session.api, same(backend));
-    expect(session.account?['id'], 7);
+    expect(session.account?.id, '7');
     expect(subjects(session), ['From memory']);
     expect(session.folders.single.path, 'INBOX');
     await session.forgetConnection();

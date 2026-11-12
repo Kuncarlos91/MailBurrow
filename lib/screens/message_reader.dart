@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../archive_errors.dart';
 import '../archive_backend.dart';
+import '../archive_models.dart';
 import '../attachments.dart';
 import '../content_safety.dart';
 import '../demo/demo_banner.dart';
@@ -26,14 +27,11 @@ class MessageReader extends StatefulWidget {
 }
 
 class _MessageReaderState extends State<MessageReader> {
-  late Future<Map<String, dynamic>> result;
-  Future<Map<String, dynamic>> loadMessage() async {
+  late Future<(MailMessage, PreparedEmailBody)> result;
+  Future<(MailMessage, PreparedEmailBody)> loadMessage() async {
     final mail = await widget.api.message(widget.id);
-    final body = await prepareEmailBodyAsync(
-      mail['htmlBody'] as String? ?? '',
-      mail['textBody'] as String? ?? '',
-    );
-    return {...mail, '_preparedBody': body};
+    final body = await prepareEmailBodyAsync(mail.htmlBody, mail.textBody);
+    return (mail, body);
   }
 
   @override
@@ -61,7 +59,8 @@ class _MessageReaderState extends State<MessageReader> {
     ),
   );
 
-  Widget _message(BuildContext context) => FutureBuilder<Map<String, dynamic>>(
+  Widget _message(BuildContext context) =>
+      FutureBuilder<(MailMessage, PreparedEmailBody)>(
         future: result,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
@@ -90,27 +89,22 @@ class _MessageReaderState extends State<MessageReader> {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
-          final mail = snapshot.data!;
-          final attachments = (mail['attachments'] as List<dynamic>? ?? [])
-              .map(
-                (value) =>
-                    MailAttachment.fromJson(value as Map<String, dynamic>),
-              )
-              .toList();
+          final (mail, body) = snapshot.data!;
+          final attachments = mail.attachments;
           return SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  mail['subject'] as String? ?? '(No subject)',
+                  mail.subject ?? '(No subject)',
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 20),
-                Text(mail['from'] as String? ?? ''),
+                Text(mail.from ?? ''),
                 const SizedBox(height: 8),
-                MessageDate(value: mail['sentDate'], detailed: true),
-                if (isCautionFolder(mail['folderName'] as String? ?? ''))
+                MessageDate(value: mail.sentDate, detailed: true),
+                if (isCautionFolder(mail.folderName ?? ''))
                   Padding(
                     padding: const EdgeInsets.only(top: 16),
                     child: Card(
@@ -126,7 +120,7 @@ class _MessageReaderState extends State<MessageReader> {
                     ),
                   ),
                 const Divider(height: 36),
-                MessageBody(body: mail['_preparedBody'] as PreparedEmailBody),
+                MessageBody(body: body),
                 if (attachments.isNotEmpty)
                   MessageAttachments(
                     api: widget.api,

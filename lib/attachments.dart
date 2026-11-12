@@ -10,24 +10,7 @@ import 'content_safety.dart';
 import 'saved_files.dart';
 import 'attachment_download.dart';
 
-class MailAttachment {
-  const MailAttachment(
-    this.id,
-    this.name,
-    this.size, [
-    this.contentType = 'application/octet-stream',
-  ]);
-  factory MailAttachment.fromJson(Map<String, dynamic> value) => MailAttachment(
-    archiveId(value['id']),
-    value['fileName'] as String? ?? 'attachment',
-    (value['size'] as num?)?.toInt() ?? 0,
-    value['contentType'] as String? ?? 'application/octet-stream',
-  );
-  final String id;
-  final int size;
-  final String name;
-  final String contentType;
-}
+export 'archive_models.dart' show MailAttachment;
 
 String safeAttachmentName(String value) {
   final name = value

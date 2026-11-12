@@ -6,7 +6,8 @@ All notable changes to MailBurrow are recorded here. Versions follow the app ver
 
 Groundwork for a second archive server type; no visible change for Mail-Archiver users.
 
-- Backend method parameters, reader and attachment handles use text identifiers. Mail-Archiver keeps numeric wire IDs; UUID-like IDs no longer require integer casts in shared calls. Typed result models and capabilities remain separate groundwork.
+- Backend method parameters, reader and attachment handles use text identifiers. Mail-Archiver keeps numeric wire IDs; UUID-like IDs no longer require integer casts in shared calls.
+- Backends return typed results (accounts, mail pages and summaries, messages, totals) instead of Mail-Archiver JSON maps, so screens no longer depend on one server's field names. Mail-Archiver and the demo convert their JSON at the backend boundary, and malformed responses are rejected there. Capabilities remain separate groundwork.
 
 - The saved connection now records its server type and stores the selected account ID as text (format version 2). Connections saved by 0.3.0-rc.9 and earlier migrate automatically on the next successful connection and keep the selected account.
 - Reject ambiguous saved records with an explicit null version or a server type without a version before creating an API client; preserve the stored record for recovery.
