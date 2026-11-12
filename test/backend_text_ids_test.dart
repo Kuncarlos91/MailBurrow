@@ -66,6 +66,17 @@ class TextIdBackend extends FakeArchiveBackend {
   }
 }
 
+class NumericAccountBackend extends TextIdBackend {
+  NumericAccountBackend(this.accountId)
+    : super(Uri.parse('https://archive.example'), 'test-only');
+  final Object accountId;
+
+  @override
+  Future<List<dynamic>> accounts() async => [
+    {'id': accountId, 'emailAddress': 'one@example.com'},
+  ];
+}
+
 class RecordingWireApi extends ArchiveApi {
   RecordingWireApi() : super(Uri.parse('https://archive.example'), 'test-only');
   String? path;
@@ -120,6 +131,39 @@ void main() {
     }
     session.dispose();
   });
+
+  for (final originalId in <Object>[1, '1']) {
+    test('same account in another ID representation is a no-op ($originalId, '
+        '${originalId.runtimeType})', () async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final backend = NumericAccountBackend(originalId);
+      final session = ArchiveSession(apiFactory: (_, _) => backend);
+      addTearDown(session.dispose);
+      session.server.text = backend.server.toString();
+      session.keyInput.text = backend.key;
+      await session.connect();
+      final originalAccount = session.account;
+      final originalRequests = List<String>.of(backend.requestedAccounts);
+      final originalSaved = await const FlutterSecureStorage().read(
+        key: 'connection',
+      );
+      var accountChanges = 0;
+      session.onAccountChanged = (_) => accountChanges++;
+
+      await session.switchAccount({
+        'id': originalId is int ? '1' : 1,
+        'emailAddress': 'replacement@example.com',
+      });
+
+      expect(identical(session.account, originalAccount), isTrue);
+      expect(backend.requestedAccounts, originalRequests);
+      expect(accountChanges, 0);
+      expect(
+        await const FlutterSecureStorage().read(key: 'connection'),
+        originalSaved,
+      );
+    });
+  }
 
   test(
     'UUID account selection survives switching and restoration unchanged',
