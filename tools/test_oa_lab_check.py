@@ -169,6 +169,12 @@ class FakeOpenArchiver:
         hits = [dict(self.public(e), body=e["body"], timestamp=e["timestamp"],
                      attachments=[{"filename": a["filename"], "content": a["_text"]} for a in e["attachments"]])
                 for e in rows[(page - 1) * limit: page * limit]]
+        if self.f.get("leak_page2") and page == 2 and q.get("sources") == A:
+            hits = [dict(h, ingestionSourceId=B) for h in hits]
+        if self.f.get("duplicate_ids_page2") and page == 2 and q.get("sources") == A and hits:
+            hits = [dict(h, id=hits[0]["id"]) for h in hits]
+        if self.f.get("page2_total_mismatch") and page == 2 and q.get("sources") == A:
+            total += 7
         return self.json(200, {"hits": hits, "total": total, "page": page, "limit": limit})
 
     @staticmethod
@@ -260,7 +266,7 @@ class CheckerTests(unittest.TestCase):
         code, out = run(FakeOpenArchiver(search_finds_nothing=True))
         self.assertEqual(code, 1)
         for name in ("Reader search finds a known own message", "Attachment-text search finds the known attachment",
-                     "Filter-only search returns exactly", "Search pages are distinct"):
+                     "Filter-only search returns exactly", "Search pages are distinct, own-source only"):
             self.assertIn("[FAIL]", line(out, name), name)
         # With no admin control hit, the isolation test cannot be proven either way.
         self.assertIn("[SKIP]", line(out, "Reader search cannot find another source's term"))
@@ -276,6 +282,13 @@ class CheckerTests(unittest.TestCase):
             lab.EXPECT["other_term"] = original
         self.assertEqual(code, 0, out)
         self.assertIn("1 hits (0 from other sources)", line(out, "Reader search cannot find another source's term"))
+
+    def test_second_search_page_faults_fail(self):
+        # Review regression: only page 2 leaks another source (IDs and counts unchanged).
+        for fault in ("leak_page2", "duplicate_ids_page2", "page2_total_mismatch"):
+            code, out = run(FakeOpenArchiver(**{fault: True}))
+            self.assertEqual(code, 1, fault)
+            self.assertIn("[FAIL]", line(out, "Search pages are distinct, own-source only"), fault)
 
     def test_inline_payload_is_counted_separately(self):
         code, out = run(FakeOpenArchiver(inline=True))

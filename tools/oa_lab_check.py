@@ -391,7 +391,8 @@ def run_checks(lab, admin, reader, deleted, rate_limit=False, samples=None):
     own_hits = dicts(hits_of(own))
     known = any(h.get("subject") == EXPECT["own_term_subject"] for h in own_hits)
     lab.check("Reader search finds a known own message",
-              hits_of(own) is not None and known and all(h.get("ingestionSourceId") == src_a for h in own_hits),
+              own.status == 200 and hits_of(own) is not None and known
+              and all(h.get("ingestionSourceId") == src_a for h in own_hits),
               "%s, %s hits, known message %s" % (st(own), count(hits_of(own)), "found" if known else "missing"))
     control = lab.get("/search", admin, {"keywords": EXPECT["other_term"], "limit": 25})
     control_hits = dicts(hits_of(control))
@@ -424,7 +425,7 @@ def run_checks(lab, admin, reader, deleted, rate_limit=False, samples=None):
     carries = any(EXPECT["attachment_term"] in str(a.get("content") or "").lower()
                   for h in match for a in dicts(h.get("attachments")))
     lab.check("Attachment-text search finds the known attachment",
-              bool(match) and all(h.get("ingestionSourceId") == src_a for h in at_hits),
+              at.status == 200 and bool(match) and all(h.get("ingestionSourceId") == src_a for h in at_hits),
               "%s, %d hits, known message %s, hit carries attachment text: %s" % (
                   st(at), len(at_hits), "found" if match else "missing", "yes" if carries else "no"))
     ff = lab.get("/search", reader, {"sources": src_a, "hasAttachments": "true", "dateFrom": "2026-01-01",
@@ -433,6 +434,7 @@ def run_checks(lab, admin, reader, deleted, rate_limit=False, samples=None):
     subjects_ok = sorted(str(h.get("subject")) for h in ff_hits) == sorted(EXPECT["filter_subjects"])
     lab.check("Filter-only search returns exactly the expected messages",
               ff.status == 200 and subjects_ok and ff_total == len(EXPECT["filter_subjects"])
+              and len({h.get("id") for h in ff_hits}) == len(ff_hits)
               and all(h.get("hasAttachments") is True and h.get("ingestionSourceId") == src_a
                       and year_of(h.get("timestamp")) == 2026 for h in ff_hits),
               "%s, %d hits (expected %d), total %s, subjects %s" % (
@@ -440,13 +442,27 @@ def run_checks(lab, admin, reader, deleted, rate_limit=False, samples=None):
                   "match" if subjects_ok else "differ"))
     p1 = lab.get("/search", reader, {"sources": src_a, "limit": 10, "page": 1, "sort": "date_desc"})
     p2 = lab.get("/search", reader, {"sources": src_a, "limit": 10, "page": 2, "sort": "date_desc"})
-    h1 = [h.get("id") for h in dicts(hits_of(p1))]
-    h2 = [h.get("id") for h in dicts(hits_of(p2))]
-    p_total = total_of(p1)
-    lab.check("Search pages are distinct and totals match",
-              len(h1) == 10 and len(h2) == 10 and not set(h1) & set(h2) and p_total == EXPECT["reader_total"],
-              "page 1 %d hits, page 2 %d hits, %d overlap, total %s (expected %d)" % (
-                  len(h1), len(h2), len(set(h1) & set(h2)), number(p_total), EXPECT["reader_total"]))
+    pages = []
+    for resp in (p1, p2):
+        raw_hits = hits_of(resp)
+        valid = (resp.status == 200 and raw_hits is not None and len(dicts(raw_hits)) == len(raw_hits)
+                 and all(isinstance(h.get("id"), str) and h.get("id") for h in raw_hits))
+        ids = [h.get("id") for h in dicts(raw_hits)]
+        pages.append({
+            "valid": valid, "ids": ids, "unique": len(set(ids)) == len(ids),
+            "foreign": sum(1 for h in dicts(raw_hits) if h.get("ingestionSourceId") != src_a),
+            "total": total_of(resp),
+        })
+    h1, h2 = pages[0]["ids"], pages[1]["ids"]
+    overlap = len(set(h1) & set(h2))
+    lab.check("Search pages are distinct, own-source only and totals match",
+              all(pg["valid"] and pg["unique"] and pg["foreign"] == 0 and len(pg["ids"]) == 10
+                  and pg["total"] == EXPECT["reader_total"] for pg in pages) and overlap == 0,
+              "page 1 %d hits (%d from other sources, %s), page 2 %d hits (%d from other sources, %s), "
+              "%d overlap, totals %s/%s (expected %d)" % (
+                  len(h1), pages[0]["foreign"], "valid" if pages[0]["valid"] and pages[0]["unique"] else "invalid",
+                  len(h2), pages[1]["foreign"], "valid" if pages[1]["valid"] and pages[1]["unique"] else "invalid",
+                  overlap, number(pages[0]["total"]), number(pages[1]["total"]), EXPECT["reader_total"]))
     if h1:
         lab.check("Search page size", True, "%d bytes for %d hits; hit fields: %s" % (
             len(p1.body), len(h1), names(dicts(hits_of(p1))[0].keys())))
