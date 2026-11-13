@@ -383,7 +383,7 @@ class ArchiveSession extends ChangeNotifier {
         final total = result.totalItems;
         final count = total == null
             ? '${messages.length} messages on this page'
-            : capabilities.estimatedTotals
+            : (result.totalIsEstimate ?? capabilities.estimatedTotals)
             ? 'about $total matches'
             : '$total matches';
         searchFeedback =
