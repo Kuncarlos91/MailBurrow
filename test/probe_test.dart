@@ -140,8 +140,11 @@ void main() {
     final previous = HttpOverrides.current;
     HttpOverrides.global = null;
     addTearDown(() => HttpOverrides.global = previous);
-    final cancel = await measureCancel(scale: 0.05);
-    expect(cancel['error'], isNull);
-    expect(cancel['clientCancelMs'], isA<int>());
+    for (final variant in cancelVariants) {
+      final cancel = await measureCancel(variant, scale: 0.05);
+      expect(cancel['error'], isNull, reason: variant);
+      expect(cancel['clientCancelMs'], isA<int>(), reason: variant);
+      expect(cancel['contentLengthSeen'], isTrue, reason: variant);
+    }
   });
 }
