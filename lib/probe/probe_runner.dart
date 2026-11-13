@@ -5,6 +5,7 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:typed_data';
@@ -164,50 +165,69 @@ const cancelVariants = [
   'detach-destroy',
 ];
 
-/// Streams a large response over loopback with a Content-Length (as Open
-/// Archiver's JSON responses have) and stops it part-way using [variant].
-/// It times how quickly the client stops, when the server sees the drop,
-/// and how many bytes the server still delivered after the stop.
+/// Response framings compared in run 3: a known length (Express `res.json`
+/// without compression) and chunked (streamed downloads, or any compressed
+/// response).
+const cancelFramings = ['length', 'chunked'];
+
+/// Streams a large response from a raw loopback socket server and stops it
+/// part-way using [variant]. The server reads its side of the socket, so it
+/// sees the client's close as soon as it arrives, and counts the bytes it
+/// still delivered after the stop.
 Future<Map<String, Object?>> measureCancel(
   String variant, {
+  String framing = 'length',
   double scale = 1,
 }) async {
   final index = probeCases.indexWhere((item) => item.name == 'inline-8m');
   final wire = encodeWire(probeCases[index].build(scale));
   final threshold = (wire.length ~/ 8).clamp(1, _mib);
-  final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-  final serverStopped = Completer<void>();
+  final chunked = framing == 'chunked';
+  final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+  final serverClosed = Completer<void>();
   final cancelClock = Stopwatch();
   var sentAfterCancel = 0;
   var serverCompleted = false;
-  server.listen((request) async {
-    final response = request.response..contentLength = wire.length;
-    var gone = false;
-    // A dropped client fails `done`; a pending flush may never complete.
-    unawaited(
-      response.done.then<void>((_) {}, onError: (Object _) {}).whenComplete(() {
-        gone = true;
-        if (!serverStopped.isCompleted) serverStopped.complete();
-      }),
-    );
+  server.listen((socket) async {
+    var closed = false;
+    void markClosed() {
+      closed = true;
+      if (!serverClosed.isCompleted) serverClosed.complete();
+    }
+
+    socket.listen((_) {}, onDone: markClosed, onError: (Object _) => markClosed());
     try {
-      for (var at = 0; at < wire.length && !gone; at += 64 * 1024) {
+      socket.add(
+        latin1.encode(
+          'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n'
+          '${chunked ? 'Transfer-Encoding: chunked' : 'Content-Length: ${wire.length}'}'
+          '\r\n\r\n',
+        ),
+      );
+      for (var at = 0; at < wire.length && !closed; at += 64 * 1024) {
         final end = at + 64 * 1024 < wire.length ? at + 64 * 1024 : wire.length;
-        response.add(Uint8List.sublistView(wire, at, end));
-        await response.flush();
+        if (chunked) {
+          socket.add(latin1.encode('${(end - at).toRadixString(16)}\r\n'));
+        }
+        socket.add(Uint8List.sublistView(wire, at, end));
+        if (chunked) socket.add(latin1.encode('\r\n'));
+        await socket.flush();
         if (cancelClock.isRunning) sentAfterCancel += end - at;
         await Future<void>.delayed(const Duration(milliseconds: 1));
       }
-      await response.close();
-      serverCompleted = true;
+      if (!closed) {
+        if (chunked) socket.add(latin1.encode('0\r\n\r\n'));
+        await socket.flush();
+        serverCompleted = true;
+      }
     } catch (_) {
       // The client went away: the case this measures.
     } finally {
-      if (!serverStopped.isCompleted) serverStopped.complete();
+      socket.destroy();
     }
   });
   final client = HttpClient();
-  final result = <String, Object?>{'case': 'cancel-$variant'};
+  final result = <String, Object?>{'case': 'cancel-$framing-$variant'};
   try {
     final request = await client.getUrl(
       Uri.parse('http://127.0.0.1:${server.port}/'),
@@ -217,7 +237,6 @@ Future<Map<String, Object?>> measureCancel(
       result['error'] = 'status ${response.statusCode}';
       return result;
     }
-    result['contentLengthSeen'] = response.contentLength == wire.length;
     final decoder = BufferArrayDecoder(maxBytes: streamCap);
     final reached = Completer<void>();
     void onChunk(List<int> chunk) {
@@ -232,12 +251,28 @@ Future<Map<String, Object?>> measureCancel(
 
     Future<void> Function() stop;
     if (variant == 'detach-destroy') {
-      final socket = await response.detachSocket();
-      final subscription = socket.listen(onChunk, onDone: onDone);
-      stop = () async {
-        socket.destroy();
-        await subscription.cancel();
-      };
+      if (chunked) {
+        // Reading a detached chunked body needs our own framing parser;
+        // the probe only needs to see whether destroying stops the server.
+        final socket = await response.detachSocket();
+        final subscription = socket.listen((_) {
+          if (!reached.isCompleted) {
+            decoder.consumed += threshold;
+            reached.complete();
+          }
+        }, onDone: onDone);
+        stop = () async {
+          socket.destroy();
+          await subscription.cancel();
+        };
+      } else {
+        final socket = await response.detachSocket();
+        final subscription = socket.listen(onChunk, onDone: onDone);
+        stop = () async {
+          socket.destroy();
+          await subscription.cancel();
+        };
+      }
     } else {
       final subscription = response.listen(onChunk, onDone: onDone);
       stop = switch (variant) {
@@ -262,25 +297,24 @@ Future<Map<String, Object?>> measureCancel(
     cancelClock.start();
     await stop();
     result['clientCancelMs'] = cancelClock.elapsedMilliseconds;
-    // A server that never sees the drop is a result, not a probe error.
-    var stopped = true;
-    await serverStopped.future.timeout(
-      const Duration(seconds: 10),
-      onTimeout: () => stopped = false,
+    // A server that never sees the close is a result, not a probe error.
+    var sawClose = true;
+    await serverClosed.future.timeout(
+      const Duration(seconds: 3),
+      onTimeout: () => sawClose = false,
     );
     result
-      ..['serverStopMs'] = stopped
+      ..['serverSawCloseMs'] = sawClose
           ? cancelClock.elapsedMilliseconds
-          : 'not within 10 s'
+          : 'not within 3 s'
       ..['serverCompleted'] = serverCompleted
-      ..['wireBeforeCancel'] = decoder.consumed
       ..['sentAfterCancel'] = sentAfterCancel
       ..['wireTotal'] = wire.length;
   } on TimeoutException catch (error) {
     result['error'] = 'timeout waiting for ${error.message}';
   } finally {
     client.close(force: true);
-    await server.close(force: true);
+    await server.close();
   }
   return result;
 }
@@ -302,13 +336,15 @@ Future<Map<String, Object?>> runProbe({
     capOnly: true,
   );
   final cancel = <Map<String, Object?>>[];
-  for (final variant in cancelVariants) {
-    onStatus?.call('Running the cancellation check: $variant');
-    cancel.add(await measureCancel(variant, scale: scale));
+  for (final framing in cancelFramings) {
+    for (final variant in cancelVariants) {
+      onStatus?.call('Running the cancellation check: $framing, $variant');
+      cancel.add(await measureCancel(variant, framing: framing, scale: scale));
+    }
   }
   return {
     'probe': 'oa-phone-budgets',
-    'version': 2,
+    'version': 3,
     'os': Platform.operatingSystem,
     'osVersion': Platform.operatingSystemVersion,
     'processors': Platform.numberOfProcessors,

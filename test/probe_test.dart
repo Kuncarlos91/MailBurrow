@@ -143,13 +143,19 @@ void main() {
     final previous = HttpOverrides.current;
     HttpOverrides.global = null;
     addTearDown(() => HttpOverrides.global = previous);
-    for (final variant in cancelVariants) {
-      final cancel = await measureCancel(variant, scale: 0.05);
-      expect(cancel['error'], isNull, reason: variant);
-      expect(cancel['clientCancelMs'], isA<int>(), reason: variant);
-      expect(cancel['contentLengthSeen'], isTrue, reason: variant);
-      expect(cancel['serverStopMs'], isNotNull, reason: variant);
+    for (final framing in cancelFramings) {
+      for (final variant in cancelVariants) {
+        final cancel = await measureCancel(
+          variant,
+          framing: framing,
+          scale: 0.05,
+        );
+        final label = '$framing $variant';
+        expect(cancel['error'], isNull, reason: label);
+        expect(cancel['clientCancelMs'], isA<int>(), reason: label);
+        expect(cancel['serverSawCloseMs'], isNotNull, reason: label);
+      }
     }
-    // Variants whose server never sees the drop wait up to 10 s each.
+    // Variants whose server never sees the close wait up to 3 s each.
   }, timeout: const Timeout(Duration(minutes: 2)));
 }
