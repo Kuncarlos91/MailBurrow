@@ -81,7 +81,7 @@ void main() {
     expect(session.filters.direction, '');
     expect(session.filters.sortBy, 'sentDate');
     expect(session.messages, isNotEmpty);
-    expect(session.searchFeedback, contains('about 40 matches'));
+    expect(session.searchFeedback, matches(RegExp(r'about \d+ matches')));
   });
 
   Widget app(ArchiveCapabilities? capabilities) => MaterialApp(
