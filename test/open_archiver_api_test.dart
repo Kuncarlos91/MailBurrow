@@ -325,9 +325,10 @@ void main() {
       api.message(mailA),
       throwsA(isA<ArchiveMessageRefused>()),
     );
+    // Never listed by an opened message, so its storage path is unknown.
     await expectLater(
       api.downloadAttachment(mailA, 'x', File('unused')),
-      throwsUnsupportedError,
+      throwsA(isA<ArchiveMessageRefused>()),
     );
     expect(api.lastPath, isNull);
   });
