@@ -135,6 +135,9 @@ void main() {
       capOnly: true,
     );
     expect(cap['capRejected'], isTrue);
+  });
+
+  test('every cancellation variant reports its measurements', () async {
     // The test binding answers every HttpClient request with a mock 400;
     // the cancellation check needs real loopback sockets.
     final previous = HttpOverrides.current;
@@ -145,6 +148,8 @@ void main() {
       expect(cancel['error'], isNull, reason: variant);
       expect(cancel['clientCancelMs'], isA<int>(), reason: variant);
       expect(cancel['contentLengthSeen'], isTrue, reason: variant);
+      expect(cancel['serverStopMs'], isNotNull, reason: variant);
     }
-  });
+    // Variants whose server never sees the drop wait up to 10 s each.
+  }, timeout: const Timeout(Duration(minutes: 2)));
 }
