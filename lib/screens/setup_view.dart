@@ -22,31 +22,31 @@ class SetupView extends StatelessWidget {
           style: Theme.of(context).textTheme.headlineLarge,
         ),
         const SizedBox(height: 12),
-        const Text(
-          'Read archived mail from your own Mail-Archiver or Open Archiver server over HTTPS. This app does not provide server hosting or accounts.',
+        // The choice replaces the introduction line, which moves to the
+        // notes below, so the form keeps its height on small screens.
+        Semantics(
+          container: true,
+          label: 'Server type',
+          child: SegmentedButton<ArchiveServerType>(
+            segments: [
+              for (final value in ArchiveServerType.values)
+                ButtonSegment(value: value, label: Text(value.label)),
+            ],
+            selected: {type},
+            showSelectedIcon: false,
+            onSelectionChanged: busy
+                ? null
+                : (selection) => session.chooseServerType(selection.single),
+          ),
         ),
-        const SizedBox(height: 24),
-        Text('Server type', style: Theme.of(context).textTheme.titleSmall),
-        const SizedBox(height: 8),
-        SegmentedButton<ArchiveServerType>(
-          segments: [
-            for (final value in ArchiveServerType.values)
-              ButtonSegment(value: value, label: Text(value.label)),
-          ],
-          selected: {type},
-          showSelectedIcon: false,
-          onSelectionChanged: busy
-              ? null
-              : (selection) => session.chooseServerType(selection.single),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          openArchiver
-              ? 'Tested with Open Archiver 0.6.2. Messages from sources that keep full original files cannot be opened in this app.'
-              : 'Choose the archive software your server runs. MailBurrow never guesses it.',
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-        const SizedBox(height: 16),
+        if (openArchiver) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Tested with Open Archiver 0.6.2. Messages from sources that keep full original files cannot be opened in this app.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+        const SizedBox(height: 20),
         TextField(
           controller: session.server,
           enabled: !busy,
@@ -101,6 +101,10 @@ class SetupView extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 16),
+        const Text(
+          'Read archived mail from your own Mail-Archiver or Open Archiver server over HTTPS. MailBurrow never guesses the server type. It does not provide server hosting or accounts.',
+        ),
+        const SizedBox(height: 8),
         const Text(
           'Configure your own server and private-network access. If your server uses Tailscale, connect its app first. Connection details are saved securely on this device.',
         ),

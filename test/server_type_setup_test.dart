@@ -194,7 +194,7 @@ void main() {
     );
     expect(find.text('Mail-Archiver'), findsOneWidget);
     expect(find.text('Open Archiver'), findsOneWidget);
-    expect(find.textContaining('MailBurrow never guesses it'), findsOneWidget);
+    expect(find.textContaining('Tested with Open Archiver'), findsNothing);
     expect(find.text('Create an API key on your own Mail-Archiver server.'), findsOneWidget);
 
     await tester.tap(find.text('Open Archiver'));
