@@ -61,7 +61,8 @@ String _openArchiverId(String id) {
 /// Search hits carry whole index documents, including extracted attachment
 /// text: only the fields the list shows are kept, and the rest is dropped
 /// with the decoded response. Messages open within the approved phone
-/// budgets (see [message]); saving attachments comes in Phase 3c.
+/// budgets (see [message]), and their attachments save through the
+/// storage route (see [downloadAttachment]).
 class OpenArchiverApi extends ArchiveApi {
   OpenArchiverApi(
     super.server,
@@ -82,13 +83,15 @@ class OpenArchiverApi extends ArchiveApi {
   // Which source each listed message came from.
   final _messageSource = <String, String>{};
 
-  // Attachment storage paths from opened messages, for attachment saving.
-  final _attachmentPaths = <String, String>{};
+  // Attachments listed by opened messages: their message, storage path and
+  // stated size, for saving them.
+  final _attachments =
+      <String, ({String emailId, String storagePath, int size})>{};
 
-  /// The storage path of an attachment listed by an opened message, for
-  /// saving it (Phase 3c); null when unknown.
+  /// The storage path of an attachment listed by an opened message; null
+  /// when unknown.
   String? attachmentStoragePath(String attachmentId) =>
-      _attachmentPaths[attachmentId];
+      _attachments[attachmentId]?.storagePath;
 
   void _remember(String source, Iterable<MailSummary> items) {
     if (_messageSource.length > _rememberedMessages) _messageSource.clear();
@@ -227,10 +230,7 @@ class OpenArchiverApi extends ArchiveApi {
       detail.raw,
     ).timeout(openArchiverMimeTimeout);
     final attachments = openArchiverAttachments(fields['attachments']);
-    for (final file in attachments) {
-      _attachmentPaths[file.attachment.id] = file.storagePath;
-    }
-    return MailMessage(
+    final result = MailMessage(
       subject: _text(fields, 'subject'),
       from: _sender(_text(fields, 'senderName'), _text(fields, 'senderEmail')),
       sentDate: _text(fields, 'sentAt'),
@@ -239,8 +239,26 @@ class OpenArchiverApi extends ArchiveApi {
       textBody: bodies.text,
       attachments: [for (final file in attachments) file.attachment],
     );
+    // Publish handles only after the entire message has validated.
+    _attachments.removeWhere((_, file) => file.emailId == messageId);
+    if (_attachments.length > _rememberedMessages) _attachments.clear();
+    for (final file in attachments) {
+      _attachments[file.attachment.id] = (
+        emailId: messageId,
+        storagePath: file.storagePath,
+        size: file.attachment.size,
+      );
+    }
+    return result;
   }
 
+  /// Saves an attachment listed by a message this backend opened, through
+  /// `GET /storage/download?path=<storagePath>`.
+  ///
+  /// That route streams without a `Content-Length`, so the size stated in
+  /// the message's attachment record is enforced instead: above the
+  /// attachment limit it is refused before any request, and the download
+  /// must match it exactly or the partial file is deleted.
   @override
   Future<void> downloadAttachment(
     String emailId,
@@ -248,7 +266,26 @@ class OpenArchiverApi extends ArchiveApi {
     File destination, {
     AttachmentDownload? transfer,
     void Function(int receivedBytes)? onProgress,
-  }) async => throw UnsupportedError('Open Archiver attachments come in 3c.');
+  }) async {
+    final messageId = _openArchiverId(emailId);
+    final fileId = _openArchiverId(attachmentId);
+    final known = _attachments[fileId];
+    if (known == null || known.emailId != messageId) {
+      throw const ArchiveMessageRefused(
+        'Open the message again to save this attachment.',
+      );
+    }
+    await downloadTo(
+      server.replace(
+        path: '${server.path}/api/v1/storage/download',
+        queryParameters: {'path': known.storagePath},
+      ),
+      destination,
+      transfer: transfer,
+      onProgress: onProgress,
+      expectedBytes: known.size,
+    );
+  }
 }
 
 Map<String, dynamic> _object(Object? value, String what) {
@@ -436,7 +473,12 @@ List<({MailAttachment attachment, String storagePath})> openArchiverAttachments(
         final json = _object(item, 'attachment');
         final size = json['sizeBytes'];
         final path = json['storagePath'];
-        if (size is! int || size < 0 || path is! String || path.isEmpty) {
+        if (size is! int ||
+            size < 0 ||
+            path is! String ||
+            path.isEmpty ||
+            path.length > 1024 ||
+            path.codeUnits.any((unit) => unit < 0x20 || unit == 0x7f)) {
           throw const FormatException('Invalid attachment');
         }
         return (

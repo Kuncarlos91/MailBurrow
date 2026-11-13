@@ -244,7 +244,44 @@ class ArchiveApi implements ArchiveBackend {
     if (_closed) throw StateError('Archive connection closed');
     _mailArchiverId(emailId);
     _mailArchiverId(attachmentId);
+    await downloadTo(
+      server.replace(
+        path: '${server.path}/api/v1/emails/$emailId/attachments/$attachmentId',
+      ),
+      destination,
+      transfer: transfer,
+      onProgress: onProgress,
+    );
+  }
+
+  /// Streams [url] into [destination] on a client of its own, within the
+  /// attachment size, deadline and idle limits, deleting a partial file on
+  /// any failure or cancellation. [expectedBytes], when the server states an
+  /// attachment's size, is enforced as an exact length. The URL must use
+  /// the configured server's HTTPS origin without user information or a fragment.
+  Future<void> downloadTo(
+    Uri url,
+    File destination, {
+    AttachmentDownload? transfer,
+    void Function(int receivedBytes)? onProgress,
+    int? expectedBytes,
+  }) async {
+    if (_closed) throw StateError('Archive connection closed');
     validateServer(server.toString());
+    if (url.scheme != server.scheme ||
+        url.host != server.host ||
+        url.port != server.port ||
+        url.userInfo.isNotEmpty ||
+        url.hasFragment) {
+      throw const FormatException('Invalid attachment URL');
+    }
+
+    if (expectedBytes != null && expectedBytes < 0) {
+      throw ArgumentError.value(expectedBytes, 'expectedBytes');
+    }
+    if (expectedBytes != null && expectedBytes > attachmentByteLimit) {
+      throw const AttachmentTooLarge();
+    }
     if (attachmentByteLimit < 1 ||
         attachmentDeadline <= Duration.zero ||
         attachmentIdleTimeout <= Duration.zero) {
@@ -263,23 +300,21 @@ class ArchiveApi implements ArchiveBackend {
     var opened = false, completed = false;
     try {
       final request = await active.wait(
-        client
-            .getUrl(
-              server.replace(
-                path:
-                    '${server.path}/api/v1/emails/$emailId/attachments/$attachmentId',
-              ),
-            )
-            .timeout(const Duration(seconds: 20)),
+        client.getUrl(url).timeout(const Duration(seconds: 20)),
       );
       request.followRedirects = false;
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $key');
+      authorize(request);
       final response = await active.wait(
         request.close().timeout(const Duration(seconds: 30)),
       );
       if (response.statusCode != 200) throw ArchiveFailure(response.statusCode);
       if (response.contentLength > attachmentByteLimit) {
         throw const AttachmentTooLarge();
+      }
+      if (expectedBytes != null &&
+          response.contentLength >= 0 &&
+          response.contentLength != expectedBytes) {
+        throw const FormatException('Attachment size does not match');
       }
       active.throwIfStopped();
       output = await destination.open(mode: FileMode.write);
@@ -292,6 +327,9 @@ class ArchiveApi implements ArchiveBackend {
         if (chunk.length > attachmentByteLimit - received) {
           throw const AttachmentTooLarge();
         }
+        if (expectedBytes != null && chunk.length > expectedBytes - received) {
+          throw const FormatException('Attachment size does not match');
+        }
         // Serialize file writes: never close/delete while a write is pending.
         await output.writeFrom(chunk);
         active.throwIfStopped();
@@ -299,6 +337,9 @@ class ArchiveApi implements ArchiveBackend {
         onProgress?.call(received);
       }
       active.throwIfStopped();
+      if (expectedBytes != null && received != expectedBytes) {
+        throw const FormatException('Attachment size does not match');
+      }
       await output.flush();
       await output.close();
       output = null;
