@@ -345,10 +345,6 @@ class CheckerTests(unittest.TestCase):
                                   out=out), 2)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class Phase3ContractTests(unittest.TestCase):
     def test_clean_server_passes_the_app_contract(self):
         code, out = run(FakeOpenArchiver(), expired="expired-key")
@@ -385,3 +381,60 @@ class Phase3ContractTests(unittest.TestCase):
         self.assertIn("missing timestamp", lab.search_hit_problems({"id": "abc", "subject": None, "from": None}))
         self.assertIn("raw", lab.detail_problems({"subject": "s", "senderEmail": None, "sentAt": None,
                                                   "attachments": []}, A))
+
+
+class ContractEdgeTests(unittest.TestCase):
+    def test_malformed_array_members_are_not_dropped(self):
+        self.assertIn("items", lab.paging_problems({"total": 1, "items": [None]}, "items"))
+        self.assertIn("hits", lab.paging_problems({"total": 1, "hits": [7]}, "hits"))
+        self.assertEqual(lab.list_item_problems(None), ["items"])
+        detail = {"subject": None, "senderEmail": None, "sentAt": None,
+                  "raw": {"type": "Buffer", "data": [65]}, "attachments": [None]}
+        self.assertIn("attachments.record", lab.detail_problems(detail, A))
+
+    def test_buffer_requires_actual_bytes(self):
+        for value in (True, -1, 256, 1.5, "65"):
+            detail = {"subject": None, "senderEmail": None, "sentAt": None,
+                      "raw": {"type": "Buffer", "data": [value]}, "attachments": []}
+            self.assertIn("raw", lab.detail_problems(detail, A))
+
+    def test_timestamp_bounds_match_dart_and_never_crash(self):
+        for stamp in (-8640000000000000, 8640000000000000, -100000000001):
+            self.assertNotIn("timestamp", lab.search_hit_problems(
+                {"id": "abc", "subject": None, "from": None, "timestamp": stamp}))
+        for stamp in (True, 1.5, 8640000000000001, -(10 ** 1000)):
+            self.assertIn("timestamp", lab.search_hit_problems(
+                {"id": "abc", "subject": None, "from": None, "timestamp": stamp}))
+        self.assertIsNone(lab.year_of(10 ** 1000))
+
+    def test_filter_paging_and_malformed_records_fail_the_run(self):
+        for fault, check in (
+            ("filter_limit", "Search hits match the app's rules"),
+            ("attachment_record", "Opened message matches the app's rules"),
+            ("raw_byte", "Opened message matches the app's rules"),
+        ):
+            server = FakeOpenArchiver()
+            def transport(url, headers):
+                status, response_headers, body = server(url, headers)
+                parsed = urllib.parse.urlsplit(url)
+                data = json.loads(body)
+                if isinstance(data, dict):
+                    if fault == "filter_limit" and "dateFrom=" in parsed.query:
+                        data["limit"] = 0
+                    if parsed.path.startswith("/api/v1/archived-emails/e-"):
+                        if fault == "attachment_record":
+                            data["attachments"].append(SECRET)
+                        elif fault == "raw_byte":
+                            data["raw"]["data"].append(True)
+                return status, response_headers, json.dumps(data).encode()
+            code, out = run(transport)
+            self.assertEqual(code, 1, out)
+            self.assertTrue(line(out, check).startswith("[FAIL]"), out)
+            self.assertNotIn(SECRET, out)
+
+    def test_identifier_requires_full_match(self):
+        self.assertFalse(lab.app_id("abc\n"))
+
+
+if __name__ == "__main__":
+    unittest.main()

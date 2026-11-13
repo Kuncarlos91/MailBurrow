@@ -234,8 +234,11 @@ def mime_payloads(raw):
 def year_of(timestamp):
     if not isinstance(timestamp, (int, float)) or isinstance(timestamp, bool):
         return None
-    seconds = timestamp / 1000 if timestamp > 1e11 else timestamp
-    return time.gmtime(seconds).tm_year
+    try:
+        seconds = timestamp / 1000 if abs(timestamp) > 1e11 else timestamp
+        return time.gmtime(seconds).tm_year
+    except (OverflowError, ValueError, OSError):
+        return None
 
 
 def dicts(value):
@@ -264,7 +267,7 @@ def iso_date(value):
 
 
 def app_id(value):
-    return isinstance(value, str) and bool(APP_ID.match(value))
+    return isinstance(value, str) and bool(APP_ID.fullmatch(value))
 
 
 def storage_path_ok(value):
@@ -278,6 +281,8 @@ def missing(record, fields):
 
 def list_item_problems(item):
     """Field names, never values, that break MailBurrow's list-item rules."""
+    if not isinstance(item, dict):
+        return ["items"]
     bad = ([] if app_id(item.get("id")) else ["id"]) + missing(item, ("subject", "senderEmail", "sentAt"))
     bad += [f for f in ("subject", "senderName", "senderEmail") if not text_or_none(item.get(f))]
     if item.get("sentAt") is not None and not iso_date(item.get("sentAt")):
@@ -286,14 +291,24 @@ def list_item_problems(item):
 
 
 def search_hit_problems(hit):
+    if not isinstance(hit, dict):
+        return ["hits"]
     bad = ([] if app_id(hit.get("id")) else ["id"]) + missing(hit, ("subject", "from", "timestamp"))
     bad += [f for f in ("subject", "from", "fromName") if not text_or_none(hit.get(f))]
-    if hit.get("timestamp") is not None and not whole(hit.get("timestamp"), -10 ** 13):
-        bad.append("timestamp")
+    stamp = hit.get("timestamp")
+    if stamp is not None:
+        if not isinstance(stamp, int) or isinstance(stamp, bool):
+            bad.append("timestamp")
+        else:
+            millis = stamp if abs(stamp) > 100000000000 else stamp * 1000
+            if abs(millis) > 8640000000000000:
+                bad.append("timestamp")
     return bad
 
 
 def attachment_problems(record):
+    if not isinstance(record, dict):
+        return ["record"]
     bad = [] if app_id(record.get("id")) else ["id"]
     bad += [f for f in ("filename", "mimeType") if not text_or_none(record.get(f))]
     if not whole(record.get("sizeBytes")):
@@ -316,7 +331,10 @@ def detail_problems(detail, source):
     records = detail.get("attachments")
     if records is not None and not isinstance(records, list):
         bad.append("attachments")
-    for record in dicts(records):
+    if isinstance(raw, dict) and isinstance(raw.get("data"), list):
+        if any(not whole(byte) or byte > 255 for byte in raw["data"]):
+            bad.append("raw")
+    for record in records if isinstance(records, list) else []:
         bad += ["attachments." + f for f in attachment_problems(record)]
     return sorted(set(bad))
 
@@ -325,6 +343,8 @@ def paging_problems(data, hits_field):
     if not isinstance(data, dict) or not isinstance(data.get(hits_field), list):
         return [hits_field]
     bad = [] if whole(data.get("total")) else ["total"]
+    if any(not isinstance(item, dict) for item in data[hits_field]):
+        bad.append(hits_field)
     for field in ("page", "limit"):
         if data.get(field) is not None and not whole(data.get(field), 1):
             bad.append(field)
@@ -406,13 +426,17 @@ def run_checks(lab, admin, reader, deleted, rate_limit=False, samples=None, expi
             pages_ok = False
             break
         paging_bad.update(paging_problems(page_resp.obj(), "items"))
-        all_items.extend(dicts(items))
+        all_items.extend(items)
         for it in dicts(items):
-            if it.get("hasAttachments") is True and it.get("id") not in att_emails:
+            if (it.get("hasAttachments") is True and app_id(it.get("id"))
+                    and it.get("id") not in att_emails):
                 att_emails.append(it.get("id"))
-            seen.add(it.get("id"))
+            if app_id(it.get("id")):
+                seen.add(it["id"])
+            else:
+                pages_ok = False
             foreign += it.get("ingestionSourceId") != src_a
-            if att_email is None and it.get("hasAttachments") is True:
+            if att_email is None and it.get("hasAttachments") is True and app_id(it.get("id")):
                 att_email = it.get("id")
         if len(items) < 10:
             break
@@ -471,7 +495,9 @@ def run_checks(lab, admin, reader, deleted, rate_limit=False, samples=None, expi
 
     # Own message and attachment
     if not att_email:
-        for name in ("Reader opens own email", "raw has no attachment parts", "Reader downloads own attachment"):
+        for name in ("Reader opens own email", "raw has no attachment parts", "Reader downloads own attachment",
+                     "Opened message matches the app's rules",
+                     "Opened message within the app's size limits"):
             lab.skip(name, "no email with attachments found in the reader's source")
     else:
         op = lab.get("/archived-emails/" + str(att_email), reader)
@@ -524,10 +550,14 @@ def run_checks(lab, admin, reader, deleted, rate_limit=False, samples=None, expi
 
     # Every attachment in the reader's source downloads at exactly its stated size
     checked = mismatched = unsafe = 0
-    for eid in att_emails:
+    for eid in att_emails[:MAX_SIZE_DOWNLOADS]:
         if checked >= MAX_SIZE_DOWNLOADS:
             break
-        d = lab.get("/archived-emails/" + str(eid), reader).obj() or {}
+        response = lab.get("/archived-emails/" + str(eid), reader)
+        d = response.obj() or {}
+        if response.status != 200 or detail_problems(d, src_a):
+            unsafe += 1
+            continue
         for record in dicts(d.get("attachments")):
             if checked >= MAX_SIZE_DOWNLOADS:
                 break
@@ -593,6 +623,7 @@ def run_checks(lab, admin, reader, deleted, rate_limit=False, samples=None, expi
     subjects_ok = sorted(str(h.get("subject")) for h in ff_hits) == sorted(EXPECT["filter_subjects"])
     lab.check("Filter-only search returns exactly the expected messages",
               ff.status == 200 and subjects_ok and ff_total == len(EXPECT["filter_subjects"])
+              and all(app_id(h.get("id")) for h in ff_hits)
               and len({h.get("id") for h in ff_hits}) == len(ff_hits)
               and all(h.get("hasAttachments") is True and h.get("ingestionSourceId") == src_a
                       and year_of(h.get("timestamp")) == 2026 for h in ff_hits),
@@ -606,7 +637,7 @@ def run_checks(lab, admin, reader, deleted, rate_limit=False, samples=None, expi
         raw_hits = hits_of(resp)
         valid = (resp.status == 200 and raw_hits is not None and len(dicts(raw_hits)) == len(raw_hits)
                  and all(isinstance(h.get("id"), str) and h.get("id") for h in raw_hits))
-        ids = [h.get("id") for h in dicts(raw_hits)]
+        ids = [h["id"] for h in dicts(raw_hits) if app_id(h.get("id"))]
         pages.append({
             "valid": valid, "ids": ids, "unique": len(set(ids)) == len(ids),
             "foreign": sum(1 for h in dicts(raw_hits) if h.get("ingestionSourceId") != src_a),
@@ -628,7 +659,8 @@ def run_checks(lab, admin, reader, deleted, rate_limit=False, samples=None, expi
         save("search-reader", p1.json)
     search_hits = dicts(hits_of(p1)) + dicts(hits_of(p2)) + dicts(hits_of(ff))
     hit_bad = sorted({f for h in search_hits for f in search_hit_problems(h)}
-                     | set(paging_problems(p1.obj(), "hits")) | set(paging_problems(p2.obj(), "hits")))
+                     | set(paging_problems(p1.obj(), "hits")) | set(paging_problems(p2.obj(), "hits"))
+                     | set(paging_problems(ff.obj(), "hits")))
     lab.check("Search hits match the app's rules", bool(search_hits) and not hit_bad,
               "%d hits checked; problems: %s" % (len(search_hits), ", ".join(hit_bad) or "none"))
 
