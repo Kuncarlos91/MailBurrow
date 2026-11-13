@@ -10,6 +10,7 @@ import 'package:mailburrow/screens/archive_home.dart';
 import 'package:mailburrow/screens/message_reader.dart';
 
 import 'support/fake_archive_backend.dart';
+import 'support/saved_connection.dart';
 
 class RecoveryApi extends ArchiveApi {
   RecoveryApi() : super(Uri.parse('https://example.com'), 'test-only');
@@ -676,7 +677,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(oldApi.closed, isTrue);
         expect(
-          await const FlutterSecureStorage().read(key: 'connection'),
+          await savedConnectionText(),
           isNull,
         );
         final fields = find.byType(TextField);
@@ -913,7 +914,7 @@ void main() {
         );
         expect(
           jsonDecode(
-            (await const FlutterSecureStorage().read(key: 'connection'))!,
+            (await savedConnectionText())!,
           ),
           succeeds
               ? {
@@ -1022,7 +1023,7 @@ void main() {
       );
       expect(
         jsonDecode(
-          (await const FlutterSecureStorage().read(key: 'connection'))!,
+          (await savedConnectionText())!,
         ),
         {
           ...jsonDecode(saved) as Map<String, dynamic>,

@@ -10,6 +10,7 @@ import 'package:mailburrow/state/archive_session.dart';
 import 'package:mailburrow/state/connection_store.dart';
 
 import 'support/fake_archive_backend.dart';
+import 'support/saved_connection.dart';
 
 /// Records every secure-storage call so tests can prove the demo makes none.
 class RecordingStore extends ConnectionStore {
@@ -75,7 +76,7 @@ const savedJson =
     '{"server":"https://archive.example.com","key":"test-only","accountId":7}';
 
 Future<String?> savedRaw() =>
-    const FlutterSecureStorage().read(key: 'connection');
+    savedConnectionText();
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

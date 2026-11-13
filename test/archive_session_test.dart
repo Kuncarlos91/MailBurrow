@@ -15,6 +15,7 @@ import 'package:mailburrow/state/archive_session.dart';
 import 'package:mailburrow/state/connection_store.dart';
 
 import 'support/fake_archive_backend.dart';
+import 'support/saved_connection.dart';
 
 /// Synthetic archive: two accounts, and mail results that a test can hold
 /// open per query to finish requests out of order.
@@ -159,7 +160,7 @@ List<String> subjects(ArchiveSession session) => [
 ];
 
 Future<Map<String, dynamic>?> savedConnection() async {
-  final saved = await const FlutterSecureStorage().read(key: 'connection');
+  final saved = await savedConnectionText();
   return saved == null ? null : jsonDecode(saved) as Map<String, dynamic>;
 }
 
@@ -363,7 +364,7 @@ void main() {
         expect(session.setup, isTrue);
         expect(session.error, contains('Saved connection unavailable'));
         expect(
-          await const FlutterSecureStorage().read(key: 'connection'),
+          await savedConnectionText(),
           encoded,
         );
       },

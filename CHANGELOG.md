@@ -11,6 +11,7 @@ Support for a second archive server type, Open Archiver 0.6.2. Mail-Archiver use
 - Typed JSON decoders reject wrong text/boolean types, invalid attachment metadata and impossible paging bounds with safe format errors rather than silently showing blank content or failing with cast errors. Account address, last-sync and archiving fields keep their "not reported" fallback.
 
 - The saved connection now records its server type and stores the selected account ID as text (format version 2). Connections saved by 0.3.0-rc.9 and earlier migrate automatically on the next successful connection and keep the selected account.
+- Saved connections move to a store that can hold several archives (format version 3): an index without keys and one secure entry per archive's key, written in stages so a failed save never loses the working connection. Existing connections migrate automatically on first start and keep their server type, key and selected account; there is still one active connection until the archive picker arrives.
 - Reject ambiguous saved records with an explicit null version or a server type without a version before creating an API client; preserve the stored record for recovery.
 
 ## 0.3.0-rc.9 (build23) - 2026-11-10

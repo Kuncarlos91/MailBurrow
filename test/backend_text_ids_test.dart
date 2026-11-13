@@ -11,6 +11,7 @@ import 'package:mailburrow/search_filters.dart';
 import 'package:mailburrow/state/archive_session.dart';
 
 import 'support/fake_archive_backend.dart';
+import 'support/saved_connection.dart';
 
 const firstId = 'aaaaaaaa-0000-4000-8000-000000000001';
 const secondId = 'aaaaaaaa-0000-4000-8000-000000000002';
@@ -140,14 +141,14 @@ void main() {
     session.keyInput.text = backend.key;
     await session.connect();
     expect(session.account?.id, firstId);
-    final before = await const FlutterSecureStorage().read(key: 'connection');
+    final before = await savedConnectionText();
     await session.switchAccount(
       const ArchiveAccount(id: firstId, emailAddress: 'x@example.com'),
     );
     expect(session.account?.id, firstId);
     expect(session.account?.emailAddress, 'one@example.com');
     expect(
-      await const FlutterSecureStorage().read(key: 'connection'),
+      await savedConnectionText(),
       before,
       reason: 'an unchanged switch must not rewrite the saved connection',
     );
@@ -181,7 +182,7 @@ void main() {
       expect(backend.requestedAccounts, originalRequests);
       expect(accountChanges, 0);
       expect(
-        await const FlutterSecureStorage().read(key: 'connection'),
+        await savedConnectionText(),
         originalSaved,
       );
     });
@@ -208,7 +209,7 @@ void main() {
       expect(session.account?.id, secondId);
       expect(backend.requestedAccounts, containsAll([firstId, secondId]));
       final saved = jsonDecode(
-        (await const FlutterSecureStorage().read(key: 'connection'))!,
+        (await savedConnectionText())!,
       );
       expect(saved['accountId'], secondId);
       session.dispose();

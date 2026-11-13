@@ -8,6 +8,8 @@ import 'package:mailburrow/app.dart';
 import 'package:mailburrow/screens/archive_home.dart';
 import 'package:mailburrow/search_filters.dart';
 
+import 'saved_connection.dart';
+
 const _server = 'https://archive.example.invalid';
 const _syntheticKey = 'test-only-smoke';
 
@@ -103,12 +105,13 @@ void runSmokeScenarios() {
   const storage = FlutterSecureStorage();
 
   // This suite is only for the newly created disposable simulator.
+  // Saved archives use a v3 index and one key entry per archive.
   setUp(() async {
-    await storage.delete(key: 'connection');
-    expect(await storage.read(key: 'connection'), isNull);
+    await storage.deleteAll();
+    expect(await savedConnectionText(), isNull);
   });
   tearDown(() async {
-    await storage.delete(key: 'connection');
+    await storage.deleteAll();
   });
 
   testWidgets('fresh native startup is blank and obscures the key', (
@@ -161,7 +164,7 @@ void runSmokeScenarios() {
     await tester.tap(find.text('Connect to archive'));
     await _settle(tester);
     expect(find.text('Simulator test message'), findsOneWidget);
-    final saved = await storage.read(key: 'connection');
+    final saved = await savedConnectionText();
     expect(saved, isNotNull);
     expect(jsonDecode(saved!)['server'], _server);
     expect(jsonDecode(saved)['key'], _syntheticKey);
