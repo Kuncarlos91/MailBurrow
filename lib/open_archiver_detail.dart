@@ -31,6 +31,7 @@ class OpenArchiverDetailReader {
   Object? _root;
   var _state = _State.value;
   var _otherBytes = 0;
+  var _values = 0;
 
   // String state. Raw UTF-8 bytes are kept, escapes included, and decoded
   // once at the closing quote.
@@ -47,6 +48,7 @@ class OpenArchiverDetailReader {
   Uint8List _raw = Uint8List(64 * 1024);
   var _rawLength = 0;
   var _rawValue = -1;
+  var _rawNumberEnded = false;
   var _sawRaw = false;
 
   static const _whitespace = {0x20, 0x09, 0x0a, 0x0d};
@@ -152,6 +154,10 @@ class OpenArchiverDetailReader {
       _keys[1] == 'data';
 
   void _startValue(int b) {
+    // Bound heap amplification from many tiny values and nested containers.
+    if (++_values > 100000 || _stack.length >= 64) {
+      throw const ArchiveResponseTooLarge();
+    }
     if (b == 0x7b) {
       _stack.add(<String, dynamic>{});
       _keys.add(null);
@@ -213,6 +219,7 @@ class OpenArchiverDetailReader {
   void _finishString() {
     final text = _unescape(utf8.decode(_string.takeBytes()));
     if (_stringIsKey) {
+      if ((_stack.last as Map).containsKey(text)) _fail();
       _keys[_keys.length - 1] = text;
       _state = _State.colon;
     } else {
@@ -223,8 +230,8 @@ class OpenArchiverDetailReader {
   void _finishNumber() {
     final text = _number.toString();
     final value = int.tryParse(text) ?? double.tryParse(text);
-    if (value == null || !RegExp(r'^-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?$')
-        .hasMatch(text)) {
+    if (value == null ||
+        !RegExp(r'^-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?$').hasMatch(text)) {
       _fail();
     }
     _emit(value);
@@ -232,6 +239,7 @@ class OpenArchiverDetailReader {
 
   void _rawByte(int b) {
     if (b >= 0x30 && b <= 0x39) {
+      if (_rawNumberEnded || _rawValue == 0) _fail();
       _rawValue = (_rawValue < 0 ? 0 : _rawValue * 10) + b - 0x30;
       if (_rawValue > 255) _fail();
     } else if (b == 0x2c) {
@@ -240,7 +248,9 @@ class OpenArchiverDetailReader {
       if (_rawValue >= 0 || _rawLength > 0) _pushRaw();
       // A placeholder: the bytes are returned separately.
       _emit(true);
-    } else if (!_whitespace.contains(b)) {
+    } else if (_whitespace.contains(b)) {
+      if (_rawValue >= 0) _rawNumberEnded = true;
+    } else {
       _fail();
     }
   }
@@ -255,6 +265,7 @@ class OpenArchiverDetailReader {
     }
     _raw[_rawLength++] = _rawValue;
     _rawValue = -1;
+    _rawNumberEnded = false;
   }
 
   /// Finishes reading. Returns every field except `raw`, and the raw bytes.

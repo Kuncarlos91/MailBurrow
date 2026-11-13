@@ -73,7 +73,11 @@ class _Walk {
       return;
     }
     if (split.end < 0) result.problems.add('no-header-end');
-    final headerBytes = Uint8List.sublistView(part, 0, split.end < 0 ? part.length : split.end);
+    final headerBytes = Uint8List.sublistView(
+      part,
+      0,
+      split.end < 0 ? part.length : split.end,
+    );
     final headers = _headers(latin1.decode(headerBytes), result);
     final body = split.end < 0
         ? Uint8List(0)
@@ -138,16 +142,18 @@ class _Walk {
       final hit = _indexOf(body, delimiter, at);
       if (hit < 0) break;
       final next = hit + delimiter.length;
-      // A delimiter starts a line and is followed by `--`, whitespace or the
-      // line end, so `--b` does not match inside `--b2`.
-      final after = next < body.length ? body[next] : 0x0a;
-      final delimited =
-          after == 0x2d ||
-          after == 0x0d ||
-          after == 0x0a ||
-          after == 0x20 ||
-          after == 0x09;
-      if ((hit != 0 && body[hit - 1] != 0x0a) || !delimited) {
+      // Match a complete delimiter line, not body text sharing its prefix.
+      final closing =
+          next + 1 < body.length &&
+          body[next] == 0x2d &&
+          body[next + 1] == 0x2d;
+      var tail = next + (closing ? 2 : 0);
+      while (tail < body.length && (body[tail] == 0x20 || body[tail] == 0x09)) {
+        tail++;
+      }
+      if (tail < body.length && body[tail] == 0x0d) tail++;
+      final lineEnded = tail == body.length || body[tail] == 0x0a;
+      if ((hit != 0 && body[hit - 1] != 0x0a) || !lineEnded) {
         at = next;
         continue;
       }
@@ -157,7 +163,7 @@ class _Walk {
         if (end > partStart && body[end - 1] == 0x0d) end--;
         visitChild(Uint8List.sublistView(body, partStart, end));
       }
-      if (next + 1 < body.length && body[next] == 0x2d && body[next + 1] == 0x2d) {
+      if (closing) {
         return;
       }
       var lineEnd = next;
@@ -216,7 +222,9 @@ Map<String, String> _headers(String block, MimeBodies result) {
   final value = StringBuffer();
   void flush() {
     final current = name;
-    if (current != null) out.putIfAbsent(current, () => value.toString().trim());
+    if (current != null) {
+      out.putIfAbsent(current, () => value.toString().trim());
+    }
     name = null;
     value.clear();
   }

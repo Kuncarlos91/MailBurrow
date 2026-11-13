@@ -195,6 +195,33 @@ void main() {
       }
     });
 
+    test('rejects ambiguous raw JSON across chunk boundaries', () {
+      for (final invalid in [
+        '{"raw":{"type":"Buffer","data":[1 2]}}',
+        '{"raw":{"type":"Buffer","data":[01]}}',
+        '{"raw":{"type":"Buffer","data":[0 0]}}',
+        '{"raw":{"type":"Buffer","data":[1]},"raw":{"type":"Buffer"}}',
+        '{"raw":{"type":"Buffer","data":[1],"data":false}}',
+        '{"raw":{"type":"Buffer","data":[1],"type":"Buffer"}}',
+      ]) {
+        for (final chunk in [1, 3, 4096]) {
+          expect(() => readAll(bytes(invalid), chunk: chunk),
+              throwsFormatException, reason: invalid);
+        }
+      }
+    });
+
+    test('bounds metadata nesting and value allocation', () {
+      for (final metadata in [
+        '${'[' * 64}0${']' * 64}',
+        '[${List.filled(100000, '0').join(',')}]',
+      ]) {
+        expect(() => readAll(bytes(
+          '{"raw":{"type":"Buffer","data":[]},"metadata":$metadata}',
+        )), throwsA(isA<ArchiveResponseTooLarge>()));
+      }
+    });
+
     test('rejects malformed responses', () {
       for (final bad in [
         '',
@@ -256,6 +283,20 @@ void main() {
   });
 
   group('MIME bodies', () {
+    test('keeps text that only resembles a multipart delimiter', () {
+      final body = readMimeBodies(bytes(
+        'Content-Type: multipart/mixed; boundary=b\r\n\r\n'
+        '--b\r\nContent-Type: text/plain\r\n\r\n'
+        'start\r\n--b-not-a-boundary\r\n--b--suffix\r\n'
+        '--b extra text\r\nend\r\n--b-- \t\r\n',
+      ));
+      expect(body.text, contains('end'));
+      expect(body.text, contains('--b-not-a-boundary'));
+      expect(body.text, contains('--b--suffix'));
+      expect(body.text, contains('--b extra text'));
+      expect(body.problems, isEmpty);
+    });
+
     MimeBodies read(String text, [MimeBodyLimits limits = const MimeBodyLimits()]) =>
         readMimeBodies(Uint8List.fromList(latin1.encode(text)), limits: limits);
 
