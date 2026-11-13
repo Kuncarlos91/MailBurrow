@@ -12,6 +12,8 @@ If Android says **App not installed** when updating, the new APK was signed with
 
 ## Connection and request failures
 
+On feature-branch builds with a server-type choice, select the type explicitly before entering its key. Changing type, reopening setup or cancelling setup clears the unsaved key; the saved active connection stays intact. If a connection fails after a type change, check the chosen type and re-enter that server’s key. Open Archiver sources that keep full original files cannot be opened in the app. The published 0.3.0-rc.9 build supports Mail-Archiver only.
+
 | Symptom | Checks/recovery | Relevant component |
 | --- | --- | --- |
 | Unable to connect/timeout | Check the HTTPS host/base path and that any private network (such as Tailscale) is connected on the phone. Reconnect and Retry. Do not expose the home server to fix a phone issue. | archive_api.dart, state/archive_session.dart |

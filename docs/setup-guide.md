@@ -4,6 +4,8 @@
 
 MailBurrow is a phone app for reading the mail you already archive with [Mail-Archiver](https://github.com/s1t5/mail-archiver). It talks only to your Mail-Archiver server, over HTTPS, with an API key you create. This guide covers how the pieces fit together and the exact settings each one needs.
 
+**Feature-branch builds:** setup also offers **Open Archiver** for the 0.6.2 backend; this option is not in the published 0.3.0-rc.9 build. Choose the server type explicitly before entering its key. Changing the type clears the entered key. Open Archiver needs an HTTPS endpoint and a key for a user whose role can read the intended sources; sources that keep full original files cannot be opened. The steps below describe Mail-Archiver; full Open Archiver setup guidance awaits live validation.
+
 The same guide is on the [MailBurrow website](https://mailburrow.pages.dev/setup.html).
 
 To see what the app looks like before setting anything up, tap **Try the demo** on the setup screen: it opens fictional sample mail built into the app, with no server needed.

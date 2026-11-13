@@ -101,6 +101,42 @@ void main() {
     expect(ArchiveServerType.openArchiver.label, 'Open Archiver');
   });
 
+  test('changing type requires a fresh key before any client is created', () async {
+    final value = session();
+    addTearDown(value.dispose);
+    value.server.text = 'https://archive.example';
+    value.keyInput.text = 'key-for-mail-archiver';
+    value.chooseServerType(ArchiveServerType.openArchiver);
+    expect(value.keyInput.text, isEmpty);
+    await value.connect();
+    expect(created, isEmpty);
+    expect(value.error, 'Enter your API key.');
+    expect(await saved(), isNull);
+    value.keyInput.text = 'key-for-open-archiver';
+    await value.connect();
+    expect(created.single.type, ArchiveServerType.openArchiver);
+    expect(created.single.key, 'key-for-open-archiver');
+  });
+
+  test('cancelled setup discards its unsaved key', () async {
+    final value = session();
+    addTearDown(value.dispose);
+    value.server.text = 'https://archive.example';
+    value.keyInput.text = 'original-key';
+    await value.connect();
+    final original = value.api;
+    value.openSetup();
+    value.chooseServerType(ArchiveServerType.openArchiver);
+    value.keyInput.text = 'discarded-key';
+    value.cancelSetup();
+    expect(value.keyInput.text, isEmpty);
+    value.openSetup();
+    expect(value.keyInput.text, isEmpty);
+    expect(value.setupServerType, ArchiveServerType.mailArchiver);
+    expect(value.api, same(original));
+    expect((await saved())?['key'], 'original-key');
+  });
+
   test('connecting from setup uses and saves the chosen type', () async {
     final value = session();
     addTearDown(value.dispose);

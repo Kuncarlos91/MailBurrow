@@ -94,6 +94,7 @@ class ArchiveSession extends ChangeNotifier {
   void chooseServerType(ArchiveServerType value) {
     if (busy || value == setupServerType) return;
     setupServerType = value;
+    keyInput.clear();
     error = null;
     _notify();
   }
@@ -545,12 +546,14 @@ class ArchiveSession extends ChangeNotifier {
   }
 
   void openSetup() {
+    keyInput.clear();
     setup = true;
     error = null;
     _notify();
   }
 
   void cancelSetup() {
+    keyInput.clear();
     setup = false;
     setupServerType = serverType;
     error = null;
