@@ -3,9 +3,9 @@ import 'search_filters.dart';
 /// What one archive backend can do, declared by the backend itself.
 ///
 /// The list is fixed per backend and never detected by probing a server.
-/// Screens use it to hide controls the server cannot honour (Phase 2 of the
-/// Open Archiver plan); until then every backend reports [full] and nothing
-/// changes on screen.
+/// Screens use it to hide controls the server cannot honour: the folder
+/// picker, filter and sort choices, archive totals in Settings, and exact
+/// match counts. Mail-Archiver and the demo report [full].
 class ArchiveCapabilities {
   ArchiveCapabilities({
     required this.folders,
@@ -70,4 +70,20 @@ class ArchiveCapabilities {
       (directionFilter || filters.direction.isEmpty) &&
       sortFields.contains(filters.sortBy) &&
       sortOrders.contains(filters.sortOrder);
+
+  /// [filters] with every unsupported choice returned to its default. Used
+  /// when filters are applied, so a backend never receives an option it
+  /// cannot honour.
+  SearchFilters supported(SearchFilters filters) => SearchFilters(
+    from: dateRangeFilter ? filters.from : null,
+    to: dateRangeFilter ? filters.to : null,
+    direction:
+        directionFilter && searchDirections.containsKey(filters.direction)
+        ? filters.direction
+        : '',
+    sortBy: sortFields.contains(filters.sortBy) ? filters.sortBy : 'sentDate',
+    sortOrder: sortOrders.contains(filters.sortOrder)
+        ? filters.sortOrder
+        : 'desc',
+  );
 }

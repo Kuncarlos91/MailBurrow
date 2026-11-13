@@ -108,6 +108,7 @@ class _ArchiveHomeState extends State<ArchiveHome> {
   }
 
   Future<void> chooseFolder() async {
+    if (!session.capabilities.folders) return;
     final choice = await showModalBottomSheet<ArchiveFolder>(
       context: context,
       showDragHandle: true,
@@ -182,7 +183,10 @@ class _ArchiveHomeState extends State<ArchiveHome> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => SearchFiltersSheet(filters: session.filters),
+      builder: (_) => SearchFiltersSheet(
+        filters: session.filters,
+        capabilities: session.capabilities,
+      ),
     );
     if (updated == null || !mounted) return;
     await session.applyFilters(updated);

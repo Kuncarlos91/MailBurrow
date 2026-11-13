@@ -41,7 +41,11 @@ class _ArchiveInformationState extends State<ArchiveInformation> {
       error = null;
     });
     try {
-      final totals = await widget.api.stats();
+      // Servers whose totals cover the whole server, not this key, are
+      // never asked; their totals would mislead.
+      final totals = widget.api.capabilities.archiveStats
+          ? await widget.api.stats()
+          : null;
       final available = await widget.api.accounts();
       final updated = available
           .where((item) => item.id == widget.account.id)
@@ -122,9 +126,11 @@ class _ArchiveInformationState extends State<ArchiveInformation> {
                 null => 'Not reported',
               }}',
             ),
-            const Divider(height: 28),
-            const Text('Totals across all accounts accessible to this API key'),
             if (stats != null) ...[
+              const Divider(height: 28),
+              const Text(
+                'Totals across all accounts accessible to this API key',
+              ),
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.mail_outline),
