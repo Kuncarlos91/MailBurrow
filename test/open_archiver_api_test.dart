@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mailburrow/archive_api.dart';
 import 'package:mailburrow/open_archiver_api.dart';
 import 'package:mailburrow/search_filters.dart';
 import 'package:mailburrow/state/archive_session.dart';

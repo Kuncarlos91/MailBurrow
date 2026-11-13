@@ -74,7 +74,7 @@ class OpenArchiverApi extends ArchiveApi {
   }
 
   @override
-  Future<List<ArchiveFolder>> folders(String accountId) async =>
+  Future<List<ArchiveFolder>> folders(String id) async =>
       throw UnsupportedError('Open Archiver sources have no folders.');
 
   @override
@@ -83,13 +83,13 @@ class OpenArchiverApi extends ArchiveApi {
 
   @override
   Future<MailPage> emails(
-    String accountId,
+    String id,
     String query,
     int page, {
     String? folder,
     SearchFilters filters = const SearchFilters(),
   }) async {
-    final source = _openArchiverId(accountId);
+    final source = _openArchiverId(id);
     if (folder != null) {
       throw ArgumentError.value(folder, 'folder', 'Open Archiver has no folders');
     }
