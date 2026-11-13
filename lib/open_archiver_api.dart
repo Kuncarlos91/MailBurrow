@@ -1,12 +1,31 @@
 import 'dart:io';
+import 'dart:isolate';
+import 'dart:typed_data';
 
 import 'archive_api.dart';
 import 'archive_capabilities.dart';
 import 'attachment_download.dart';
+import 'mime_bodies.dart';
+import 'open_archiver_detail.dart';
 import 'search_filters.dart';
 
 /// Results per page, matching Mail-Archiver's page size.
 const openArchiverPageSize = 25;
+
+/// Approved phone budgets for opening a message (plan, November 12, 2026):
+/// the response on the wire, the decoded `.eml`, and all other JSON text.
+const openArchiverMaxMessageWireBytes = 40 * 1024 * 1024;
+const openArchiverMaxRawBytes = 10 * 1024 * 1024;
+const openArchiverMaxDetailFieldBytes = 4 * 1024 * 1024;
+
+/// Time to read a message response after its headers, and to read its MIME
+/// structure afterwards.
+const openArchiverMessageReadTimeout = Duration(seconds: 60);
+const openArchiverMimeTimeout = Duration(seconds: 5);
+
+/// Message IDs remembered from lists and searches, to know each message's
+/// source before opening it.
+const _rememberedMessages = 2000;
 
 /// What Open Archiver v0.6.2 supports through MailBurrow: sources have no
 /// folders, search filters by sent date and sorts by date only, search
@@ -41,8 +60,8 @@ String _openArchiverId(String id) {
 /// order use the search route limited to that source (estimated totals).
 /// Search hits carry whole index documents, including extracted attachment
 /// text: only the fields the list shows are kept, and the rest is dropped
-/// with the decoded response. Opening messages and saving attachments come
-/// in later Phase 3 steps.
+/// with the decoded response. Messages open within the approved phone
+/// budgets (see [message]); saving attachments comes in Phase 3c.
 class OpenArchiverApi extends ArchiveApi {
   OpenArchiverApi(
     super.server,
@@ -55,6 +74,28 @@ class OpenArchiverApi extends ArchiveApi {
 
   @override
   ArchiveCapabilities get capabilities => openArchiverCapabilities;
+
+  // Preserve-original policy per source, from the last accounts() call.
+  // A source with a missing or malformed flag has no entry.
+  final _sourcePolicy = <String, bool>{};
+
+  // Which source each listed message came from.
+  final _messageSource = <String, String>{};
+
+  // Attachment storage paths from opened messages, for attachment saving.
+  final _attachmentPaths = <String, String>{};
+
+  /// The storage path of an attachment listed by an opened message, for
+  /// saving it (Phase 3c); null when unknown.
+  String? attachmentStoragePath(String attachmentId) =>
+      _attachmentPaths[attachmentId];
+
+  void _remember(String source, Iterable<MailSummary> items) {
+    if (_messageSource.length > _rememberedMessages) _messageSource.clear();
+    for (final item in items) {
+      _messageSource[item.id] = source;
+    }
+  }
 
   @override
   void authorize(HttpClientRequest request) =>
@@ -70,7 +111,18 @@ class OpenArchiverApi extends ArchiveApi {
     if (result is! List<dynamic>) {
       throw const FormatException('Invalid source response');
     }
-    return [for (final item in result) openArchiverSource(item)];
+    final accounts = [for (final item in result) openArchiverSource(item)];
+    _sourcePolicy.clear();
+    for (var i = 0; i < accounts.length; i++) {
+      try {
+        _sourcePolicy[accounts[i].id] = openArchiverPreservesOriginals(
+          result[i],
+        );
+      } on FormatException {
+        // Unknown policy: messages from this source are not opened.
+      }
+    }
+    return accounts;
   }
 
   @override
@@ -103,14 +155,16 @@ class OpenArchiverApi extends ArchiveApi {
         filters.to == null &&
         filters.sortOrder == 'desc';
     if (browse) {
-      return openArchiverListPage(
+      final result = openArchiverListPage(
         await get('archived-emails/ingestion-source/$source', {
           'page': '$page',
           'limit': '$openArchiverPageSize',
         }),
       );
+      _remember(source, result.items);
+      return result;
     }
-    return openArchiverSearchPage(
+    final result = openArchiverSearchPage(
       await get('search', {
         'keywords': query.trim(),
         'sources': source,
@@ -121,11 +175,71 @@ class OpenArchiverApi extends ArchiveApi {
         if (filters.to != null) 'dateTo': dateLabel(filters.to!),
       }),
     );
+    _remember(source, result.items);
+    return result;
   }
 
+  /// Opens a message from a source whose policy allows it.
+  ///
+  /// Sources that keep full original files carry their attachments inside
+  /// `raw`, so fetching it would download attachments without the user's
+  /// confirmation. They are refused before any request, as are messages
+  /// whose source or policy is unknown.
   @override
-  Future<MailMessage> message(String id) async =>
-      throw UnsupportedError('Opening Open Archiver messages comes in 3b.');
+  Future<MailMessage> message(String id) async {
+    final messageId = _openArchiverId(id);
+    final source = _messageSource[messageId];
+    if (source == null) {
+      throw const ArchiveMessageRefused(
+        'Open this message from its mail list.',
+      );
+    }
+    var preserves = _sourcePolicy[source];
+    if (preserves == null) {
+      await accounts();
+      preserves = _sourcePolicy[source];
+    }
+    if (preserves == null) {
+      throw const ArchiveMessageRefused(
+        'Open Archiver did not say whether this source keeps full original '
+        'messages, so MailBurrow will not open its mail.',
+      );
+    }
+    if (preserves) {
+      throw const ArchiveMessageRefused(
+        'This source keeps full original messages, attachments included, '
+        'so MailBurrow does not open them. Use the Open Archiver website '
+        'for this source.',
+      );
+    }
+    final detail = await send(
+      'archived-emails/$messageId',
+      null,
+      readOpenArchiverDetail,
+      timeout: openArchiverMessageReadTimeout,
+    );
+    final fields = detail.fields;
+    final listed = fields['ingestionSourceId'];
+    if (listed != null && listed != source) {
+      throw const FormatException('Message source does not match');
+    }
+    final bodies = await _readBodies(
+      detail.raw,
+    ).timeout(openArchiverMimeTimeout);
+    final attachments = openArchiverAttachments(fields['attachments']);
+    for (final file in attachments) {
+      _attachmentPaths[file.attachment.id] = file.storagePath;
+    }
+    return MailMessage(
+      subject: _text(fields, 'subject'),
+      from: _sender(_text(fields, 'senderName'), _text(fields, 'senderEmail')),
+      sentDate: _text(fields, 'sentAt'),
+      folderName: _text(fields, 'path'),
+      htmlBody: bodies.html,
+      textBody: bodies.text,
+      attachments: [for (final file in attachments) file.attachment],
+    );
+  }
 
   @override
   Future<void> downloadAttachment(
@@ -276,4 +390,64 @@ MailPage openArchiverSearchPage(Object? value) {
     totalItems: total,
     totalIsEstimate: true,
   );
+}
+
+/// Reads a message response within the approved budgets: the wire size from
+/// `Content-Length` and while streaming, and the decoded message and other
+/// fields inside [OpenArchiverDetailReader].
+Future<({Map<String, dynamic> fields, Uint8List raw})> readOpenArchiverDetail(
+  Stream<List<int>> body,
+  int contentLength,
+) async {
+  if (contentLength > openArchiverMaxMessageWireBytes) {
+    throw const ArchiveResponseTooLarge();
+  }
+  final reader = OpenArchiverDetailReader(
+    maxRawBytes: openArchiverMaxRawBytes,
+    maxOtherBytes: openArchiverMaxDetailFieldBytes,
+  );
+  var wire = 0;
+  await for (final chunk in body) {
+    if (chunk.length > openArchiverMaxMessageWireBytes - wire) {
+      throw const ArchiveResponseTooLarge();
+    }
+    wire += chunk.length;
+    reader.add(chunk);
+  }
+  return reader.close();
+}
+
+// Top level, so the isolate closure captures only the bytes.
+Future<MimeBodies> _readBodies(Uint8List raw) =>
+    Isolate.run(() => readMimeBodies(raw));
+
+/// The detail response's attachment records: `id`, `filename`, `mimeType`,
+/// `sizeBytes` and `storagePath`.
+List<({MailAttachment attachment, String storagePath})> openArchiverAttachments(
+  Object? value,
+) {
+  if (value == null) return const [];
+  if (value is! List<dynamic>) {
+    throw const FormatException('Invalid attachments');
+  }
+  return [
+    for (final item in value)
+      () {
+        final json = _object(item, 'attachment');
+        final size = json['sizeBytes'];
+        final path = json['storagePath'];
+        if (size is! int || size < 0 || path is! String || path.isEmpty) {
+          throw const FormatException('Invalid attachment');
+        }
+        return (
+          attachment: MailAttachment(
+            archiveId(json['id']),
+            _text(json, 'filename') ?? 'attachment',
+            size,
+            _text(json, 'mimeType') ?? 'application/octet-stream',
+          ),
+          storagePath: path,
+        );
+      }(),
+  ];
 }
