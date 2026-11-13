@@ -34,6 +34,7 @@ class MailView extends StatelessWidget {
     final busy = s.busy;
     final page = s.page;
     final totalPages = s.totalPages;
+    final folders = s.capabilities.folders;
     return CustomScrollView(
       controller: scrollController,
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -65,44 +66,48 @@ class MailView extends StatelessWidget {
                     ),
                   ),
                 ),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: ActionChip(
-                    avatar: const Icon(Icons.tune, size: 18),
-                    label: Text(
-                      s.filters.active ? 'Filters • Active' : 'Filters',
+              if (s.capabilities.hasFilterChoices)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: ActionChip(
+                      avatar: const Icon(Icons.tune, size: 18),
+                      label: Text(
+                        s.filters.active ? 'Filters • Active' : 'Filters',
+                      ),
+                      onPressed: busy ? null : onChooseFilters,
                     ),
-                    onPressed: busy ? null : onChooseFilters,
                   ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextButton.icon(
-                        onPressed: busy || s.foldersBusy ? null : onChooseFolder,
-                        icon: const Icon(Icons.folder_outlined),
-                        label: Text(
-                          '${s.selectedFolder ?? 'All archived mail'} ▾',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+              if (folders)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextButton.icon(
+                          onPressed: busy || s.foldersBusy
+                              ? null
+                              : onChooseFolder,
+                          icon: const Icon(Icons.folder_outlined),
+                          label: Text(
+                            '${s.selectedFolder ?? 'All archived mail'} ▾',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ),
-                    ),
-                    IconButton(
-                      onPressed: busy || s.foldersBusy ? null : s.loadFolders,
-                      tooltip: 'Reload folders',
-                      icon: const Icon(Icons.sync),
-                    ),
-                  ],
+                      IconButton(
+                        onPressed: busy || s.foldersBusy ? null : s.loadFolders,
+                        tooltip: 'Reload folders',
+                        icon: const Icon(Icons.sync),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              if (s.foldersBusy) const LinearProgressIndicator(),
-              if (s.folderError != null)
+              if (folders && s.foldersBusy) const LinearProgressIndicator(),
+              if (folders && s.folderError != null)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
@@ -139,7 +144,9 @@ class MailView extends StatelessWidget {
                     ? 'Loading messages…'
                     : s.error != null
                     ? 'Messages could not be loaded. Use Refresh to retry.'
-                    : 'No messages match this folder and search.',
+                    : folders
+                    ? 'No messages match this folder and search.'
+                    : 'No messages match this search.',
               ),
             ),
           )
@@ -252,7 +259,9 @@ class MailView extends StatelessWidget {
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       leading: CircleAvatar(
-        child: Text(sender.isEmpty ? '?' : sender.substring(0, 1).toUpperCase()),
+        child: Text(
+          sender.isEmpty ? '?' : sender.substring(0, 1).toUpperCase(),
+        ),
       ),
       title: Text(sender, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Column(

@@ -7,6 +7,7 @@ import '../archive_models.dart';
 import '../archive_errors.dart';
 import '../archive_backend.dart';
 import '../demo/demo_archive.dart';
+import '../archive_capabilities.dart';
 import '../search_filters.dart';
 import '../archive_server_type.dart';
 import 'connection_store.dart';
@@ -371,8 +372,8 @@ class ArchiveSession extends ChangeNotifier {
         account!.id,
         query,
         requestedPage,
-        folder: selectedFolder,
-        filters: filters,
+        folder: requestApi.capabilities.folders ? selectedFolder : null,
+        filters: requestApi.capabilities.supported(filters),
       );
       if (current()) {
         messages = result.items;
@@ -382,6 +383,8 @@ class ArchiveSession extends ChangeNotifier {
         final total = result.totalItems;
         final count = total == null
             ? '${messages.length} messages on this page'
+            : capabilities.estimatedTotals
+            ? 'about $total matches'
             : '$total matches';
         searchFeedback =
             '${query.isEmpty ? 'Messages loaded' : 'Search complete'} · $count · ${(watch.elapsedMilliseconds / 1000).toStringAsFixed(1)} s';
@@ -421,10 +424,22 @@ class ArchiveSession extends ChangeNotifier {
     }
   }
 
+  /// What the connected backend supports; [ArchiveCapabilities.full] while
+  /// disconnected, so setup and empty states keep their current controls.
+  ArchiveCapabilities get capabilities =>
+      api?.capabilities ?? ArchiveCapabilities.full;
+
   Future<void> loadFolders() async {
     final requestApi = api;
     final accountId = account?.id;
     if (requestApi == null || accountId == null || foldersBusy) return;
+    if (!requestApi.capabilities.folders) {
+      // Nothing to browse: never ask a server for folders it does not have.
+      folders = [];
+      folderError = null;
+      selectedFolder = null;
+      return;
+    }
     final requestId = ++folderRequestId;
     bool current() =>
         !_disposed &&
@@ -454,7 +469,7 @@ class ArchiveSession extends ChangeNotifier {
   }
 
   Future<void> selectFolder(ArchiveFolder choice) async {
-    if (busy) return;
+    if (busy || !capabilities.folders) return;
     selectedFolder = choice.path.isEmpty ? null : choice.path;
     page = 1;
     totalPages = 1;
@@ -465,7 +480,7 @@ class ArchiveSession extends ChangeNotifier {
 
   Future<void> applyFilters(SearchFilters updated) async {
     if (busy) return;
-    filters = updated;
+    filters = capabilities.supported(updated);
     page = 1;
     totalPages = 1;
     messages = [];
