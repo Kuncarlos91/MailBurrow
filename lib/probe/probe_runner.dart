@@ -262,12 +262,16 @@ Future<Map<String, Object?>> measureCancel(
     cancelClock.start();
     await stop();
     result['clientCancelMs'] = cancelClock.elapsedMilliseconds;
+    // A server that never sees the drop is a result, not a probe error.
+    var stopped = true;
     await serverStopped.future.timeout(
       const Duration(seconds: 10),
-      onTimeout: () => throw TimeoutException('server stop'),
+      onTimeout: () => stopped = false,
     );
     result
-      ..['serverStopMs'] = cancelClock.elapsedMilliseconds
+      ..['serverStopMs'] = stopped
+          ? cancelClock.elapsedMilliseconds
+          : 'not within 10 s'
       ..['serverCompleted'] = serverCompleted
       ..['wireBeforeCancel'] = decoder.consumed
       ..['sentAfterCancel'] = sentAfterCancel
