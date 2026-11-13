@@ -28,11 +28,11 @@ typedef ConnectionProfile = ({
 /// Saved archive connections in platform secure storage.
 ///
 /// Format version 3 (current, provisional until the multi-archive prototype
-/// is reviewed) keeps an **index** under `connections`:
-/// `{"version": 3, "active": "<id>" | null, "profiles": [{"id", "label",
-/// "serverType", "server", "accountId"}]}`, which holds no keys, and **one
-/// key entry per profile** under `connection.key.<id>`. Writes are staged so
-/// that a failed write never breaks another profile or the working key: a
+/// is reviewed) keeps an **index** under `connections`, holding the version,
+/// the active profile ID (or null) and, per profile, its `id`, `label`,
+/// `serverType`, `server` and `accountId`. The index holds no keys. There is
+/// **one key entry per profile**, named `connection.key.` plus its ID. Writes
+/// are staged so that a failed write never breaks another profile or the working key: a
 /// new or changed key is written under a fresh ID before the index points to
 /// it, and an old key entry is deleted only after the index stops pointing to
 /// it. Key entries the index does not reference are removed when it is read.
