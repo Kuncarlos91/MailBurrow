@@ -1,4 +1,4 @@
-"""Open Archiver lab check for MailBurrow (Phase 0).
+"""Open Archiver lab check for MailBurrow (Phase 0, extended for Phase 3).
 
 Runs read-only API checks against a TEST Open Archiver server that holds only
 the fictional demo mail from tools/export_demo_eml.py, and prints a summary
@@ -8,9 +8,15 @@ that is safe to share. It never sends a request that changes server state
 Usage (PowerShell):
     python tools\\oa_lab_check.py https://<test-server>:8443 [--samples DIR] [--rate-limit]
 
-It asks for three API keys without echoing them (on Windows, paste with a
-right-click): the admin key, the reader key (custom read-only role on the
-Alex Rivera demo source) and, optionally, a deleted key.
+It asks for up to four API keys without echoing them (on Windows, paste with
+a right-click): the admin key, the reader key (custom read-only role on the
+Alex Rivera demo source) and, optionally, a deleted key and an expired key.
+
+Version 3 adds the Phase 3 contract checks: list items, search hits and the
+opened-message response must have the fields and types MailBurrow's Open
+Archiver backend reads, IDs and storage paths must pass its validation, and
+every attachment in the reader's source must download at exactly its stated
+size.
 
 Every check is PASS, FAIL or SKIP and either required or optional. The run
 succeeds (exit 0) only if no check failed and no required check was skipped.
@@ -20,6 +26,7 @@ server, so an error page cannot leak into a pasted summary.
 """
 import argparse
 import email
+import re
 import getpass
 import json
 import ssl
@@ -64,6 +71,13 @@ KNOWN_FIELDS = {
     "to", "userEmailDomain", "userEmailLocalPart", "filename", "content", "mimeType",
     "preserveOriginalFile", "name", "provider",
 }
+# MailBurrow's Open Archiver backend rules (lib/open_archiver_api.dart).
+APP_ID = re.compile(r"^[A-Za-z0-9-]{1,64}$")
+APP_MAX_WIRE = 40 * 1024 * 1024
+APP_MAX_RAW = 10 * 1024 * 1024
+APP_MAX_ATTACHMENT = 50 * 1024 * 1024
+MAX_SIZE_DOWNLOADS = 12
+
 KNOWN_HEADERS = {"ratelimit-limit", "ratelimit-policy", "ratelimit-remaining",
                  "ratelimit-reset", "retry-after", "x-ratelimit-limit",
                  "x-ratelimit-remaining", "x-ratelimit-reset"}
@@ -108,11 +122,12 @@ class Lab:
         self.connection_errors = 0
         self.headers_seen = set()
 
-    def get(self, path, key=None, params=None):
+    def get(self, path, key=None, params=None, extra=None):
         url = self.base + self.prefix + path
         if params:
             url += "?" + urllib.parse.urlencode(params)
-        headers = {"Accept": "application/json", "User-Agent": "MailBurrow-lab-check/2"}
+        headers = {"Accept": "application/json", "User-Agent": "MailBurrow-lab-check/3"}
+        headers.update(extra or {})
         if key:
             headers["X-API-KEY"] = key
         start = time.monotonic()
@@ -219,17 +234,128 @@ def mime_payloads(raw):
 def year_of(timestamp):
     if not isinstance(timestamp, (int, float)) or isinstance(timestamp, bool):
         return None
-    seconds = timestamp / 1000 if timestamp > 1e11 else timestamp
-    return time.gmtime(seconds).tm_year
+    try:
+        seconds = timestamp / 1000 if abs(timestamp) > 1e11 else timestamp
+        return time.gmtime(seconds).tm_year
+    except (OverflowError, ValueError, OSError):
+        return None
 
 
 def dicts(value):
     return [v for v in value if isinstance(v, dict)] if isinstance(value, list) else []
 
 
+# ---------------------------------------------------------------- app contract
+
+def text_or_none(value):
+    return value is None or isinstance(value, str)
+
+
+def whole(value, minimum=0):
+    return isinstance(value, int) and not isinstance(value, bool) and value >= minimum
+
+
+def iso_date(value):
+    if not isinstance(value, str):
+        return False
+    try:
+        from datetime import datetime
+        datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return True
+    except ValueError:
+        return False
+
+
+def app_id(value):
+    return isinstance(value, str) and bool(APP_ID.fullmatch(value))
+
+
+def storage_path_ok(value):
+    return (isinstance(value, str) and 0 < len(value) <= 1024
+            and not any(ord(c) < 0x20 or ord(c) == 0x7f for c in value))
+
+
+def missing(record, fields):
+    return ["missing " + f for f in fields if f not in record]
+
+
+def list_item_problems(item):
+    """Field names, never values, that break MailBurrow's list-item rules."""
+    if not isinstance(item, dict):
+        return ["items"]
+    bad = ([] if app_id(item.get("id")) else ["id"]) + missing(item, ("subject", "senderEmail", "sentAt"))
+    bad += [f for f in ("subject", "senderName", "senderEmail") if not text_or_none(item.get(f))]
+    if item.get("sentAt") is not None and not iso_date(item.get("sentAt")):
+        bad.append("sentAt")
+    return bad
+
+
+def search_hit_problems(hit):
+    if not isinstance(hit, dict):
+        return ["hits"]
+    bad = ([] if app_id(hit.get("id")) else ["id"]) + missing(hit, ("subject", "from", "timestamp"))
+    bad += [f for f in ("subject", "from", "fromName") if not text_or_none(hit.get(f))]
+    stamp = hit.get("timestamp")
+    if stamp is not None:
+        if not isinstance(stamp, int) or isinstance(stamp, bool):
+            bad.append("timestamp")
+        else:
+            millis = stamp if abs(stamp) > 100000000000 else stamp * 1000
+            if abs(millis) > 8640000000000000:
+                bad.append("timestamp")
+    return bad
+
+
+def attachment_problems(record):
+    if not isinstance(record, dict):
+        return ["record"]
+    bad = [] if app_id(record.get("id")) else ["id"]
+    bad += [f for f in ("filename", "mimeType") if not text_or_none(record.get(f))]
+    if not whole(record.get("sizeBytes")):
+        bad.append("sizeBytes")
+    if not storage_path_ok(record.get("storagePath")):
+        bad.append("storagePath")
+    return bad
+
+
+def detail_problems(detail, source):
+    bad = missing(detail, ("subject", "senderEmail", "sentAt", "raw", "attachments"))
+    bad += [f for f in ("subject", "senderName", "senderEmail", "path") if not text_or_none(detail.get(f))]
+    if detail.get("sentAt") is not None and not iso_date(detail.get("sentAt")):
+        bad.append("sentAt")
+    if detail.get("ingestionSourceId") not in (None, source):
+        bad.append("ingestionSourceId")
+    raw = detail.get("raw")
+    if not (isinstance(raw, dict) and raw.get("type") == "Buffer" and isinstance(raw.get("data"), list)):
+        bad.append("raw")
+    records = detail.get("attachments")
+    if records is not None and not isinstance(records, list):
+        bad.append("attachments")
+    if isinstance(raw, dict) and isinstance(raw.get("data"), list):
+        if any(not whole(byte) or byte > 255 for byte in raw["data"]):
+            bad.append("raw")
+    for record in records if isinstance(records, list) else []:
+        bad += ["attachments." + f for f in attachment_problems(record)]
+    return sorted(set(bad))
+
+
+def paging_problems(data, hits_field):
+    if not isinstance(data, dict) or not isinstance(data.get(hits_field), list):
+        return [hits_field]
+    bad = [] if whole(data.get("total")) else ["total"]
+    if any(not isinstance(item, dict) for item in data[hits_field]):
+        bad.append(hits_field)
+    for field in ("page", "limit"):
+        if data.get(field) is not None and not whole(data.get(field), 1):
+            bad.append(field)
+    if data.get("totalPages") is not None and not whole(data.get("totalPages")):
+        bad.append("totalPages")
+    return bad
+
+
 # ---------------------------------------------------------------- the checks
 
-def run_checks(lab, admin, reader, deleted, rate_limit=False, samples=None):
+def run_checks(lab, admin, reader, deleted, rate_limit=False, samples=None, expired=""):
     def save(name, data):
         if samples is not None and data is not None:
             (samples / (name + ".json")).write_text(json.dumps(data, indent=2), encoding="utf-8")
@@ -260,6 +386,13 @@ def run_checks(lab, admin, reader, deleted, rate_limit=False, samples=None):
                       required=False)
     else:
         lab.skip("Deleted key refused", "no deleted key given", required=False)
+    if expired:
+        for path, params in (("/ingestion-sources", None), ("/search", {"keywords": "a"})):
+            r = lab.get(path, expired, params)
+            lab.check("Expired key refused on " + path, r.status == 401, "%s, %s" % (st(r), kind(r)),
+                      required=False)
+    else:
+        lab.skip("Expired key refused", "no expired key given", required=False)
 
     # Sources
     admin_sources = [s for s in dicts(adm_src.json) if isinstance(s.get("id"), str)]
@@ -283,6 +416,7 @@ def run_checks(lab, admin, reader, deleted, rate_limit=False, samples=None):
     save("archived-emails-list-reader-a", first.json)
     total = total_of(first)
     seen, foreign, pages_ok, att_email = set(), 0, items_of(first) is not None, None
+    all_items, att_emails, paging_bad = [], [], set()
     page_resp = first
     for page in range(1, 11):
         if page > 1:
@@ -291,10 +425,18 @@ def run_checks(lab, admin, reader, deleted, rate_limit=False, samples=None):
         if items is None:
             pages_ok = False
             break
+        paging_bad.update(paging_problems(page_resp.obj(), "items"))
+        all_items.extend(items)
         for it in dicts(items):
-            seen.add(it.get("id"))
+            if (it.get("hasAttachments") is True and app_id(it.get("id"))
+                    and it.get("id") not in att_emails):
+                att_emails.append(it.get("id"))
+            if app_id(it.get("id")):
+                seen.add(it["id"])
+            else:
+                pages_ok = False
             foreign += it.get("ingestionSourceId") != src_a
-            if att_email is None and it.get("hasAttachments") is True:
+            if att_email is None and it.get("hasAttachments") is True and app_id(it.get("id")):
                 att_email = it.get("id")
         if len(items) < 10:
             break
@@ -304,6 +446,9 @@ def run_checks(lab, admin, reader, deleted, rate_limit=False, samples=None):
                   st(first), number(total), EXPECT["reader_total"], len(seen), foreign))
     if dicts(items_of(first)):
         lab.check("List item fields", True, names(dicts(items_of(first))[0].keys()))
+    item_bad = sorted({f for it in all_items for f in list_item_problems(it)} | paging_bad)
+    lab.check("List items match the app's rules", bool(all_items) and not item_bad,
+              "%d items checked; problems: %s" % (len(all_items), ", ".join(item_bad) or "none"))
 
     # Other source: admin finds fixtures first, then the reader tries them
     src_b = None
@@ -350,7 +495,9 @@ def run_checks(lab, admin, reader, deleted, rate_limit=False, samples=None):
 
     # Own message and attachment
     if not att_email:
-        for name in ("Reader opens own email", "raw has no attachment parts", "Reader downloads own attachment"):
+        for name in ("Reader opens own email", "raw has no attachment parts", "Reader downloads own attachment",
+                     "Opened message matches the app's rules",
+                     "Opened message within the app's size limits"):
             lab.skip(name, "no email with attachments found in the reader's source")
     else:
         op = lab.get("/archived-emails/" + str(att_email), reader)
@@ -368,6 +515,21 @@ def run_checks(lab, admin, reader, deleted, rate_limit=False, samples=None):
                   "%d inline parts, %d bytes" % tuple(payloads["inline"]))
         if detail:
             lab.check("Detail fields", True, names(detail.keys()))
+        bad = detail_problems(detail, src_a) if detail else ["response"]
+        lab.check("Opened message matches the app's rules", op.status == 200 and not bad,
+                  "problems: %s" % (", ".join(bad) or "none"))
+        lab.check("Opened message within the app's size limits",
+                  op.status == 200 and len(op.body) <= APP_MAX_WIRE and len(raw) <= APP_MAX_RAW,
+                  "response %d bytes (limit %d), .eml %d bytes (limit %d)" % (
+                      len(op.body), APP_MAX_WIRE, len(raw), APP_MAX_RAW))
+        lab.check("Opened-message response headers (reported)", op.status == 200,
+                  "Content-Length %s" % ("yes" if op.headers.get("content-length") else "no"), required=False)
+        gz = lab.get("/archived-emails/" + str(att_email), reader, extra={"Accept-Encoding": "gzip"})
+        lab.check("Opened message with compression accepted (reported)", gz.status == 200,
+                  "%s, Content-Encoding %s, Content-Length %s" % (
+                      st(gz), "gzip" if (gz.headers.get("content-encoding") or "").lower() == "gzip"
+                      else ("other" if gz.headers.get("content-encoding") else "none"),
+                      "yes" if gz.headers.get("content-length") else "no"), required=False)
         if samples is not None and detail:
             trimmed = dict(detail)
             trimmed["raw"] = {"type": "Buffer", "data": "<%d bytes omitted>" % len(raw)}
@@ -385,6 +547,33 @@ def run_checks(lab, admin, reader, deleted, rate_limit=False, samples=None):
                           "yes" if dl.headers.get("content-length") else "no (streamed)"))
         else:
             lab.skip("Reader downloads own attachment", "email lists no downloadable attachment record")
+
+    # Every attachment in the reader's source downloads at exactly its stated size
+    checked = mismatched = unsafe = 0
+    for eid in att_emails[:MAX_SIZE_DOWNLOADS]:
+        if checked >= MAX_SIZE_DOWNLOADS:
+            break
+        response = lab.get("/archived-emails/" + str(eid), reader)
+        d = response.obj() or {}
+        if response.status != 200 or detail_problems(d, src_a):
+            unsafe += 1
+            continue
+        for record in dicts(d.get("attachments")):
+            if checked >= MAX_SIZE_DOWNLOADS:
+                break
+            if attachment_problems(record) or record.get("sizeBytes") > APP_MAX_ATTACHMENT:
+                unsafe += 1
+                continue
+            dl = lab.get("/storage/download", reader, {"path": record["storagePath"]})
+            checked += 1
+            mismatched += dl.status != 200 or len(dl.body) != record["sizeBytes"]
+    if att_emails:
+        lab.check("Every checked attachment matches its stated size",
+                  checked > 0 and mismatched == 0 and unsafe == 0,
+                  "%d downloaded (at most %d), %d mismatched or failed, %d records outside the app's rules" % (
+                      checked, MAX_SIZE_DOWNLOADS, mismatched, unsafe))
+    else:
+        lab.skip("Every checked attachment matches its stated size", "no email with attachments found")
 
     # Search: positive controls, isolation, filters, pagination
     own = lab.get("/search", reader, {"keywords": EXPECT["own_term"], "limit": 25})
@@ -434,6 +623,7 @@ def run_checks(lab, admin, reader, deleted, rate_limit=False, samples=None):
     subjects_ok = sorted(str(h.get("subject")) for h in ff_hits) == sorted(EXPECT["filter_subjects"])
     lab.check("Filter-only search returns exactly the expected messages",
               ff.status == 200 and subjects_ok and ff_total == len(EXPECT["filter_subjects"])
+              and all(app_id(h.get("id")) for h in ff_hits)
               and len({h.get("id") for h in ff_hits}) == len(ff_hits)
               and all(h.get("hasAttachments") is True and h.get("ingestionSourceId") == src_a
                       and year_of(h.get("timestamp")) == 2026 for h in ff_hits),
@@ -447,7 +637,7 @@ def run_checks(lab, admin, reader, deleted, rate_limit=False, samples=None):
         raw_hits = hits_of(resp)
         valid = (resp.status == 200 and raw_hits is not None and len(dicts(raw_hits)) == len(raw_hits)
                  and all(isinstance(h.get("id"), str) and h.get("id") for h in raw_hits))
-        ids = [h.get("id") for h in dicts(raw_hits)]
+        ids = [h["id"] for h in dicts(raw_hits) if app_id(h.get("id"))]
         pages.append({
             "valid": valid, "ids": ids, "unique": len(set(ids)) == len(ids),
             "foreign": sum(1 for h in dicts(raw_hits) if h.get("ingestionSourceId") != src_a),
@@ -467,6 +657,12 @@ def run_checks(lab, admin, reader, deleted, rate_limit=False, samples=None):
         lab.check("Search page size", True, "%d bytes for %d hits; hit fields: %s" % (
             len(p1.body), len(h1), names(dicts(hits_of(p1))[0].keys())))
         save("search-reader", p1.json)
+    search_hits = dicts(hits_of(p1)) + dicts(hits_of(p2)) + dicts(hits_of(ff))
+    hit_bad = sorted({f for h in search_hits for f in search_hit_problems(h)}
+                     | set(paging_problems(p1.obj(), "hits")) | set(paging_problems(p2.obj(), "hits"))
+                     | set(paging_problems(ff.obj(), "hits")))
+    lab.check("Search hits match the app's rules", bool(search_hits) and not hit_bad,
+              "%d hits checked; problems: %s" % (len(search_hits), ", ".join(hit_bad) or "none"))
 
     # Totals
     stats = lab.get("/dashboard/stats", reader)
@@ -515,7 +711,7 @@ def run_checks(lab, admin, reader, deleted, rate_limit=False, samples=None):
 
 
 def report(lab, out):
-    print("\nOpen Archiver lab check v2 (paste this summary; it holds no keys, addresses or server text)", file=out)
+    print("\nOpen Archiver lab check v3 (paste this summary; it holds no keys, addresses or server text)", file=out)
     print("Python %s, %s" % (sys.version.split()[0], time.strftime("%Y-%m-%d %H:%M")), file=out)
     for status, required, name, detail in lab.results:
         print("[%s]%s %s%s" % (status, "" if required else " (optional)", name, (": " + detail) if detail else ""),
@@ -556,15 +752,17 @@ def main(argv=None, keys=None, transport=None, out=None):
         return 2
     if keys is None:
         keys = (ask_key("Admin API key: "), ask_key("Reader API key: "),
-                ask_key("Deleted key (Enter to skip): ", optional=True))
-    admin, reader, deleted = keys
+                ask_key("Deleted key (Enter to skip): ", optional=True),
+                ask_key("Expired key (Enter to skip): ", optional=True))
+    admin, reader, deleted = keys[:3]
+    expired = keys[3] if len(keys) > 3 else ""
     if not admin or not reader:
         return 2
     samples = Path(args.samples) if args.samples else None
     if samples is not None:
         samples.mkdir(parents=True, exist_ok=True)
     lab = Lab(args.url, args.api_prefix, transport or urllib_transport)
-    run_checks(lab, admin, reader, deleted, args.rate_limit, samples)
+    run_checks(lab, admin, reader, deleted, args.rate_limit, samples, expired)
     return 0 if report(lab, out) else 1
 
 

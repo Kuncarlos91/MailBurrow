@@ -135,6 +135,8 @@ Run focused tests, appropriate shared checks, privacy/docs checks and diff revie
 
 Match Dart build defines to native version/build and preserve the app identity so updates install over earlier versions.
 
+The Open Archiver lab checker validates Phase 3 list/search/detail field contracts, raw-byte types, timestamp bounds, filter paging, and sampled attachment lengths. Invalid array members fail validation rather than being discarded. Sampling uses at most 12 message-detail requests and 12 attachment downloads; live phone memory and cancellation remain separate app checks. See [test archive servers](development/test-archive-servers.md).
+
 ## Design decision log
 
 | Date | Decision | Reason/evidence |

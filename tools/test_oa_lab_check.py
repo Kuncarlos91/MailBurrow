@@ -37,9 +37,13 @@ def load_fixtures():
                          "_data": data,
                          "_text": re.sub(r"<[^>]+>", " ", data.decode("utf-8", "replace"))
                          if a["contentType"].startswith("text/") else ""})
+        sender = m.get("from") or ""
         emails["e-%d" % m["id"]] = {
             "id": "e-%d" % m["id"], "ingestionSourceId": ACCOUNT_SOURCE[m["accountId"]],
             "subject": m["subject"], "hasAttachments": bool(atts), "timestamp": ts,
+            "senderEmail": sender.split("<")[-1].rstrip(">").strip() or None,
+            "senderName": sender.split("<")[0].strip() if "<" in sender else "",
+            "sentAt": date or None, "path": m.get("folderName") or "INBOX",
             "body": m.get("textBody") or "", "html": re.sub(r"<[^>]+>", " ", m.get("htmlBody") or ""),
             "attachments": atts,
         }
@@ -99,6 +103,8 @@ class FakeOpenArchiver:
         path = u.path[len("/api/v1"):]
         key = headers.get("X-API-KEY")
         who = {"admin-key": "admin", "reader-key": "reader"}.get(key)
+        if key == "expired-key" and self.f.get("expired_accepted"):
+            who = "reader"
         if self.f.get("error_text"):
             return 500, {"content-type": "text/html", "x-debug": SECRET}, ("<h1>%s</h1>" % SECRET).encode()
         if not who:
@@ -123,8 +129,12 @@ class FakeOpenArchiver:
             if not e or e["ingestionSourceId"] not in allowed:
                 return self.json(404, {"message": "Not found " + SECRET})
             raw = stripped_eml(e.get("_full", e), inline=self.f.get("inline"), full="_full" in e)
-            body = dict(self.public(e), raw={"type": "Buffer", "data": list(raw)},
-                        attachments=[{k: v for k, v in a.items() if not k.startswith("_")} for a in e["attachments"]])
+            records = [{k: v for k, v in a.items() if not k.startswith("_")} for a in e["attachments"]]
+            if self.f.get("unsafe_storage_path"):
+                records = [dict(r, storagePath=r["storagePath"] + "\n") for r in records]
+            if self.f.get("size_mismatch"):
+                records = [dict(r, sizeBytes=r["sizeBytes"] + 1) for r in records]
+            body = dict(self.public(e), raw={"type": "Buffer", "data": list(raw)}, attachments=records)
             return self.json(200, body)
         if path == "/storage/download":
             for e in self.emails.values():
@@ -167,6 +177,7 @@ class FakeOpenArchiver:
         if self.f.get("leak_total") and q.get("sources") == B:
             total = 20
         hits = [dict(self.public(e), body=e["body"], timestamp=e["timestamp"],
+                     **{"from": e["senderEmail"], "fromName": e["senderName"]},
                      attachments=[{"filename": a["filename"], "content": a["_text"]} for a in e["attachments"]])
                 for e in rows[(page - 1) * limit: page * limit]]
         if self.f.get("leak_page2") and page == 2 and q.get("sources") == A:
@@ -177,9 +188,14 @@ class FakeOpenArchiver:
             total += 7
         return self.json(200, {"hits": hits, "total": total, "page": page, "limit": limit})
 
-    @staticmethod
-    def public(e):
-        return {k: e[k] for k in ("id", "ingestionSourceId", "subject", "hasAttachments")}
+    def public(self, e):
+        row = {k: e[k] for k in ("id", "ingestionSourceId", "subject", "hasAttachments",
+                                 "senderName", "senderEmail", "sentAt", "path")}
+        if self.f.get("numeric_sender"):
+            row["senderEmail"] = 7
+        if self.f.get("unsafe_id") and e["ingestionSourceId"] == A:
+            row["id"] = e["id"] + "/x"
+        return row
 
     @staticmethod
     def json(status, obj):
@@ -187,10 +203,10 @@ class FakeOpenArchiver:
             json.dumps(obj).encode()
 
 
-def run(server, deleted="", extra=None):
+def run(server, deleted="", extra=None, expired=""):
     out = io.StringIO()
     code = lab.main(["https://lab.example:8443"] + (extra or []),
-                    keys=("admin-key", "reader-key", deleted), transport=server, out=out)
+                    keys=("admin-key", "reader-key", deleted, expired), transport=server, out=out)
     return code, out.getvalue()
 
 
@@ -327,6 +343,97 @@ class CheckerTests(unittest.TestCase):
         out = io.StringIO()
         self.assertEqual(lab.main(["http://lab.example"], keys=("a", "b", ""), transport=FakeOpenArchiver(),
                                   out=out), 2)
+
+
+class Phase3ContractTests(unittest.TestCase):
+    def test_clean_server_passes_the_app_contract(self):
+        code, out = run(FakeOpenArchiver(), expired="expired-key")
+        self.assertEqual(code, 0, out)
+        for name in ("List items match the app's rules", "Search hits match the app's rules",
+                     "Opened message matches the app's rules", "Opened message within the app's size limits",
+                     "Every checked attachment matches its stated size"):
+            self.assertTrue(line(out, name).startswith("[PASS]"), out)
+        self.assertIn("problems: none", line(out, "List items match"))
+        self.assertTrue(line(out, "Expired key refused on /ingestion-sources").startswith("[PASS]"))
+
+    def test_contract_faults_fail_without_leaking_values(self):
+        for fault, name, field in (
+            ("numeric_sender", "List items match the app's rules", "senderEmail"),
+            ("unsafe_id", "List items match the app's rules", "id"),
+            ("unsafe_storage_path", "Opened message matches the app's rules", "attachments.storagePath"),
+            ("size_mismatch", "Every checked attachment matches its stated size", "mismatched"),
+        ):
+            code, out = run(FakeOpenArchiver(**{fault: True}))
+            self.assertEqual(code, 1, fault)
+            self.assertTrue(line(out, name).startswith("[FAIL]"), out)
+            self.assertIn(field, line(out, name))
+            self.assertNotIn("\\n", out)
+            self.assertNotIn(SECRET, out)
+
+    def test_accepted_expired_key_fails(self):
+        code, out = run(FakeOpenArchiver(expired_accepted=True), expired="expired-key")
+        self.assertTrue(line(out, "Expired key refused on /ingestion-sources").startswith("[FAIL]"), out)
+        self.assertEqual(code, 1)  # any failure, optional ones included, is NOT PROVEN
+
+    def test_missing_fields_are_named(self):
+        self.assertEqual(lab.list_item_problems({"id": "abc"}),
+                         ["missing subject", "missing senderEmail", "missing sentAt"])
+        self.assertIn("missing timestamp", lab.search_hit_problems({"id": "abc", "subject": None, "from": None}))
+        self.assertIn("raw", lab.detail_problems({"subject": "s", "senderEmail": None, "sentAt": None,
+                                                  "attachments": []}, A))
+
+
+class ContractEdgeTests(unittest.TestCase):
+    def test_malformed_array_members_are_not_dropped(self):
+        self.assertIn("items", lab.paging_problems({"total": 1, "items": [None]}, "items"))
+        self.assertIn("hits", lab.paging_problems({"total": 1, "hits": [7]}, "hits"))
+        self.assertEqual(lab.list_item_problems(None), ["items"])
+        detail = {"subject": None, "senderEmail": None, "sentAt": None,
+                  "raw": {"type": "Buffer", "data": [65]}, "attachments": [None]}
+        self.assertIn("attachments.record", lab.detail_problems(detail, A))
+
+    def test_buffer_requires_actual_bytes(self):
+        for value in (True, -1, 256, 1.5, "65"):
+            detail = {"subject": None, "senderEmail": None, "sentAt": None,
+                      "raw": {"type": "Buffer", "data": [value]}, "attachments": []}
+            self.assertIn("raw", lab.detail_problems(detail, A))
+
+    def test_timestamp_bounds_match_dart_and_never_crash(self):
+        for stamp in (-8640000000000000, 8640000000000000, -100000000001):
+            self.assertNotIn("timestamp", lab.search_hit_problems(
+                {"id": "abc", "subject": None, "from": None, "timestamp": stamp}))
+        for stamp in (True, 1.5, 8640000000000001, -(10 ** 1000)):
+            self.assertIn("timestamp", lab.search_hit_problems(
+                {"id": "abc", "subject": None, "from": None, "timestamp": stamp}))
+        self.assertIsNone(lab.year_of(10 ** 1000))
+
+    def test_filter_paging_and_malformed_records_fail_the_run(self):
+        for fault, check in (
+            ("filter_limit", "Search hits match the app's rules"),
+            ("attachment_record", "Opened message matches the app's rules"),
+            ("raw_byte", "Opened message matches the app's rules"),
+        ):
+            server = FakeOpenArchiver()
+            def transport(url, headers):
+                status, response_headers, body = server(url, headers)
+                parsed = urllib.parse.urlsplit(url)
+                data = json.loads(body)
+                if isinstance(data, dict):
+                    if fault == "filter_limit" and "dateFrom=" in parsed.query:
+                        data["limit"] = 0
+                    if parsed.path.startswith("/api/v1/archived-emails/e-"):
+                        if fault == "attachment_record":
+                            data["attachments"].append(SECRET)
+                        elif fault == "raw_byte":
+                            data["raw"]["data"].append(True)
+                return status, response_headers, json.dumps(data).encode()
+            code, out = run(transport)
+            self.assertEqual(code, 1, out)
+            self.assertTrue(line(out, check).startswith("[FAIL]"), out)
+            self.assertNotIn(SECRET, out)
+
+    def test_identifier_requires_full_match(self):
+        self.assertFalse(lab.app_id("abc\n"))
 
 
 if __name__ == "__main__":
