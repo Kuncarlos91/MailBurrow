@@ -1,5 +1,24 @@
 import 'package:flutter/material.dart';
 
+/// Sort fields the filter sheet offers, keyed by [SearchFilters.sortBy].
+const searchSortFields = {
+  'sentDate': 'Sent date',
+  'receivedDate': 'Received date',
+  'subject': 'Subject',
+  'from': 'Sender',
+  'to': 'Recipient',
+};
+
+/// Sort orders the filter sheet offers, keyed by [SearchFilters.sortOrder].
+const searchSortOrders = {'desc': 'Descending', 'asc': 'Ascending'};
+
+/// Direction choices shared by the filter sheet and capability validation.
+const searchDirections = {
+  '': 'All mail',
+  'incoming': 'Incoming',
+  'outgoing': 'Outgoing',
+};
+
 class SearchFilters {
   const SearchFilters({
     this.from,
@@ -168,22 +187,24 @@ class _SearchFiltersSheetState extends State<SearchFiltersSheet> {
           const Text('Sent date range · inclusive'),
           dateField('From', from, true),
           dateField('To', to, false),
-          choice('Direction', direction, {
-            '': 'All mail',
-            'incoming': 'Incoming',
-            'outgoing': 'Outgoing',
-          }, (value) => direction = value),
-          choice('Sort by', sortBy, {
-            'sentDate': 'Sent date',
-            'receivedDate': 'Received date',
-            'subject': 'Subject',
-            'from': 'Sender',
-            'to': 'Recipient',
-          }, (value) => sortBy = value),
-          choice('Order', sortOrder, {
-            'desc': 'Descending',
-            'asc': 'Ascending',
-          }, (value) => sortOrder = value),
+          choice(
+            'Direction',
+            direction,
+            searchDirections,
+            (value) => direction = value,
+          ),
+          choice(
+            'Sort by',
+            sortBy,
+            searchSortFields,
+            (value) => sortBy = value,
+          ),
+          choice(
+            'Order',
+            sortOrder,
+            searchSortOrders,
+            (value) => sortOrder = value,
+          ),
           if (error != null)
             Text(
               error!,

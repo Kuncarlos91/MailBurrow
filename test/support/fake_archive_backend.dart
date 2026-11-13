@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:mailburrow/archive_backend.dart';
+import 'package:mailburrow/archive_capabilities.dart';
 import 'package:mailburrow/archive_models.dart';
 import 'package:mailburrow/attachment_download.dart';
 import 'package:mailburrow/search_filters.dart';
@@ -13,6 +14,10 @@ class FakeArchiveBackend implements ArchiveBackend {
   final Uri server;
   @override
   final String key;
+
+  @override
+  ArchiveCapabilities get capabilities => ArchiveCapabilities.full;
+
   @override
   Future<List<ArchiveAccount>> accounts() => throw UnimplementedError('accounts');
   @override

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'archive_capabilities.dart';
 import 'archive_models.dart';
 import 'attachment_download.dart';
 import 'search_filters.dart';
@@ -27,6 +28,9 @@ abstract interface class ArchiveBackend {
 
   /// The credential sent with each request, saved in secure storage.
   String get key;
+
+  /// What this backend supports. Fixed per backend; never probed.
+  ArchiveCapabilities get capabilities;
 
   /// Mail accounts the key can read.
   Future<List<ArchiveAccount>> accounts();
