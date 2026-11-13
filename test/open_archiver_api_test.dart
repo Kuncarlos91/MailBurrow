@@ -167,6 +167,58 @@ void main() {
     );
   });
 
+  test('preserve-original policy requires an explicit boolean', () {
+    expect(openArchiverPreservesOriginals(sources[0]), isFalse);
+    expect(openArchiverPreservesOriginals(sources[1]), isTrue);
+    for (final flag in [null, 'true', 'false', 0, 1, <Object>[]]) {
+      expect(
+        () => openArchiverPreservesOriginals({'preserveOriginalFile': flag}),
+        throwsFormatException,
+      );
+    }
+    expect(
+      () => openArchiverPreservesOriginals(<String, dynamic>{}),
+      throwsFormatException,
+    );
+  });
+
+  test(
+    'search dates support negative epochs and reject out-of-range values',
+    () {
+      for (final stamp in [-315619200, -315619200000]) {
+        expect(
+          openArchiverSearchHit({'id': mailA, 'timestamp': stamp}).sentDate,
+          '1960-01-01T00:00:00.000Z',
+        );
+      }
+      expect(
+        openArchiverSearchHit({'id': mailA, 'timestamp': -1}).sentDate,
+        '1969-12-31T23:59:59.000Z',
+      );
+      expect(openArchiverSearchHit({'id': mailA}).sentDate, isNull);
+      for (final stamp in [
+        9223372036854775807,
+        -9223372036854775808,
+        8640000000000001,
+        -8640000000000001,
+      ]) {
+        expect(
+          () => openArchiverSearchHit({'id': mailA, 'timestamp': stamp}),
+          throwsFormatException,
+        );
+        expect(
+          () => openArchiverSearchPage({
+            'hits': [
+              {'id': mailA, 'timestamp': stamp},
+            ],
+            'total': 1,
+          }),
+          throwsFormatException,
+        );
+      }
+    },
+  );
+
   test('a plain listing uses the source browse route with exact totals', () async {
     final api = RecordingOpenArchiver();
     final page = await api.emails(sourceA, '  ', 1);

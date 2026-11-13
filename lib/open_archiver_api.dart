@@ -167,8 +167,14 @@ ArchiveAccount openArchiverSource(Object? value) {
 
 /// Whether a source keeps full original messages, attachments included.
 /// Such sources cannot be opened within the download contract (Phase 3b).
-bool openArchiverPreservesOriginals(Object? value) =>
-    _object(value, 'source')['preserveOriginalFile'] == true;
+/// Missing or malformed policy is unknown, never permission to fetch raw mail.
+bool openArchiverPreservesOriginals(Object? value) {
+  final flag = _object(value, 'source')['preserveOriginalFile'];
+  if (flag is! bool) {
+    throw const FormatException('Invalid preserve-original flag');
+  }
+  return flag;
+}
 
 String? _sender(String? name, String? address) {
   final label = name?.trim() ?? '';
@@ -196,10 +202,22 @@ MailSummary openArchiverSearchHit(Object? value) {
   final json = _object(value, 'search');
   final stamp = json['timestamp'];
   String? sent;
-  if (stamp is int && stamp >= 0) {
-    final millis = stamp > 100000000000 ? stamp : stamp * 1000;
-    sent = DateTime.fromMillisecondsSinceEpoch(millis, isUtc: true)
-        .toIso8601String();
+  if (stamp is int) {
+    // Preserve the seconds/milliseconds compatibility heuristic for either
+    // sign. Negative Unix timestamps represent valid pre-1970 messages.
+    final millis = stamp > 100000000000 || stamp < -100000000000
+        ? stamp
+        : stamp * 1000;
+    // Check before DateTime construction so malformed values remain safe
+    // format failures rather than escaping as RangeError.
+    const maxDateMillis = 8640000000000000;
+    if (millis < -maxDateMillis || millis > maxDateMillis) {
+      throw const FormatException('Invalid timestamp');
+    }
+    sent = DateTime.fromMillisecondsSinceEpoch(
+      millis,
+      isUtc: true,
+    ).toIso8601String();
   } else if (stamp != null) {
     throw const FormatException('Invalid timestamp');
   }
