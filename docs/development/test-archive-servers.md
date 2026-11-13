@@ -38,9 +38,11 @@ File imports run once; they are not re-synced. Importing the same zip again may 
 python tools/oa_lab_check.py https://<test-server>:8443 --samples oa-samples --rate-limit
 ```
 
-It asks for an admin key, a reader key and, optionally, a deleted key, without echoing them (on Windows, paste with a right-click). It only sends `GET` requests, always verifies certificates and never follows redirects.
+It asks for an admin key, a reader key and, optionally, a deleted key and an expired key, without echoing them (on Windows, paste with a right-click). For an expired key, create a reader key with the earliest expiry Open Archiver allows and run the check after that date. It only sends `GET` requests, always verifies certificates and never follows redirects.
 
 **What a result means.** Every check is `PASS`, `FAIL` or `SKIP`, and required or `(optional)`. The last line reads `RESULT: all required checks passed` only when nothing failed **and** no required check was skipped; otherwise it reads `NOT PROVEN` and the script exits with 1. Search checks use known terms from the demo fixtures with positive controls (an admin search that must find the other source's term), so an empty or malformed response never counts as working.
+
+**Phase 3 contract checks (v3):** the list items, search hits and opened-message response must have the fields and types MailBurrow's Open Archiver backend reads. IDs must pass its ID rule, storage paths its path rule, and the opened message must fit the app's 40 MiB response and 10 MiB message limits. Up to 12 attachments from the reader's source are downloaded and each must match its stated `sizeBytes` exactly. Problems are reported by field name only. The script also reports, without failing, whether the opened-message response states a `Content-Length` and whether the server compresses it when asked.
 
 **Required fixtures:** the three demo zips imported as separate sources, and a reader limited to the Alex Rivera source (40 messages). **Optional:** a deleted key, a source imported with **Preserve Original File** (from `riverside-garden-club.zip`), and `--rate-limit`, which sends about 100 quick requests and rate-limits the reader key for about a minute. Optional checks that did not run are listed as `SKIP (optional)`, never as passes.
 
