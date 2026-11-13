@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mailburrow/archive_errors.dart';
 import 'package:mailburrow/open_archiver_api.dart';
 import 'package:mailburrow/search_filters.dart';
 import 'package:mailburrow/state/archive_session.dart';
@@ -315,11 +316,15 @@ void main() {
     expect(api.lastPath, isNull);
   });
 
-  test('features outside 3a are refused, never improvised', () async {
+  test('unsupported features are refused, never improvised', () async {
     final api = RecordingOpenArchiver();
     await expectLater(api.folders(sourceA), throwsUnsupportedError);
     await expectLater(api.stats(), throwsUnsupportedError);
-    await expectLater(api.message(mailA), throwsUnsupportedError);
+    // Never listed by this backend, so its source is unknown.
+    await expectLater(
+      api.message(mailA),
+      throwsA(isA<ArchiveMessageRefused>()),
+    );
     await expectLater(
       api.downloadAttachment(mailA, 'x', File('unused')),
       throwsUnsupportedError,

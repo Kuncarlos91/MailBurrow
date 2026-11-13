@@ -137,7 +137,22 @@ class ArchiveApi implements ArchiveBackend {
   /// [cancelEmailRequests] stops.
   bool isMailRequest(String path) => path == 'emails';
 
-  Future<dynamic> get(String path, [Map<String, String>? query]) async {
+  Future<dynamic> get(String path, [Map<String, String>? query]) => send(
+    path,
+    query,
+    (body, contentLength) =>
+        decodeArchiveJson(body, contentLength: contentLength),
+  );
+
+  /// Sends a GET to [path] on the shared transport and hands the response
+  /// body to [read], which owns its size limits. [timeout] bounds reading
+  /// the body after the headers arrive; it defaults to [responseTimeout].
+  Future<T> send<T>(
+    String path,
+    Map<String, String>? query,
+    Future<T> Function(Stream<List<int>> body, int contentLength) read, {
+    Duration? timeout,
+  }) async {
     if (_closed) throw StateError('Archive connection closed');
     validateServer(server.toString());
     final client = _apiClient ??= HttpClient()
@@ -170,10 +185,7 @@ class ArchiveApi implements ArchiveBackend {
       final body = call.trackBody(response);
       if (response.statusCode != 200) throw ArchiveFailure(response.statusCode);
       final result = await call.guard(
-        decodeArchiveJson(
-          body,
-          contentLength: response.contentLength,
-        ).timeout(responseTimeout),
+        read(body, response.contentLength).timeout(timeout ?? responseTimeout),
       );
       finished = true;
       return result;
