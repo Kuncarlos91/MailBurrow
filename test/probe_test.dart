@@ -1,5 +1,6 @@
 // PROBE BRANCH ONLY: correctness checks for the phone probe's helpers.
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -134,6 +135,11 @@ void main() {
       capOnly: true,
     );
     expect(cap['capRejected'], isTrue);
+    // The test binding answers every HttpClient request with a mock 400;
+    // the cancellation check needs real loopback sockets.
+    final previous = HttpOverrides.current;
+    HttpOverrides.global = null;
+    addTearDown(() => HttpOverrides.global = previous);
     final cancel = await measureCancel(scale: 0.05);
     expect(cancel['error'], isNull);
     expect(cancel['clientCancelMs'], isA<int>());

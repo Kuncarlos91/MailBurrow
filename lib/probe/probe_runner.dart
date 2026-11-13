@@ -195,6 +195,10 @@ Future<Map<String, Object?>> measureCancel({double scale = 1}) async {
       Uri.parse('http://127.0.0.1:${server.port}/'),
     );
     final response = await request.close();
+    if (response.statusCode != 200) {
+      result['error'] = 'status ${response.statusCode}';
+      return result;
+    }
     final decoder = BufferArrayDecoder(maxBytes: streamCap);
     final reached = Completer<void>();
     final subscription = response.listen((chunk) {
@@ -205,19 +209,25 @@ Future<Map<String, Object?>> measureCancel({double scale = 1}) async {
     }, onDone: () {
       if (!reached.isCompleted) reached.complete();
     });
-    await reached.future.timeout(const Duration(seconds: 30));
+    await reached.future.timeout(
+      const Duration(seconds: 30),
+      onTimeout: () => throw TimeoutException('first bytes'),
+    );
     cancelClock.start();
     await subscription.cancel();
     client.close(force: true);
     result['clientCancelMs'] = cancelClock.elapsedMilliseconds;
-    await serverStopped.future.timeout(const Duration(seconds: 10));
+    await serverStopped.future.timeout(
+      const Duration(seconds: 10),
+      onTimeout: () => throw TimeoutException('server stop'),
+    );
     result
       ..['serverStopMs'] = cancelClock.elapsedMilliseconds
       ..['wireBeforeCancel'] = decoder.consumed
       ..['sentAfterCancel'] = sentAfterCancel
       ..['wireTotal'] = wire.length;
-  } on TimeoutException {
-    result['error'] = 'timeout';
+  } on TimeoutException catch (error) {
+    result['error'] = 'timeout waiting for ${error.message}';
   } finally {
     client.close(force: true);
     await server.close(force: true);
