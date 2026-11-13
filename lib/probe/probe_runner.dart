@@ -165,8 +165,16 @@ Future<Map<String, Object?>> measureCancel({double scale = 1}) async {
   var sentAfterCancel = 0;
   server.listen((request) async {
     final response = request.response;
+    var gone = false;
+    // A dropped client fails `done`; a pending flush may never complete.
+    unawaited(
+      response.done.then<void>((_) {}, onError: (Object _) {}).whenComplete(() {
+        gone = true;
+        if (!serverStopped.isCompleted) serverStopped.complete();
+      }),
+    );
     try {
-      for (var at = 0; at < wire.length; at += 64 * 1024) {
+      for (var at = 0; at < wire.length && !gone; at += 64 * 1024) {
         final end = at + 64 * 1024 < wire.length ? at + 64 * 1024 : wire.length;
         response.add(Uint8List.sublistView(wire, at, end));
         await response.flush();
