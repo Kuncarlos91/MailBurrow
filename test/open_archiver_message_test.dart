@@ -325,6 +325,17 @@ void main() {
       }
       expect(read(nested.toString()).problems, contains('depth-limit'));
 
+      // A boundary that prefixes another is not mistaken for it.
+      final prefixed = read(
+        'Content-Type: multipart/mixed; boundary=b\r\n\r\n'
+        '--b\r\n'
+        'Content-Type: multipart/alternative; boundary=b2\r\n\r\n'
+        '--b2\r\nContent-Type: text/plain\r\n\r\ninner\r\n--b2--\r\n'
+        '--b--\r\n',
+      );
+      expect(prefixed.text, 'inner');
+      expect(prefixed.problems, isEmpty);
+
       final header = read('X-Long: ${'a' * 300000}\r\nSubject: x');
       expect(header.problems, contains('header-limit'));
       expect(header.text, isEmpty);

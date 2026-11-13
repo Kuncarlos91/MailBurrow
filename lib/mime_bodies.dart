@@ -138,7 +138,16 @@ class _Walk {
       final hit = _indexOf(body, delimiter, at);
       if (hit < 0) break;
       final next = hit + delimiter.length;
-      if (hit != 0 && body[hit - 1] != 0x0a) {
+      // A delimiter starts a line and is followed by `--`, whitespace or the
+      // line end, so `--b` does not match inside `--b2`.
+      final after = next < body.length ? body[next] : 0x0a;
+      final delimited =
+          after == 0x2d ||
+          after == 0x0d ||
+          after == 0x0a ||
+          after == 0x20 ||
+          after == 0x09;
+      if ((hit != 0 && body[hit - 1] != 0x0a) || !delimited) {
         at = next;
         continue;
       }
