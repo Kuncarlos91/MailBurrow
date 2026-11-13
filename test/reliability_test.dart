@@ -923,7 +923,14 @@ void main() {
                   'serverType': 'mail-archiver',
                   'accountId': '1',
                 }
-              : jsonDecode(saved),
+              // The readable rc.9 record migrates on startup even when the
+              // server is unreachable; nothing is lost.
+              : {
+                  ...jsonDecode(saved) as Map<String, dynamic>,
+                  'version': 2,
+                  'serverType': 'mail-archiver',
+                  'accountId': null,
+                },
         );
       },
     );

@@ -232,7 +232,7 @@ class ConnectionStore {
     // IDs of unreadable profiles count too, so their keys survive for a
     // build that can read them.
     final known = {for (final id in index.referencedIds) '$_keyPrefix$id'};
-    for (final name in all.keys) {
+    for (final name in [...all.keys]) {
       if (name.startsWith(_keyPrefix) && !known.contains(name)) {
         await _deleteQuietly(name);
       }

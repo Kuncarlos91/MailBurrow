@@ -341,9 +341,7 @@ void main() {
       final api = AccountsApi();
       await openApp(tester, api);
       await choose(tester, 2);
-      final saved = (await const FlutterSecureStorage().read(
-        key: 'connection',
-      ))!;
+      final saved = (await savedConnectionText())!;
       await tester.pumpWidget(const SizedBox.shrink());
       final next = AccountsApi()
         ..available = [

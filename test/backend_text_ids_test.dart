@@ -167,9 +167,7 @@ void main() {
       await session.connect();
       final originalAccount = session.account;
       final originalRequests = List<String>.of(backend.requestedAccounts);
-      final originalSaved = await const FlutterSecureStorage().read(
-        key: 'connection',
-      );
+      final originalSaved = await savedConnectionText();
       var accountChanges = 0;
       session.onAccountChanged = (_) => accountChanges++;
 
