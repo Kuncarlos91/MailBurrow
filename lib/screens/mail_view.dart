@@ -66,19 +66,20 @@ class MailView extends StatelessWidget {
                     ),
                   ),
                 ),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: ActionChip(
-                    avatar: const Icon(Icons.tune, size: 18),
-                    label: Text(
-                      s.filters.active ? 'Filters • Active' : 'Filters',
+              if (s.capabilities.hasFilterChoices)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: ActionChip(
+                      avatar: const Icon(Icons.tune, size: 18),
+                      label: Text(
+                        s.filters.active ? 'Filters • Active' : 'Filters',
+                      ),
+                      onPressed: busy ? null : onChooseFilters,
                     ),
-                    onPressed: busy ? null : onChooseFilters,
                   ),
                 ),
-              ),
               if (folders)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -86,7 +87,9 @@ class MailView extends StatelessWidget {
                     children: [
                       Expanded(
                         child: TextButton.icon(
-                          onPressed: busy || s.foldersBusy ? null : onChooseFolder,
+                          onPressed: busy || s.foldersBusy
+                              ? null
+                              : onChooseFolder,
                           icon: const Icon(Icons.folder_outlined),
                           label: Text(
                             '${s.selectedFolder ?? 'All archived mail'} ▾',
@@ -256,7 +259,9 @@ class MailView extends StatelessWidget {
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       leading: CircleAvatar(
-        child: Text(sender.isEmpty ? '?' : sender.substring(0, 1).toUpperCase()),
+        child: Text(
+          sender.isEmpty ? '?' : sender.substring(0, 1).toUpperCase(),
+        ),
       ),
       title: Text(sender, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Column(

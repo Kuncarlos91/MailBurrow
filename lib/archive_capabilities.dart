@@ -62,6 +62,13 @@ class ArchiveCapabilities {
   /// whose server only offers server-wide totals reports false.
   final bool archiveStats;
 
+  /// Whether the filter sheet has any choice the user can adjust.
+  bool get hasFilterChoices =>
+      dateRangeFilter ||
+      directionFilter ||
+      sortFields.length > 1 ||
+      sortOrders.length > 1;
+
   /// Whether [filters] are valid and use only what this backend supports.
   bool allows(SearchFilters filters) =>
       filters.validationError == null &&

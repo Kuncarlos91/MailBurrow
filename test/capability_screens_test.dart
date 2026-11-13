@@ -67,7 +67,9 @@ void main() {
     expect(session.folderError, isNull);
     await session.loadFolders();
     expect(session.folderError, isNull);
-    await session.selectFolder(const ArchiveFolder('Receipts', 'Receipts', 1, 0));
+    await session.selectFolder(
+      const ArchiveFolder('Receipts', 'Receipts', 1, 0),
+    );
     expect(session.selectedFolder, isNull);
     await session.applyFilters(
       SearchFilters(
@@ -113,6 +115,48 @@ void main() {
     await tester.tap(find.text('Filters'));
     await tester.pumpAndSettle();
   }
+
+  ArchiveCapabilities minimal({bool sortable = false}) => ArchiveCapabilities(
+    folders: false,
+    dateRangeFilter: false,
+    directionFilter: false,
+    sortFields: {'sentDate'},
+    sortOrders: sortable ? {'desc', 'asc'} : {'desc'},
+    estimatedTotals: false,
+    archiveStats: false,
+  );
+
+  testWidgets('no adjustable options means no Filters action', (tester) async {
+    await tester.pumpWidget(app(minimal()));
+    await tester.pumpAndSettle();
+    await startDemo(tester);
+    expect(find.text('Welcome to the MailBurrow demo'), findsOneWidget);
+    expect(find.widgetWithText(ActionChip, 'Filters'), findsNothing);
+    expect(find.byIcon(Icons.tune), findsNothing);
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Search'));
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.tune), findsNothing);
+    expect(find.byType(TextField), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('sort order alone keeps the Filters action available', (
+    tester,
+  ) async {
+    await tester.pumpWidget(app(minimal(sortable: true)));
+    await tester.pumpAndSettle();
+    await startDemo(tester);
+    await openFilters(tester);
+    expect(find.text('Order'), findsOneWidget);
+    expect(find.text('Sent date range · inclusive'), findsNothing);
+    expect(find.text('Direction'), findsNothing);
+    expect(find.text('Sort by'), findsNothing);
+    await tester.ensureVisible(find.text('Apply'));
+    await tester.tap(find.text('Apply'));
+    await tester.pumpAndSettle();
+    expect(find.text('Welcome to the MailBurrow demo'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('the full demo keeps folders and every filter', (tester) async {
     await tester.pumpWidget(app(null));

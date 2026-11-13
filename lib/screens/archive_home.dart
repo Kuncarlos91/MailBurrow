@@ -179,6 +179,7 @@ class _ArchiveHomeState extends State<ArchiveHome> {
   }
 
   Future<void> chooseFilters() async {
+    if (!session.capabilities.hasFilterChoices) return;
     final updated = await showModalBottomSheet<SearchFilters>(
       context: context,
       isScrollControlled: true,
