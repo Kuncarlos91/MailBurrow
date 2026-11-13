@@ -230,15 +230,7 @@ class OpenArchiverApi extends ArchiveApi {
       detail.raw,
     ).timeout(openArchiverMimeTimeout);
     final attachments = openArchiverAttachments(fields['attachments']);
-    if (_attachments.length > _rememberedMessages) _attachments.clear();
-    for (final file in attachments) {
-      _attachments[file.attachment.id] = (
-        emailId: messageId,
-        storagePath: file.storagePath,
-        size: file.attachment.size,
-      );
-    }
-    return MailMessage(
+    final result = MailMessage(
       subject: _text(fields, 'subject'),
       from: _sender(_text(fields, 'senderName'), _text(fields, 'senderEmail')),
       sentDate: _text(fields, 'sentAt'),
@@ -247,6 +239,17 @@ class OpenArchiverApi extends ArchiveApi {
       textBody: bodies.text,
       attachments: [for (final file in attachments) file.attachment],
     );
+    // Publish handles only after the entire message has validated.
+    _attachments.removeWhere((_, file) => file.emailId == messageId);
+    if (_attachments.length > _rememberedMessages) _attachments.clear();
+    for (final file in attachments) {
+      _attachments[file.attachment.id] = (
+        emailId: messageId,
+        storagePath: file.storagePath,
+        size: file.attachment.size,
+      );
+    }
+    return result;
   }
 
   /// Saves an attachment listed by a message this backend opened, through

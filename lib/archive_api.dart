@@ -257,7 +257,8 @@ class ArchiveApi implements ArchiveBackend {
   /// Streams [url] into [destination] on a client of its own, within the
   /// attachment size, deadline and idle limits, deleting a partial file on
   /// any failure or cancellation. [expectedBytes], when the server states an
-  /// attachment's size, is enforced as an exact length.
+  /// attachment's size, is enforced as an exact length. The URL must use
+  /// the configured server's HTTPS origin without user information or a fragment.
   Future<void> downloadTo(
     Uri url,
     File destination, {
@@ -267,6 +268,14 @@ class ArchiveApi implements ArchiveBackend {
   }) async {
     if (_closed) throw StateError('Archive connection closed');
     validateServer(server.toString());
+    if (url.scheme != server.scheme ||
+        url.host != server.host ||
+        url.port != server.port ||
+        url.userInfo.isNotEmpty ||
+        url.hasFragment) {
+      throw const FormatException('Invalid attachment URL');
+    }
+
     if (expectedBytes != null && expectedBytes < 0) {
       throw ArgumentError.value(expectedBytes, 'expectedBytes');
     }
