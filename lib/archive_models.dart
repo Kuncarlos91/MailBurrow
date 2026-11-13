@@ -44,6 +44,7 @@ class ArchiveAccount {
   const ArchiveAccount({
     required this.id,
     this.emailAddress,
+    this.name,
     this.lastSync,
     this.archivingEnabled,
   });
@@ -67,6 +68,10 @@ class ArchiveAccount {
   final String id;
   final String? emailAddress;
 
+  /// A label the server gives the account when it has no address, such as
+  /// an Open Archiver source name; null for Mail-Archiver.
+  final String? name;
+
   /// The server's last sync time as reported (ISO 8601), or null.
   final String? lastSync;
 
@@ -74,10 +79,13 @@ class ArchiveAccount {
   /// server does not report it.
   final bool? archivingEnabled;
 
-  /// The address to show, or a neutral label when none was reported.
+  /// The address to show, the account's name when it has no address, or a
+  /// neutral label when neither was reported.
   String get address {
     final value = emailAddress?.trim() ?? '';
-    return value.isEmpty ? 'Email address not reported' : value;
+    if (value.isNotEmpty) return value;
+    final label = name?.trim() ?? '';
+    return label.isEmpty ? 'Email address not reported' : label;
   }
 }
 
@@ -118,6 +126,7 @@ class MailPage {
     this.page = 1,
     this.totalPages = 1,
     this.totalItems,
+    this.totalIsEstimate,
   });
 
   factory MailPage.fromJson(Object? value) {
@@ -149,6 +158,10 @@ class MailPage {
 
   /// Total matches, or null when the server does not report them.
   final int? totalItems;
+
+  /// Whether [totalItems] is an estimate. Null means the backend did not
+  /// say, and its capabilities decide.
+  final bool? totalIsEstimate;
 }
 
 /// Metadata for one attachment of an open message.

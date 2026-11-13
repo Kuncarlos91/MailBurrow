@@ -70,6 +70,12 @@ Future<dynamic> _decodeArchiveBytes(Uint8List bytes) =>
 
 /// The Mail-Archiver implementation of [ArchiveBackend], using its read-only
 /// REST API under `/api/v1/`.
+///
+/// It also owns the shared HTTPS transport: one pooled client, disabled
+/// redirects, response size and time limits, and per-call cancellation.
+/// Another backend on the same transport extends it and overrides
+/// [authorize], [isMailRequest] and the backend methods; see
+/// `OpenArchiverApi`.
 class ArchiveApi implements ArchiveBackend {
   ArchiveApi(
     this.server,
@@ -123,12 +129,20 @@ class ArchiveApi implements ArchiveBackend {
     }
   }
 
+  /// Adds this server's credential to [request].
+  void authorize(HttpClientRequest request) =>
+      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $key');
+
+  /// Whether a request to [path] is a mail list or search, which
+  /// [cancelEmailRequests] stops.
+  bool isMailRequest(String path) => path == 'emails';
+
   Future<dynamic> get(String path, [Map<String, String>? query]) async {
     if (_closed) throw StateError('Archive connection closed');
     validateServer(server.toString());
     final client = _apiClient ??= HttpClient()
       ..connectionTimeout = const Duration(seconds: 15);
-    final call = _ApiCall(isMail: path == 'emails');
+    final call = _ApiCall(isMail: isMailRequest(path));
     _calls.add(call);
     var finished = false;
     try {
@@ -146,7 +160,7 @@ class ArchiveApi implements ArchiveBackend {
         open().timeout(const Duration(seconds: 20)),
       );
       request.followRedirects = false;
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $key');
+      authorize(request);
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
       final response = await call.guard(
         request.close().timeout(const Duration(seconds: 20)),
