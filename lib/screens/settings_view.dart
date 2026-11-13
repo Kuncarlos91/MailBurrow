@@ -35,7 +35,11 @@ class SettingsView extends StatelessWidget {
             leading: const Icon(Icons.dns_outlined),
             title: Text(accountAddress(account)),
             subtitle: Text(
-              session.demo ? 'Built-in demo, no server' : api?.server.host ?? '',
+              session.demo
+                  ? 'Built-in demo, no server'
+                  : api == null
+                  ? ''
+                  : '${session.serverType.label} · ${api.server.host}',
             ),
             trailing: const Icon(Icons.unfold_more),
             onTap: session.canSwitchAccount ? onChooseAccount : null,
@@ -55,10 +59,10 @@ class SettingsView extends StatelessWidget {
             ),
           )
         else
-          const ListTile(
-            title: Text('Server and private network'),
+          ListTile(
+            title: const Text('Server and private network'),
             subtitle: Text(
-              'You manage your Mail-Archiver server, HTTPS address, API keys and Tailscale setup. This app does not host or configure those services.',
+              'You manage your ${session.serverType.label} server, HTTPS address, API keys and Tailscale setup. This app does not host or configure those services.',
             ),
           ),
         const ListTile(

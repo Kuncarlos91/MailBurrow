@@ -10,10 +10,27 @@ import '../demo/demo_archive.dart';
 import '../archive_capabilities.dart';
 import '../search_filters.dart';
 import '../archive_server_type.dart';
+import '../open_archiver_api.dart';
 import 'connection_store.dart';
 
-/// Creates the backend for a validated server address and key.
+/// Creates the backend for a validated server address and key, for every
+/// server type. Tests use it to supply one fake backend.
 typedef ArchiveApiFactory = ArchiveBackend Function(Uri server, String key);
+
+/// Creates the backend of [type] for a validated server address and key.
+typedef ArchiveBackendFactory =
+    ArchiveBackend Function(ArchiveServerType type, Uri server, String key);
+
+/// The real backend for each server type. There is no fallback: a type is
+/// only ever connected with its own client.
+ArchiveBackend createArchiveBackend(
+  ArchiveServerType type,
+  Uri server,
+  String key,
+) => switch (type) {
+  ArchiveServerType.mailArchiver => ArchiveApi(server, key),
+  ArchiveServerType.openArchiver => OpenArchiverApi(server, key),
+};
 
 /// Opens the built-in demo archive.
 typedef DemoArchiveLoader = Future<ArchiveBackend> Function();
@@ -30,13 +47,18 @@ typedef DemoArchiveLoader = Future<ArchiveBackend> Function();
 class ArchiveSession extends ChangeNotifier {
   ArchiveSession({
     ArchiveApiFactory? apiFactory,
+    ArchiveBackendFactory? backendFactory,
     DemoArchiveLoader? demoLoader,
     ConnectionStore store = const ConnectionStore(),
-  }) : _apiFactory = apiFactory ?? ArchiveApi.new,
+  }) : _backendFactory =
+           backendFactory ??
+           (apiFactory == null
+               ? createArchiveBackend
+               : (_, server, key) => apiFactory(server, key)),
        _demoLoader = demoLoader ?? DemoArchive.load,
        _store = store;
 
-  final ArchiveApiFactory _apiFactory;
+  final ArchiveBackendFactory _backendFactory;
   final DemoArchiveLoader _demoLoader;
   final ConnectionStore _store;
   final server = TextEditingController();
@@ -60,9 +82,21 @@ class ArchiveSession extends ChangeNotifier {
 
   ArchiveBackend? api;
 
-  /// The server type of the current or restored connection. Mail-Archiver is
-  /// the only type so far; it is saved with the connection and never detected.
+  /// The server type of the current or restored connection. It is saved with
+  /// the connection and never detected.
   ArchiveServerType serverType = ArchiveServerType.mailArchiver;
+
+  /// The type chosen in the setup form. It applies only when connecting from
+  /// setup and becomes [serverType] once that connection succeeds, so a
+  /// choice that is cancelled never changes the active connection.
+  ArchiveServerType setupServerType = ArchiveServerType.mailArchiver;
+
+  void chooseServerType(ArchiveServerType value) {
+    if (busy || value == setupServerType) return;
+    setupServerType = value;
+    error = null;
+    _notify();
+  }
   ArchiveAccount? account;
   List<ArchiveFolder> folders = [];
   String? selectedFolder;
@@ -149,6 +183,7 @@ class ArchiveSession extends ChangeNotifier {
       if (saved != null) {
         hasSavedConnection = true;
         serverType = saved.serverType;
+        setupServerType = saved.serverType;
         server.text = saved.server;
         await connect(saved.key, saved.accountId);
         return;
@@ -167,7 +202,8 @@ class ArchiveSession extends ChangeNotifier {
     }
   }
 
-  /// Connects with the key entered in setup, or with [savedKey] when restoring.
+  /// Connects with the key and server type entered in setup, or with
+  /// [savedKey] and the saved [serverType] when restoring.
   /// [preferredAccountId] is the saved account as text; it is matched against
   /// each account's ID in its text form.
   Future<void> connect([String? savedKey, String? preferredAccountId]) async {
@@ -200,7 +236,8 @@ class ArchiveSession extends ChangeNotifier {
         return;
       }
       server.text = uri.toString();
-      final created = candidate = _apiFactory(uri, key);
+      final type = savedKey == null ? setupServerType : serverType;
+      final created = candidate = _backendFactory(type, uri, key);
       final accounts = await created.accounts();
       if (accounts.isEmpty) throw const ArchiveFailure(404);
       final preferred = accounts
@@ -214,7 +251,7 @@ class ArchiveSession extends ChangeNotifier {
       final pages = result.totalPages.clamp(1, 1000000);
       try {
         await _store.write(
-          serverType: serverType,
+          serverType: type,
           server: uri.toString(),
           key: key,
           accountId: selected.id,
@@ -233,6 +270,8 @@ class ArchiveSession extends ChangeNotifier {
       _clearBrowsing();
       api = created;
       adopted = true;
+      serverType = type;
+      setupServerType = type;
       demo = false;
       account = selected;
       accountNotice = accountUnavailable
@@ -513,6 +552,7 @@ class ArchiveSession extends ChangeNotifier {
 
   void cancelSetup() {
     setup = false;
+    setupServerType = serverType;
     error = null;
     _notify();
   }
@@ -526,6 +566,7 @@ class ArchiveSession extends ChangeNotifier {
       await _store.delete();
       if (_disposed) return;
       serverType = ArchiveServerType.mailArchiver;
+      setupServerType = ArchiveServerType.mailArchiver;
       api?.close();
       _invalidateRequests();
       _clearBrowsing();

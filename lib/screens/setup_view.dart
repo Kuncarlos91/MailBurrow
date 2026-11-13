@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../archive_server_type.dart';
 import '../public_information.dart';
 import '../state/archive_session.dart';
 
@@ -11,6 +12,8 @@ class SetupView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final busy = session.busy;
+    final type = session.setupServerType;
+    final openArchiver = type == ArchiveServerType.openArchiver;
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -20,9 +23,30 @@ class SetupView extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         const Text(
-          'Read archived mail from your own Mail-Archiver server over HTTPS. This app does not provide server hosting or accounts.',
+          'Read archived mail from your own Mail-Archiver or Open Archiver server over HTTPS. This app does not provide server hosting or accounts.',
         ),
         const SizedBox(height: 24),
+        Text('Server type', style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 8),
+        SegmentedButton<ArchiveServerType>(
+          segments: [
+            for (final value in ArchiveServerType.values)
+              ButtonSegment(value: value, label: Text(value.label)),
+          ],
+          selected: {type},
+          showSelectedIcon: false,
+          onSelectionChanged: busy
+              ? null
+              : (selection) => session.chooseServerType(selection.single),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          openArchiver
+              ? 'Tested with Open Archiver 0.6.2. Messages from sources that keep full original files cannot be opened in this app.'
+              : 'Choose the archive software your server runs. MailBurrow never guesses it.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: 16),
         TextField(
           controller: session.server,
           enabled: !busy,
@@ -43,11 +67,13 @@ class SetupView extends StatelessWidget {
           obscureText: true,
           autocorrect: false,
           enableSuggestions: false,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'API key',
-            helperText: 'Create an API key on your own Mail-Archiver server.',
+            helperText: openArchiver
+                ? 'Create an API key in your Open Archiver for a user whose role can only read the sources you want here.'
+                : 'Create an API key on your own Mail-Archiver server.',
             helperMaxLines: 3,
-            border: OutlineInputBorder(),
+            border: const OutlineInputBorder(),
           ),
         ),
         const SizedBox(height: 20),
