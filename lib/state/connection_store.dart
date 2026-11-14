@@ -27,13 +27,13 @@ typedef ConnectionProfile = ({
 });
 
 /// Saving would exceed [ConnectionStore.maxProfiles].
-class TooManySavedArchives implements Exception {
-  const TooManySavedArchives();
+class TooManySavedArchives extends StateError {
+  TooManySavedArchives() : super('Too many saved archives.');
 }
 
 /// The saved archive to update is no longer in the index.
-class SavedArchiveMissing implements Exception {
-  const SavedArchiveMissing();
+class SavedArchiveMissing extends StateError {
+  SavedArchiveMissing() : super('Saved archive is no longer available.');
 }
 
 /// The saved archives as the picker shows them.
@@ -210,7 +210,7 @@ class ConnectionStore {
       );
     }
     if (index.profiles.length + index.unreadable.length >= maxProfiles) {
-      throw const TooManySavedArchives();
+      throw TooManySavedArchives();
     }
     final profile = (
       id: newProfileId(),
@@ -247,7 +247,7 @@ class ConnectionStore {
     final target = profileId ?? index.active;
     final at = profiles.indexWhere((item) => item.id == target);
     if (profileId != null && at < 0) {
-      throw const SavedArchiveMissing();
+      throw SavedArchiveMissing();
     }
     final current = at < 0 ? null : profiles[at];
     if (current != null &&
@@ -266,7 +266,7 @@ class ConnectionStore {
     }
     if (current == null &&
         profiles.length + index.unreadable.length >= maxProfiles) {
-      throw const TooManySavedArchives();
+      throw TooManySavedArchives();
     }
     final profile = (
       id: newProfileId(),

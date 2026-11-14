@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mailburrow/archive_models.dart';
 import 'package:mailburrow/archive_server_type.dart';
 import 'package:mailburrow/screens/archive_home.dart';
+import 'package:mailburrow/screens/setup_view.dart';
 import 'package:mailburrow/search_filters.dart';
 import 'package:mailburrow/state/archive_session.dart';
 import 'package:mailburrow/state/connection_store.dart';
@@ -440,7 +441,16 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Connect to archive'), findsOneWidget);
       expect(find.text('Saved archives'), findsNothing);
-      await tester.scrollUntilVisible(find.text('Cancel'), 200);
+      await tester.scrollUntilVisible(
+        find.text('Cancel'),
+        200,
+        scrollable: find
+            .descendant(
+              of: find.byType(SetupView),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
       expect(find.text('b.example account 1'), findsOneWidget);
