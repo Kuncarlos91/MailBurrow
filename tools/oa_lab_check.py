@@ -390,7 +390,7 @@ def run_checks(lab, admin, reader, deleted, rate_limit=False, samples=None, expi
     if expired:
         for path, params in (("/ingestion-sources", None), ("/search", {"keywords": "a"})):
             r = lab.get(path, expired, params)
-            lab.check("Expired key refused on " + path, r.status == 401, "%s, %s" % (st(r), kind(r)),
+            lab.check("Expired key refused on " + path, r.status == 401, "%s, %s; expiry state supplied by operator" % (st(r), kind(r)),
                       required=False)
     else:
         lab.skip("Expired key refused", "no expired key given", required=False)
@@ -758,6 +758,10 @@ def main(argv=None, keys=None, transport=None, out=None):
     admin, reader, deleted = keys[:3]
     expired = keys[3] if len(keys) > 3 else ""
     if not admin or not reader:
+        return 2
+    if expired and expired in (admin, reader, deleted):
+        print("The expired-key fixture must be distinct from the admin, reader and revoked keys. "
+              "Use a non-revoked key past its expiry date, or leave that prompt empty to skip.", file=out)
         return 2
     samples = Path(args.samples) if args.samples else None
     if samples is not None:

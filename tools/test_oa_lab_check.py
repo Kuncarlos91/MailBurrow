@@ -345,6 +345,21 @@ class CheckerTests(unittest.TestCase):
                                   out=out), 2)
 
 
+class KeyFixtureIdentityTests(unittest.TestCase):
+    def test_expiry_fixture_cannot_reuse_any_other_key(self):
+        for expired in ("admin-key", "reader-key", "revoked-key"):
+            out = io.StringIO()
+            def transport(*args):
+                self.fail("invalid fixtures must be refused before requests")
+            code = lab.main(["https://lab.example:8443"],
+                            keys=("admin-key", "reader-key", "revoked-key", expired),
+                            transport=transport, out=out)
+            self.assertEqual(code, 2)
+            self.assertIn("must be distinct", out.getvalue())
+            for key in ("admin-key", "reader-key", "revoked-key"):
+                self.assertNotIn(key, out.getvalue())
+
+
 class Phase3ContractTests(unittest.TestCase):
     def test_clean_server_passes_the_app_contract(self):
         code, out = run(FakeOpenArchiver(), expired="expired-key")
