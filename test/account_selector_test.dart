@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mailburrow/archive_api.dart';
 import 'package:mailburrow/screens/archive_home.dart';
 import 'package:mailburrow/search_filters.dart';
+import 'support/saved_connection.dart';
 
 class AccountsApi extends ArchiveApi {
   AccountsApi() : super(Uri.parse('https://example.com'), 'test-only');
@@ -210,7 +211,7 @@ void main() {
     expect(find.textContaining('Account 1 message'), findsNothing);
     expect(find.byType(TextField), findsNothing);
     final saved = jsonDecode(
-      (await const FlutterSecureStorage().read(key: 'connection'))!,
+      (await savedConnectionText())!,
     );
     expect(saved['accountId'], '2');
     expect(saved['key'], 'test-only');
@@ -296,7 +297,7 @@ void main() {
       expect(find.text('Switching account…'), findsNothing);
       expect(
         jsonDecode(
-          (await const FlutterSecureStorage().read(key: 'connection'))!,
+          (await savedConnectionText())!,
         )['accountId'],
         '1',
       );
@@ -327,7 +328,7 @@ void main() {
       );
       expect(
         jsonDecode(
-          (await const FlutterSecureStorage().read(key: 'connection'))!,
+          (await savedConnectionText())!,
         )['accountId'],
         '1',
       );
@@ -340,9 +341,7 @@ void main() {
       final api = AccountsApi();
       await openApp(tester, api);
       await choose(tester, 2);
-      final saved = (await const FlutterSecureStorage().read(
-        key: 'connection',
-      ))!;
+      final saved = (await savedConnectionText())!;
       await tester.pumpWidget(const SizedBox.shrink());
       final next = AccountsApi()
         ..available = [

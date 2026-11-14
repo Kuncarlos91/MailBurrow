@@ -10,6 +10,8 @@ Settings shows the app version and build. Include it, with your device and OS ve
 
 If Android says **App not installed** when updating, the new APK was signed with a different key from the installed app (for example a debug build over a release build). Uninstall the old app first; you will need to enter your server and key again.
 
+On feature-branch builds using saved-archive format v3, an unreadable or newer-format archive index is preserved. Ordinary Connect and Forget do not reset that index. Retry with a compatible build and report only the app version and sanitized error; do not share secure-storage contents or uninstall/clear app data as a first recovery step.
+
 ## Connection and request failures
 
 On feature-branch builds with a server-type choice, select the type explicitly before entering its key. Changing type, reopening setup or cancelling setup clears the unsaved key; the saved active connection stays intact. If a connection fails after a type change, check the chosen type and re-enter that server’s key. Open Archiver sources that keep full original files cannot be opened in the app. The published 0.3.0-rc.9 build supports Mail-Archiver only.

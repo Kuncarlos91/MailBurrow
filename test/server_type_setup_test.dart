@@ -11,6 +11,7 @@ import 'package:mailburrow/search_filters.dart';
 import 'package:mailburrow/state/archive_session.dart';
 
 import 'support/fake_archive_backend.dart';
+import 'support/saved_connection.dart';
 
 /// A fake that remembers which server type created it.
 class TypedBackend extends FakeArchiveBackend {
@@ -48,7 +49,7 @@ class TypedBackend extends FakeArchiveBackend {
 }
 
 Future<Map<String, dynamic>?> saved() async {
-  final text = await const FlutterSecureStorage().read(key: 'connection');
+  final text = await savedConnectionText();
   return text == null ? null : jsonDecode(text) as Map<String, dynamic>;
 }
 
