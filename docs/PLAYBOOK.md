@@ -120,6 +120,8 @@ Preserve useful messages and scroll position on failed refresh. Show Mail/Search
 
 Folders/information retain their own loading/errors. A successful section retries a prior failed mail load instead of assuming endpoint permissions are equivalent. Continued denial/timeout becomes the current error. A section success must not dismiss unrelated setup/storage failures.
 
+The setup guide and website describe Open Archiver 0.6.2 source-scoped read/search roles, source IDs from the View emails URL, and its shared per-client-IP rate budget. Public copy distinguishes the linked RC9 binary from 0.4.0 source features. Privacy notices cover connection validation as well as active browsing, full message/attachment text in search responses, server audit logging, response budgets and retryable secure-storage cleanup.
+
 ## Configuration and sensitive-data boundaries
 
 | Repository-root location | Role and preservation rule |
