@@ -24,6 +24,8 @@ class SetupView extends StatelessWidget {
         session.archives.isNotEmpty &&
         (session.archives.length > 1 || !session.hasSavedConnection);
     return ListView(
+      // Opening the change form starts at its heading.
+      key: ValueKey(changing?.id),
       padding: const EdgeInsets.all(24),
       children: [
         if (changing == null)
