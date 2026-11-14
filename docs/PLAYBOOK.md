@@ -136,6 +136,8 @@ The setup guide and website describe Open Archiver 0.6.2 source-scoped read/sear
 
 Use synthetic examples only, such as archive.example.ts.net. No real keys/messages, private hostnames, signing values, personal paths or raw diagnostic logs.
 
+The [Android 0.4.0 release checklist](releasing/android-0.4.0.md) keeps signed-artifact, direct legacy/v3 upgrade, phone stress-memory/cancellation and compatibility checks distinct from host tests. The recorded expired-key waiver does not waive those checks. Detailed evidence stays in private release records; public notes contain the approved artifact and compatibility summary.
+
 ## Build environment
 
 Use Flutter release commands to regenerate production plugin registration after host/integration tests. Direct Gradle can otherwise see a stale development registrant. On Windows, Flutter may select Android Studio Java independently of JAVA_HOME; an existing compatible Windows JDK can be selected with a process-only Gradle override, preserving certificate validation. See [build troubleshooting](troubleshooting/README.md#windows-android-build-environment).
