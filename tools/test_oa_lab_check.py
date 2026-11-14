@@ -240,7 +240,7 @@ class CheckerTests(unittest.TestCase):
         code, out = run(FakeOpenArchiver())
         self.assertEqual(code, 0, out)
         self.assertIn("RESULT: all required checks passed", out)
-        self.assertIn("[SKIP] (optional) Deleted key refused", out)
+        self.assertIn("[SKIP] (optional) Revoked key refused", out)
         self.assertIn("[SKIP] (optional) Preserve-original source", out)
         self.assertIn("[SKIP] (optional) Rate limit answers 429", out)
         self.assertNotIn("[FAIL]", out)
@@ -251,7 +251,7 @@ class CheckerTests(unittest.TestCase):
         self.assertEqual(code, 0, out)
         self.assertIn("[PASS] (optional) Preserve-original source keeps attachments inside raw", out)
         self.assertIn("[PASS] (optional) Rate limit answers 429", out)
-        self.assertIn("[PASS] (optional) Deleted key refused on /search", out)
+        self.assertIn("[PASS] (optional) Revoked key refused on /search", out)
 
     def test_missing_required_fixture_is_skipped_and_fails_the_run(self):
         code, out = run(FakeOpenArchiver(b_no_attachments=True))
