@@ -18,6 +18,8 @@ Support for a second archive server type, Open Archiver 0.6.2. Mail-Archiver use
 - **Settings → Archives:** rename a saved archive, change its address or key, or forget it on this device. Changing an address or key requires entering the key again and validating the connection before it is saved, keeps the server type, and refuses to duplicate another archive; a failed change keeps the saved archive. Forgetting asks for confirmation, removes only that archive's address and key from this device, and never changes server mail or revokes the key; forgetting the open archive returns to setup without opening another.
 - Adding an archive preserves an unmigrated legacy connection. Confirmed all-archives reset reports credential-deletion failures and remains retryable instead of claiming success.
 
+- Retrying or switching saved archives clears pending archive edits so later connection attempts cannot overwrite the wrong profile.
+
 ## 0.3.0-rc.9 (build23) - 2026-11-10
 
 First public Android APK, published as a [GitHub prerelease](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.3.0-rc.9) from tag `v0.3.0-rc.9`. APK SHA-256 `8cf7b33f3a7a11ba5de8541f2e111d475224ecac591e2bebb8743ee572ed078b`. See the [candidate guide](docs/releasing/android-rc9.md) for the gates it passed.

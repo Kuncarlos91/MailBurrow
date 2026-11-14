@@ -223,6 +223,8 @@ class ArchiveSession extends ChangeNotifier {
   }
 
   Future<void> restore() async {
+    reconfiguring = null;
+    keyInput.clear();
     restoring = true;
     busy = true;
     error = null;
@@ -281,6 +283,7 @@ class ArchiveSession extends ChangeNotifier {
     final profile = archives.where((item) => item.id == id).firstOrNull;
     if (profile == null) return;
     if (!setup && api != null && id == activeArchiveId) return;
+    reconfiguring = null;
     api?.close();
     _invalidateRequests();
     _clearBrowsing();

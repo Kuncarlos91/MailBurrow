@@ -147,6 +147,33 @@ void main() {
     ConnectionProfile archive(String host) =>
         session.archives.firstWhere((item) => item.server.contains(host));
 
+    test('failed saved retry discards another archive reconfiguration target', () async {
+      final a = archive('a.example');
+      session.openReconfigure(a.id);
+      session.keyInput.text = 'unsaved-edit-key';
+      HostArchive.offlineHosts.add('b.example');
+      await session.retrySaved();
+      expect(session.reconfiguring, isNull);
+      expect(session.keyInput.text, isEmpty);
+      expect((await store.connection(a.id)).server, first);
+      expect((await store.connection(a.id)).key, 'key-a');
+    });
+
+    test('failed archive switch discards another archive edit target', () async {
+      final a = archive('a.example');
+      final b = archive('b.example');
+      session.openReconfigure(a.id);
+      HostArchive.offlineHosts.add('b.example');
+      await session.switchArchive(b.id);
+      expect(session.reconfiguring, isNull);
+      session.server.text = 'https://c.example';
+      session.keyInput.text = 'key-c';
+      await session.connect();
+      expect((await store.connection(a.id)).server, first);
+      expect((await store.connection(a.id)).key, 'key-a');
+      expect(session.archives, hasLength(3));
+    });
+
     test('changing an address needs the key again and keeps the type', () async {
       final b = archive('b.example');
       session.openReconfigure(b.id);
