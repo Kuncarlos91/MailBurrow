@@ -78,7 +78,8 @@ Open Archiver's API needs no setting to turn on. What matters is which user owns
 
 1. Sign in to Open Archiver as an administrator.
 2. Open **Admin → Roles** and create a role, for example "MailBurrow read-only".
-3. Enter this policy, replacing `SOURCE_ID` with the ID of the ingestion source the phone should read. To allow several sources, list each ID inside both pairs of brackets.
+3. Find the ID of each source the phone should read: open **Archive → Ingestion**, select the source, and copy the value after `ingestionSourceId=` in the page's address.
+4. Enter this policy, replacing `SOURCE_ID` with that ID. To allow several sources, list each ID inside both pairs of brackets.
 
    ```json
    [
@@ -96,7 +97,7 @@ Open Archiver's API needs no setting to turn on. What matters is which user owns
    ```
 
    The first rule lets the user see the source; the second lets them read and search its mail. Nothing in it allows changing, deleting or exporting.
-4. Create a user for the phone and give it this role.
+5. Create a user for the phone and give it this role.
 
 ## Open Archiver step 2: Create an API key
 

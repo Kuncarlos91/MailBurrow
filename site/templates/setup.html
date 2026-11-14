@@ -87,7 +87,8 @@
     <ol>
       <li>Sign in to Open Archiver as an administrator.</li>
       <li>Open <strong>Admin &rarr; Roles</strong> and create a role, for example &ldquo;MailBurrow read-only&rdquo;.</li>
-      <li>Enter this policy, replacing <code>SOURCE_ID</code> with the ID of the ingestion source the phone should read. To allow several sources, list each ID inside both pairs of brackets.
+      <li>Find the ID of each source the phone should read: open <strong>Archive &rarr; Ingestion</strong>, select the source, and copy the value after <code>ingestionSourceId=</code> in the page's address.</li>
+      <li>Enter this policy, replacing <code>SOURCE_ID</code> with that ID. To allow several sources, list each ID inside both pairs of brackets.
         <pre><code>[
   {
     "action": ["read", "search"],
