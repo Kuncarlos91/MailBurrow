@@ -20,7 +20,7 @@ On feature-branch builds with a server-type choice, select the type explicitly b
 
 | Symptom | Checks/recovery | Relevant component |
 | --- | --- | --- |
-| Unable to connect/timeout | Check the HTTPS host/base path and that any private network (such as Tailscale) is connected on the phone. Reconnect and Retry. Do not expose the home server to fix a phone issue. | archive_api.dart, state/archive_session.dart |
+| Unable to connect/timeout | Check the HTTPS host/base path and that any private network (such as Tailscale) is connected on the phone. Reconnect and Retry. Do not expose the home server to fix a phone issue. With no network but a VPN such as Tailscale still on, the error can take about 10 seconds; on feature-branch builds, **Cancel** on the Connecting and Opening screens and in the account list stops waiting. | archive_api.dart, state/archive_session.dart |
 | Certificate could not be verified | Operator checks name/certificate/chain and device time. Never disable certificate validation. | validateServer, platform TLS |
 | Key not accepted (401) | Confirm the key belongs to this archive; the server operator can replace or revoke keys. Never paste a key into a report. | ArchiveFailure/readableError |
 | Permission denied (403) | Endpoint authorization differs: working stats do not prove mail/download access. Operator checks scope. | archive_api.dart |
@@ -105,3 +105,5 @@ A direct Gradle release after tests can fail on missing IntegrationTestPlugin be
 ### Opt-in local Android file diagnostics
 
 A local diagnostic build can add `--dart-define=MAILSHELF_FILE_DIAGNOSTICS=true`. Default builds do not enable this tracing. Native events use only fixed MailShelfFiles categories for grant retention, saved-reference registration, release and the Open outcome; never add URIs, file names, provider exception messages, attachment bytes, server settings or keys. This is local logcat output, not an analytics upload. Read only the MailShelfFiles tag and do not share broad device logs.
+
+On feature-branch builds with opening cancellation, Cancel is unavailable during the secure-storage commit and once the archive is open. Before that commit, cancelling returns to setup without activating the abandoned attempt; Retry starts another attempt.

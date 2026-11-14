@@ -61,11 +61,20 @@ class _AccountSelectorState extends State<_AccountSelector> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
           ),
-          if (snapshot.connectionState != ConnectionState.done)
+          if (snapshot.connectionState != ConnectionState.done) ...[
             const Padding(
               padding: EdgeInsets.all(24),
               child: Center(child: CircularProgressIndicator()),
-            )
+            ),
+            // Offline behind a VPN, the list can take until the connection
+            // limit to fail; closing it leaves the current account as it is.
+            Center(
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+            ),
+          ]
           else if (snapshot.hasError) ...[
             Text(readableError(snapshot.error!)),
             TextButton(onPressed: retry, child: const Text('Retry')),

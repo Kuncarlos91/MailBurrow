@@ -129,6 +129,36 @@ ConnectionProfile archiveAt(ArchiveSession session, String host) =>
 String? subject(ArchiveSession session) =>
     session.messages.isEmpty ? null : session.messages.single.subject;
 
+class CommitBarrierStore extends ConnectionStore {
+  final entered = Completer<void>();
+  final proceed = Completer<void>();
+  @override
+  Future<String> write({required ArchiveServerType serverType,
+    required String server, required String key, required String? accountId,
+    String? profileId}) async {
+    entered.complete();
+    await proceed.future;
+    return super.write(serverType: serverType, server: server, key: key,
+      accountId: accountId, profileId: profileId);
+  }
+}
+
+class OverviewBarrierStore extends ConnectionStore {
+  final entered = Completer<void>();
+  final proceed = Completer<void>();
+  bool held = false;
+  @override
+  Future<SavedArchives> overview() async {
+    final result = await super.overview();
+    if (!held) {
+      held = true;
+      entered.complete();
+      await proceed.future;
+    }
+    return result;
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -347,6 +377,140 @@ void main() {
     expect(await storage.readAll(), before);
   });
 
+  test('cancelling a switch returns at once and nothing opens later', () async {
+    await addBoth();
+    final gate = servers[hostA]!.holdAccounts = Completer<void>();
+    final a = archiveAt(session, hostA);
+    final switching = session.switchArchive(a.id);
+    await pumpEventQueue();
+    expect(session.canCancelOpening, isTrue);
+    final candidate = clients.last;
+    await session.cancelOpening();
+    expect(session.switchingArchive, isNull);
+    expect(session.setup, isTrue);
+    expect(session.busy, isFalse);
+    expect(session.error, isNull);
+    expect(session.archives, hasLength(2));
+    expect(candidate.closed, isTrue);
+    gate.complete();
+    await switching;
+    await pumpEventQueue();
+    expect(session.api, isNull, reason: 'the abandoned attempt is not adopted');
+    expect(session.error, isNull);
+    expect(session.setup, isTrue);
+    expect((await store.read())?.server, 'https://$hostB', reason: 'nothing activated');
+    // Retry and the saved list still work.
+    servers[hostA]!.holdAccounts = null;
+    await session.retrySaved();
+    expect(subject(session), '$hostA 1');
+  });
+
+  test('cancelling startup restoration returns to setup with Retry', () async {
+    await addBoth();
+    final gate = servers[hostB]!.holdAccounts = Completer<void>();
+    session.dispose();
+    session = newSession();
+    final restoring = session.restore();
+    await pumpEventQueue();
+    expect(session.restoring, isTrue);
+    expect(session.canCancelOpening, isTrue);
+    await session.cancelOpening();
+    expect(session.restoring, isFalse);
+    expect(session.setup, isTrue);
+    expect(session.hasSavedConnection, isTrue);
+    expect(session.archives, hasLength(2));
+    gate.complete();
+    await restoring;
+    await pumpEventQueue();
+    expect(session.api, isNull);
+    expect(session.error, isNull);
+    servers[hostB]!.holdAccounts = null;
+    await session.retrySaved();
+    expect(subject(session), '$hostB 1');
+  });
+
+  test('Cancel is unavailable once saving the destination begins', () async {
+    await addBoth();
+    final a = archiveAt(session, hostA);
+    session.dispose();
+    final barrier = CommitBarrierStore();
+    session = ArchiveSession(store: barrier,
+      backendFactory: (type, server, key) => LabClient(server, key));
+    // Populate the saved list without a connection or a store write.
+    session.archives = (await store.overview()).profiles;
+    session.busy = false;
+    session.restoring = false;
+    final opening = session.switchArchive(a.id);
+    await barrier.entered.future;
+    expect(session.canCancelOpening, isFalse);
+    await session.cancelOpening();
+    expect(session.switchingArchive?.id, a.id);
+    expect(session.busy, isTrue);
+    barrier.proceed.complete();
+    await opening;
+    expect(session.activeArchive?.id, a.id);
+    expect((await store.overview()).active, a.id);
+  });
+
+  test('cancelled restore finishing its overview cannot clear a newer attempt', () async {
+    session.dispose();
+    final barrier = OverviewBarrierStore();
+    session = ArchiveSession(store: barrier,
+      backendFactory: (type, server, key) => LabClient(server, key));
+    final oldRestore = session.restore();
+    await barrier.entered.future;
+    await session.cancelOpening();
+    final gate = servers[hostA]!.holdAccounts = Completer<void>();
+    final connecting = addArchive(session, ArchiveServerType.mailArchiver, hostA, 'key-a');
+    await pumpEventQueue();
+    expect(session.busy, isTrue);
+    barrier.proceed.complete();
+    await oldRestore;
+    expect(session.busy, isTrue, reason: 'old finalizer cannot alter the new attempt');
+    gate.complete();
+    await connecting;
+    expect(session.activeArchive?.label, hostA);
+  });
+
+  test('a cancelled restore cannot replace the new archive overview', () async {
+    session.dispose();
+    final barrier = OverviewBarrierStore();
+    session = ArchiveSession(store: barrier,
+      backendFactory: (type, server, key) => LabClient(server, key));
+    final oldRestore = session.restore();
+    await barrier.entered.future;
+    await session.cancelOpening();
+    await addArchive(session, ArchiveServerType.mailArchiver, hostA, 'key-a');
+    final active = session.activeArchiveId;
+    barrier.proceed.complete();
+    await oldRestore;
+    expect(session.activeArchiveId, active);
+    expect(session.archives.single.label, hostA);
+    expect(session.activeArchive?.label, hostA);
+  });
+
+  test('disposing while opening closes the pending candidate immediately', () async {
+    await addBoth();
+    final gate = servers[hostA]!.holdAccounts = Completer<void>();
+    final opening = session.switchArchive(archiveAt(session, hostA).id);
+    await pumpEventQueue();
+    final candidate = clients.last;
+    session.dispose();
+    expect(candidate.closed, isTrue);
+    gate.complete();
+    await opening;
+    session = newSession();
+  });
+
+  test('an open archive cannot be cancelled', () async {
+    await addBoth();
+    final open = session.api;
+    expect(session.canCancelOpening, isFalse);
+    await session.cancelOpening();
+    expect(session.api, same(open));
+    expect(session.setup, isFalse);
+  });
+
   group('screens', () {
     Future<void> seed() async {
       await store.add(
@@ -466,6 +630,27 @@ void main() {
         expect(tester.takeException(), isNull);
       });
     }
+
+    testWidgets('the Opening screen has Cancel', (tester) async {
+      await tester.runAsync(seed);
+      await tester.pumpWidget(app());
+      await tester.pumpAndSettle();
+      final gate = servers[hostA]!.holdAccounts = Completer<void>();
+      await tester.tap(find.byKey(const ValueKey('current-archive')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(hostA).last);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(find.text('Opening $hostA…'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('Opening $hostA…'), findsNothing);
+      expect(find.text('Saved archives'), findsOneWidget);
+      gate.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('Saved archives'), findsOneWidget);
+    });
 
     testWidgets('setup offers a new key when the saved one is refused', (tester) async {
       servers[hostB]!.acceptedKey = 'rotated';

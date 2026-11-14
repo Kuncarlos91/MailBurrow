@@ -250,6 +250,11 @@ class _ArchiveHomeState extends State<ArchiveHome> {
                     liveRegion: true,
                     child: Text('Connecting to your archive…'),
                   ),
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: s.canCancelOpening ? s.cancelOpening : null,
+                    child: const Text('Cancel'),
+                  ),
                 ],
               ),
             ),
@@ -279,6 +284,11 @@ class _ArchiveHomeState extends State<ArchiveHome> {
                   ),
                   const SizedBox(height: 8),
                   Text(archiveDetails(opening), textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: s.canCancelOpening ? s.cancelOpening : null,
+                    child: const Text('Cancel'),
+                  ),
                 ],
               ),
             ),
