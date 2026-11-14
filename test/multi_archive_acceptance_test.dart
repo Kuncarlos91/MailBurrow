@@ -481,7 +481,8 @@ void main() {
       expect(reconnect, findsOneWidget);
       await tester.tap(reconnect);
       await tester.pumpAndSettle();
-      expect(find.text('Change $hostB'), findsOneWidget);
+      // The form keeps its scroll position, so the heading may be above it.
+      expect(find.text('Save and connect', skipOffstage: false), findsOneWidget);
       await tester.enterText(find.widgetWithText(TextField, 'API key'), 'rotated');
       await tester.ensureVisible(find.text('Save and connect'));
       await tester.tap(find.text('Save and connect'));
