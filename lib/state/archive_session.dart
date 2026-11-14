@@ -141,6 +141,41 @@ class ArchiveSession extends ChangeNotifier {
   Object? _lastConnectFailure;
   String? _savedActiveId;
 
+  // Bumped by [cancelOpening] (and by each new restore, switch or connection
+  // attempt) so an abandoned attempt changes nothing when it finishes.
+  int _openingToken = 0;
+  int _connectToken = 0;
+  ArchiveBackend? _pendingCandidate;
+
+  /// True while the saved archive is being opened at startup or from the
+  /// picker, so the progress screen can offer Cancel.
+  bool get canCancelOpening => restoring || switchingArchive != null;
+
+  /// Stops opening an archive at startup or from the picker without waiting
+  /// for the server to answer or time out, and returns to setup with the
+  /// saved archives and Retry. The abandoned attempt's client is closed and
+  /// its late result is ignored; nothing is saved or activated.
+  Future<void> cancelOpening() async {
+    // Once the destination has been adopted, it is open: nothing to cancel.
+    if (!canCancelOpening || _disposed || api != null) return;
+    final switching = switchingArchive != null;
+    _openingToken++;
+    _connectToken++;
+    _pendingCandidate?.close();
+    _pendingCandidate = null;
+    _invalidateRequests();
+    restoring = false;
+    switchingArchive = null;
+    if (switching) hasSavedConnection = true;
+    setup = true;
+    busy = false;
+    error = null;
+    server.clear();
+    keyInput.clear();
+    _notify();
+    await _refreshArchives();
+  }
+
   /// The archive [reconnectArchiveId] names, if it is still saved.
   ConnectionProfile? get reconnectArchive => api != null
       ? null
@@ -244,6 +279,8 @@ class ArchiveSession extends ChangeNotifier {
   }
 
   Future<void> restore() async {
+    final token = ++_openingToken;
+    bool current() => !_disposed && token == _openingToken;
     reconfiguring = null;
     reconnectArchiveId = null;
     _lastConnectFailure = null;
@@ -254,7 +291,7 @@ class ArchiveSession extends ChangeNotifier {
     _notify();
     try {
       final saved = await _store.read();
-      if (_disposed) return;
+      if (!current()) return;
       if (saved != null) {
         hasSavedConnection = true;
         serverType = saved.serverType;
@@ -264,12 +301,12 @@ class ArchiveSession extends ChangeNotifier {
         return;
       }
     } catch (_) {
-      if (!_disposed) {
+      if (current()) {
         error = 'Saved connection unavailable. Enter your settings again.';
         _notify();
       }
     } finally {
-      if (!_disposed) {
+      if (current()) {
         await _refreshArchives();
         if (api == null && _keyRefused) reconnectArchiveId = _savedActiveId;
         if (savedArchivesUnreadable && api == null) {
@@ -324,6 +361,8 @@ class ArchiveSession extends ChangeNotifier {
     mailRequestFailed = false;
     messages = [];
     keyInput.clear();
+    final token = ++_openingToken;
+    bool current() => !_disposed && token == _openingToken;
     switchingArchive = profile;
     _retryArchiveId = id;
     reconnectArchiveId = null;
@@ -334,7 +373,7 @@ class ArchiveSession extends ChangeNotifier {
     String? failure;
     try {
       final saved = await _store.connection(id);
-      if (_disposed) return;
+      if (!current()) return;
       serverType = saved.serverType;
       setupServerType = saved.serverType;
       server.text = saved.server;
@@ -345,7 +384,7 @@ class ArchiveSession extends ChangeNotifier {
     } catch (_) {
       failure = 'Could not read its saved details from this device.';
     } finally {
-      if (!_disposed) {
+      if (current()) {
         switchingArchive = null;
         if (api == null) {
           setup = true;
@@ -407,6 +446,8 @@ class ArchiveSession extends ChangeNotifier {
     String? preferredAccountId,
     String? profileId,
   ) async {
+    final token = ++_connectToken;
+    bool stale() => _disposed || token != _connectToken;
     _lastConnectFailure = null;
     mailRequestFailed = false;
     accountSwitchGeneration++;
@@ -452,6 +493,7 @@ class ArchiveSession extends ChangeNotifier {
         return;
       }
       final created = candidate = _backendFactory(type, uri, key);
+      _pendingCandidate = created;
       final accounts = await created.accounts();
       if (accounts.isEmpty) throw const ArchiveFailure(404);
       final preferred = accounts
@@ -463,6 +505,8 @@ class ArchiveSession extends ChangeNotifier {
       final result = await created.emails(selected.id, '', 1);
       final items = result.items;
       final pages = result.totalPages.clamp(1, 1000000);
+      // A cancelled attempt saves and activates nothing.
+      if (stale()) return;
       String savedId;
       try {
         savedId = savedKey == null && profileId == null
@@ -480,28 +524,28 @@ class ArchiveSession extends ChangeNotifier {
                 profileId: profileId,
               );
       } on TooManySavedArchives {
-        if (!_disposed) {
+        if (!stale()) {
           error =
               'Connected to the server, but this device already has the most saved archives MailBurrow allows (${ConnectionStore.maxProfiles}). Forget one first.';
           _notify();
         }
         return;
       } on SavedArchiveMissing {
-        if (!_disposed) {
+        if (!stale()) {
           error =
               'Connected to the server, but this archive is no longer saved on this device.';
           _notify();
         }
         return;
       } catch (_) {
-        if (!_disposed) {
+        if (!stale()) {
           error =
               'Connected to the server, but could not save the connection securely. Retry or check device storage.';
           _notify();
         }
         return;
       }
-      if (_disposed) return;
+      if (stale()) return;
       if (!identical(api, created)) api?.close();
       _invalidateRequests();
       _clearBrowsing();
@@ -527,14 +571,15 @@ class ArchiveSession extends ChangeNotifier {
       await _refreshArchives();
       await loadFolders();
     } catch (failure) {
-      _lastConnectFailure = failure;
-      if (!_disposed) {
+      if (!stale()) {
+        _lastConnectFailure = failure;
         error = readableError(failure);
         _notify();
       }
     } finally {
+      if (identical(_pendingCandidate, candidate)) _pendingCandidate = null;
       if (!adopted) candidate?.close();
-      if (!_disposed) {
+      if (!stale()) {
         if (!mailLoading) {
           busy = false;
           _notify();

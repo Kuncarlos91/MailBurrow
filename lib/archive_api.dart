@@ -68,6 +68,12 @@ Future<dynamic> decodeArchiveJson(
 Future<dynamic> _decodeArchiveBytes(Uint8List bytes) =>
     Isolate.run(() => jsonDecode(utf8.decode(bytes)));
 
+/// How long to wait for a connection to the server, including the address
+/// lookup. With a VPN such as Tailscale still up while the device is offline,
+/// connection attempts fail only at this limit, so it is kept short. Once
+/// connected, the request and response limits apply as before.
+const archiveConnectTimeout = Duration(seconds: 10);
+
 /// The Mail-Archiver implementation of [ArchiveBackend], using its read-only
 /// REST API under `/api/v1/`.
 ///
@@ -156,7 +162,7 @@ class ArchiveApi implements ArchiveBackend {
     if (_closed) throw StateError('Archive connection closed');
     validateServer(server.toString());
     final client = _apiClient ??= HttpClient()
-      ..connectionTimeout = const Duration(seconds: 15);
+      ..connectionTimeout = archiveConnectTimeout;
     final call = _ApiCall(isMail: isMailRequest(path));
     _calls.add(call);
     var finished = false;
@@ -172,7 +178,7 @@ class ArchiveApi implements ArchiveBackend {
       }
 
       final request = await call.guard(
-        open().timeout(const Duration(seconds: 20)),
+        open().timeout(archiveConnectTimeout),
       );
       request.followRedirects = false;
       authorize(request);
@@ -290,7 +296,7 @@ class ArchiveApi implements ArchiveBackend {
     final active = transfer ?? AttachmentDownload();
     active.throwIfStopped();
     final client = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 15);
+      ..connectionTimeout = archiveConnectTimeout;
     _clients.add(client);
     void stopClient() => client.close(force: true);
     active.addStopListener(stopClient);
@@ -300,7 +306,7 @@ class ArchiveApi implements ArchiveBackend {
     var opened = false, completed = false;
     try {
       final request = await active.wait(
-        client.getUrl(url).timeout(const Duration(seconds: 20)),
+        client.getUrl(url).timeout(archiveConnectTimeout),
       );
       request.followRedirects = false;
       authorize(request);

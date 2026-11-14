@@ -347,6 +347,67 @@ void main() {
     expect(await storage.readAll(), before);
   });
 
+  test('cancelling a switch returns at once and nothing opens later', () async {
+    await addBoth();
+    final gate = servers[hostA]!.holdAccounts = Completer<void>();
+    final a = archiveAt(session, hostA);
+    final switching = session.switchArchive(a.id);
+    await pumpEventQueue();
+    expect(session.canCancelOpening, isTrue);
+    final candidate = clients.last;
+    await session.cancelOpening();
+    expect(session.switchingArchive, isNull);
+    expect(session.setup, isTrue);
+    expect(session.busy, isFalse);
+    expect(session.error, isNull);
+    expect(session.archives, hasLength(2));
+    expect(candidate.closed, isTrue);
+    gate.complete();
+    await switching;
+    await pumpEventQueue();
+    expect(session.api, isNull, reason: 'the abandoned attempt is not adopted');
+    expect(session.error, isNull);
+    expect(session.setup, isTrue);
+    expect((await store.read())?.server, 'https://$hostB', reason: 'nothing activated');
+    // Retry and the saved list still work.
+    servers[hostA]!.holdAccounts = null;
+    await session.retrySaved();
+    expect(subject(session), '$hostA 1');
+  });
+
+  test('cancelling startup restoration returns to setup with Retry', () async {
+    await addBoth();
+    final gate = servers[hostB]!.holdAccounts = Completer<void>();
+    session.dispose();
+    session = newSession();
+    final restoring = session.restore();
+    await pumpEventQueue();
+    expect(session.restoring, isTrue);
+    expect(session.canCancelOpening, isTrue);
+    await session.cancelOpening();
+    expect(session.restoring, isFalse);
+    expect(session.setup, isTrue);
+    expect(session.hasSavedConnection, isTrue);
+    expect(session.archives, hasLength(2));
+    gate.complete();
+    await restoring;
+    await pumpEventQueue();
+    expect(session.api, isNull);
+    expect(session.error, isNull);
+    servers[hostB]!.holdAccounts = null;
+    await session.retrySaved();
+    expect(subject(session), '$hostB 1');
+  });
+
+  test('an open archive cannot be cancelled', () async {
+    await addBoth();
+    final open = session.api;
+    expect(session.canCancelOpening, isFalse);
+    await session.cancelOpening();
+    expect(session.api, same(open));
+    expect(session.setup, isFalse);
+  });
+
   group('screens', () {
     Future<void> seed() async {
       await store.add(
@@ -466,6 +527,27 @@ void main() {
         expect(tester.takeException(), isNull);
       });
     }
+
+    testWidgets('the Opening screen has Cancel', (tester) async {
+      await tester.runAsync(seed);
+      await tester.pumpWidget(app());
+      await tester.pumpAndSettle();
+      final gate = servers[hostA]!.holdAccounts = Completer<void>();
+      await tester.tap(find.byKey(const ValueKey('current-archive')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(hostA).last);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(find.text('Opening $hostA…'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('Opening $hostA…'), findsNothing);
+      expect(find.text('Saved archives'), findsOneWidget);
+      gate.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('Saved archives'), findsOneWidget);
+    });
 
     testWidgets('setup offers a new key when the saved one is refused', (tester) async {
       servers[hostB]!.acceptedKey = 'rotated';

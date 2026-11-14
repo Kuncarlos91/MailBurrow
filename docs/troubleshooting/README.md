@@ -20,7 +20,7 @@ On feature-branch builds with a server-type choice, select the type explicitly b
 
 | Symptom | Checks/recovery | Relevant component |
 | --- | --- | --- |
-| Unable to connect/timeout | Check the HTTPS host/base path and that any private network (such as Tailscale) is connected on the phone. Reconnect and Retry. Do not expose the home server to fix a phone issue. | archive_api.dart, state/archive_session.dart |
+| Unable to connect/timeout | Check the HTTPS host/base path and that any private network (such as Tailscale) is connected on the phone. Reconnect and Retry. Do not expose the home server to fix a phone issue. With no network but a VPN such as Tailscale still on, the error can take about 10 seconds; on feature-branch builds, **Cancel** on the Connecting and Opening screens and in the account list stops waiting. | archive_api.dart, state/archive_session.dart |
 | Certificate could not be verified | Operator checks name/certificate/chain and device time. Never disable certificate validation. | validateServer, platform TLS |
 | Key not accepted (401) | Confirm the key belongs to this archive; the server operator can replace or revoke keys. Never paste a key into a report. | ArchiveFailure/readableError |
 | Permission denied (403) | Endpoint authorization differs: working stats do not prove mail/download access. Operator checks scope. | archive_api.dart |
