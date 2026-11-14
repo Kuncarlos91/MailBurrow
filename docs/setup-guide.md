@@ -8,6 +8,8 @@ MailBurrow is a phone app for reading the mail you already archive with [Mail-Ar
 - **Open Archiver:** follow [Open Archiver steps 1 and 2](#open-archiver-step-1-create-a-read-only-role), then steps 3 and 4.
 - **Both:** set up one, then add the other in the app. See [several archives](#several-archives).
 
+**App version:** Open Archiver, the server-type choice and several saved archives require a 0.4.0 build. The linked 0.3.0-rc.9 download supports Mail-Archiver and one saved archive.
+
 The same guide is on the [MailBurrow website](https://mailburrow.pages.dev/setup.html).
 
 To see what the app looks like before setting anything up, tap **Try the demo** on the setup screen: it opens fictional sample mail built into the app, with no server needed.
@@ -26,7 +28,7 @@ flowchart LR
 
 - **Your archive server does the archiving.** Mail-Archiver or Open Archiver copies mail from your providers into its own storage. MailBurrow never connects to Gmail, Outlook or any mail provider, and never sees your mailbox passwords. Open Archiver works the same way as the diagram, with its own database and search service.
 - **MailBurrow only reads.** It uses the server's API to list accounts or sources, folders and messages, run searches, and download attachments you ask for. It can't change, delete or send mail.
-- **Nothing is kept on the phone.** Messages are fetched when you open them and aren't stored for offline reading. Only the server address and API key are saved, in the phone's secure storage.
+- **Nothing is kept on the phone.** Messages are fetched when you open them and aren't stored for offline reading. Saved archive names, server types, addresses, API keys and selected accounts or sources are kept in the phone's secure storage; user-saved attachments stay where you save them.
 - **HTTPS is required.** The app checks the server's certificate and refuses plain `http://` addresses, so your key is never sent unencrypted.
 
 ## What you need
@@ -78,7 +80,7 @@ Open Archiver's API needs no setting to turn on. What matters is which user owns
 
 1. Sign in to Open Archiver as an administrator.
 2. Open **Admin → Roles** and create a role, for example "MailBurrow read-only".
-3. Find the ID of each source the phone should read: open **Archive → Ingestion**, select the source, and copy the value after `ingestionSourceId=` in the page's address.
+3. Find the ID of each source the phone should read: open **Archive → Ingestion**, select the source, choose **View emails**, and copy the value after `ingestionSourceId=` in the resulting mail-list address (up to the next `&`, if present).
 4. Enter this policy, replacing `SOURCE_ID` with that ID. To allow several sources, list each ID inside both pairs of brackets.
 
    ```json
@@ -96,8 +98,8 @@ Open Archiver's API needs no setting to turn on. What matters is which user owns
    ]
    ```
 
-   The first rule lets the user see the source; the second lets them read and search its mail. Nothing in it allows changing, deleting or exporting.
-5. Create a user for the phone and give it this role.
+   The first rule lets the user see the source; the second lets them read and search its mail. It allows reading/searching those sources and saving copies of their attachments, but grants no create, update or delete actions.
+5. Create a user for the phone and give it this custom role. Do not substitute the built-in **End user** role (which permits changes/deletion) or **Read only** role (which can read every source).
 
 ## Open Archiver step 2: Create an API key
 
@@ -113,8 +115,8 @@ Keep the key private, as for Mail-Archiver. If your phone is lost, delete the ke
 - **Search counts are estimates,** shown as "about N matches". Browsing a source shows exact counts.
 - **There are no folders or server-wide totals.** Open Archiver's API has no folder browsing, and its totals are for administrators only. The reader shows each message's folder path instead.
 - **Sources with Preserve Original File turned on are listed but their messages don't open.** Those sources keep each full original message, attachments included, so opening one would download every attachment without asking. Use Open Archiver's website for those sources, or keep the phone's role to sources without that option.
-- **Searches can match text inside attachments.** The matching text arrives with the results and is discarded with them; it isn't saved on the phone. Attachments themselves download only when you save one.
-- **Rate limit:** by default, Open Archiver allows about 100 requests a minute per key. If you see *Too many requests*, wait a minute.
+- **Searches can match text inside attachments.** Results can include full message text and extracted attachment text, not just the matching words. That text is held in memory, never displayed as attachment content, and discarded with the results; it isn't saved on the phone. Attachments themselves download only when you save one.
+- **Rate limit:** by default, Open Archiver allows about 100 requests a minute per client IP address. Devices or keys behind the same proxy/address can share that budget. If you see *Too many requests*, wait before retrying; changing keys does not reset an IP-based limit.
 
 ## Step 3: Give the server an HTTPS address
 
@@ -183,7 +185,7 @@ If the key can see more than one mail account or source, switch between them fro
 MailBurrow can keep up to 20 archives, for example a Mail-Archiver and an Open Archiver server, and switch between them without entering keys again.
 
 - **Add one:** tap the archive name above the account on the Mail tab, then **Add archive**. Choose its type, then enter its address and key.
-- **Switch:** tap the archive name and pick another. The previous archive's mail is cleared before the new one loads, and each archive remembers the account or source you last used in it. If one can't be reached, the app says which, and offers **Retry saved connection** and your other archives. **Cancel** stops waiting.
+- **Switch:** tap the archive name and pick another. The previous archive's mail is cleared before the new one loads, and each archive remembers the account or source you last used in it. If one can't be reached, the app says which, and offers **Retry saved connection** and your other archives. **Cancel** stops waiting before secure saving begins; it is disabled during the save commit and once the archive is open.
 - **Manage:** **Settings → Archives** lets you rename an archive, change its address or key, or forget it on this device. Changing an address or key always asks for the key again; the saved key is never sent to a new address. To use another server type, add it as a new archive.
 
 Only one archive is open at a time. There's no combined inbox or search across archives.
@@ -206,6 +208,6 @@ More detail is in [troubleshooting](troubleshooting/README.md). When asking for 
 ## Privacy and security in short
 
 - Treat the API key as read access to its user's archived mail. Use a regular user, not an administrator, with only the accounts or sources you need. For Open Archiver, use the read-only role from Open Archiver step 1.
-- Your server keeps its own access logs. MailBurrow has no analytics or crash reporting. See the [privacy notice](../PRIVACY.md).
+- Your server keeps its own access logs. Open Archiver records searches (including the query) and message opens in its audit log. MailBurrow has no analytics or crash reporting. See the [privacy notice](../PRIVACY.md).
 - MailBurrow downloads an attachment only when you choose to, and saves it where you pick.
 - Report security problems privately, as described in [SECURITY.md](../SECURITY.md).

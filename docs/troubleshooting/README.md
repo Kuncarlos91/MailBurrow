@@ -25,12 +25,12 @@ From 0.4.0, setup asks for the server type (Mail-Archiver or Open Archiver); sel
 | Key not accepted (401) | Confirm the key belongs to this archive; the server operator can replace or revoke keys. Never paste a key into a report. | ArchiveFailure/readableError |
 | Permission denied (403) | Endpoint authorization differs: working stats do not prove mail/download access. Operator checks scope. | archive_api.dart |
 | API/message unavailable (404) | Check API compatibility and message/account existence; do not guess new paths. | archive_api.dart |
-| Too many requests (429) | Wait before retrying. Mail-Archiver allows 120 requests a minute by default, Open Archiver about 100 per key. | readableError |
+| Too many requests (429) | Wait before retrying. Mail-Archiver allows 120 requests a minute by default, Open Archiver about 100 per client IP address. Multiple devices or keys behind one address may share its budget. | readableError |
 | This source keeps full original messages… (Open Archiver) | The source has Preserve Original File turned on, so its messages include every attachment. MailBurrow refuses them before downloading anything. Use Open Archiver's website for that source. | open_archiver_api.dart |
 | Open Archiver did not say whether this source keeps full original messages… | The source's settings didn't state Preserve Original File, so the app treats it as unsafe to open. Check the Open Archiver version (0.6.2 is tested). | open_archiver_api.dart |
 | Open this message from its mail list / Open the message again to save this attachment (Open Archiver) | The app opens only messages it listed in this session, and saves attachments only from a message it opened. Go back to the list, open the message, then save. | open_archiver_api.dart |
 | Only some Open Archiver sources appear | The key's user role decides which sources it can read. An administrator adds the source IDs to the role's policy (**Admin → Roles**). | Open Archiver role policy |
-| Response too large | The app caps JSON responses at 8 MiB. Use the archive website for that response; review memory/performance before increasing limits. | decodeArchiveJson |
+| Response too large | Ordinary API responses are capped at 8 MiB; Open Archiver message detail has a 40 MiB response cap and a 10 MiB decoded-message cap. Use the archive website for that response; review memory/performance before increasing limits. | decodeArchiveJson |
 | Folders unavailable | Retry after network recovery. Check account permissions/returned folders. Missing Inbox may be a server sync issue; do not invent it locally. | loadFolders, flattenFolders |
 
 ## Mail, search and layout

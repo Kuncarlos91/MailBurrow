@@ -22,6 +22,7 @@
     <li><strong>Open Archiver:</strong> follow <a href="#oa-role">Open Archiver steps 1 and 2</a>, then steps 3 and 4.</li>
     <li><strong>Both:</strong> set up one, then add the other in the app. See <a href="#several">several archives</a>.</li>
   </ul>
+  <p><strong>App version:</strong> Open Archiver, the server-type choice and several saved archives require a 0.4.0 build. The linked 0.3.0-rc.9 download supports Mail-Archiver and one saved archive.</p>
   <nav class="toc" aria-label="On this page"><a href="#how">How it works</a><a href="#need">What you need</a><a href="#api">1. Turn on the API</a><a href="#key">2. Create a key</a><a href="#https">3. HTTPS address</a><a href="#oa-role">Open Archiver</a><a href="#connect">4. Connect</a><a href="#several">Several archives</a><a href="#problems">Problems</a></nav>
 
   <section id="how"><h2>How it works</h2>
@@ -34,7 +35,7 @@
     <ul>
       <li><strong>Your archive server does the archiving.</strong> MailBurrow never connects to Gmail, Outlook or any mail provider, and never sees your mailbox passwords.</li>
       <li><strong>MailBurrow only reads.</strong> It lists accounts or sources, folders and messages, runs searches and downloads attachments you ask for. It can't change, delete or send mail.</li>
-      <li><strong>Nothing is kept on the phone.</strong> Messages are fetched when you open them and aren't stored for offline reading. Only the server address and API key are saved, in the phone's secure storage.</li>
+      <li><strong>Nothing is kept on the phone.</strong> Messages are fetched when you open them and aren't stored for offline reading. Saved archive names, server types, addresses, API keys and selected accounts or sources are kept in the phone's secure storage; user-saved attachments stay where you save them.</li>
       <li><strong>HTTPS is required.</strong> The app checks the server's certificate and refuses plain <code>http://</code> addresses, so your key is never sent unencrypted.</li>
     </ul>
   </section>
@@ -87,7 +88,7 @@
     <ol>
       <li>Sign in to Open Archiver as an administrator.</li>
       <li>Open <strong>Admin &rarr; Roles</strong> and create a role, for example &ldquo;MailBurrow read-only&rdquo;.</li>
-      <li>Find the ID of each source the phone should read: open <strong>Archive &rarr; Ingestion</strong>, select the source, and copy the value after <code>ingestionSourceId=</code> in the page's address.</li>
+      <li>Find the ID of each source the phone should read: open <strong>Archive &rarr; Ingestion</strong>, select the source, choose <strong>View emails</strong>, and copy the value after <code>ingestionSourceId=</code> in the resulting mail-list address (up to the next <code>&amp;</code>, if present).</li>
       <li>Enter this policy, replacing <code>SOURCE_ID</code> with that ID. To allow several sources, list each ID inside both pairs of brackets.
         <pre><code>[
   {
@@ -101,8 +102,8 @@
     "conditions": { "ingestionSourceId": { "$in": ["SOURCE_ID"] } }
   }
 ]</code></pre>
-        The first rule lets the user see the source; the second lets them read and search its mail. Nothing in it allows changing, deleting or exporting.</li>
-      <li>Create a user for the phone and give it this role.</li>
+        The first rule lets the user see the source; the second lets them read and search its mail. It allows reading/searching those sources and saving copies of their attachments, but grants no create, update or delete actions.</li>
+      <li>Create a user for the phone and give it this custom role. Do not substitute the built-in <strong>End user</strong> role (which permits changes/deletion) or <strong>Read only</strong> role (which can read every source).</li>
     </ol>
   </section>
 
@@ -119,8 +120,8 @@
       <li><strong>Search counts are estimates,</strong> shown as &ldquo;about N matches&rdquo;. Browsing a source shows exact counts.</li>
       <li><strong>There are no folders or server-wide totals.</strong> Open Archiver's API has no folder browsing, and its totals are for administrators only. The reader shows each message's folder path instead.</li>
       <li><strong>Sources with Preserve Original File turned on are listed but their messages don't open.</strong> Those sources keep each full original message, attachments included, so opening one would download every attachment without asking. Use Open Archiver's website for those sources, or keep the phone's role to sources without that option.</li>
-      <li><strong>Searches can match text inside attachments.</strong> The matching text arrives with the results and is discarded with them; it isn't saved on the phone. Attachments themselves download only when you save one.</li>
-      <li><strong>Rate limit:</strong> by default, Open Archiver allows about 100 requests a minute per key. If you see <em>Too many requests</em>, wait a minute.</li>
+      <li><strong>Searches can match text inside attachments.</strong> Results can include full message text and extracted attachment text, not just the matching words. That text is held in memory, never displayed as attachment content, and discarded with the results; it isn't saved on the phone. Attachments themselves download only when you save one.</li>
+      <li><strong>Rate limit:</strong> by default, Open Archiver allows about 100 requests a minute per client IP address. Devices or keys behind the same proxy/address can share that budget. If you see <em>Too many requests</em>, wait before retrying; changing keys does not reset an IP-based limit.</li>
     </ul>
   </section>
 
@@ -183,7 +184,7 @@
     <p>MailBurrow can keep up to 20 archives, for example a Mail-Archiver and an Open Archiver server, and switch between them without entering keys again.</p>
     <ul>
       <li><strong>Add one:</strong> tap the archive name above the account on the Mail tab, then <strong>Add archive</strong>. Choose its type, then enter its address and key.</li>
-      <li><strong>Switch:</strong> tap the archive name and pick another. The previous archive's mail is cleared before the new one loads, and each archive remembers the account or source you last used in it. If one can't be reached, the app says which, and offers <strong>Retry saved connection</strong> and your other archives. <strong>Cancel</strong> stops waiting.</li>
+      <li><strong>Switch:</strong> tap the archive name and pick another. The previous archive's mail is cleared before the new one loads, and each archive remembers the account or source you last used in it. If one can't be reached, the app says which, and offers <strong>Retry saved connection</strong> and your other archives. <strong>Cancel</strong> stops waiting before secure saving begins; it is disabled during the save commit and once the archive is open.</li>
       <li><strong>Manage:</strong> <strong>Settings &rarr; Archives</strong> lets you rename an archive, change its address or key, or forget it on this device. Changing an address or key always asks for the key again; the saved key is never sent to a new address. To use another server type, add it as a new archive.</li>
     </ul>
     <p>Only one archive is open at a time. There's no combined inbox or search across archives.</p>
@@ -209,7 +210,7 @@
   <section id="security"><h2>Privacy and security in short</h2>
     <ul>
       <li>Treat the API key as read access to its user's archived mail. Use a regular user, not an administrator, with only the accounts or sources you need. For Open Archiver, use the read-only role from Open Archiver step 1.</li>
-      <li>Your server keeps its own access logs. MailBurrow has no analytics or crash reporting. See the <a href="privacy.html">privacy notice</a>.</li>
+      <li>Your server keeps its own access logs. Open Archiver records searches (including the query) and message opens in its audit log. MailBurrow has no analytics or crash reporting. See the <a href="privacy.html">privacy notice</a>.</li>
       <li>MailBurrow downloads an attachment only when you choose to, and saves it where you pick.</li>
       <li>Report security problems privately through <a href="https://github.com/Kuncarlos91/MailBurrow/security">the repository's Security tab</a>.</li>
     </ul>

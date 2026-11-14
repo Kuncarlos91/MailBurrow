@@ -1,8 +1,8 @@
 # MailBurrow
 
-A read-only Android and iOS app for browsing your own [Mail-Archiver](https://github.com/s1t5/mail-archiver) or [Open Archiver](https://github.com/LogicLabs-OU/OpenArchiver) server. Browse and search archived mail, filter by folder and date, read messages in a simplified view, and save attachments when you choose to.
+A read-only Android and iOS app for browsing your own [Mail-Archiver](https://github.com/s1t5/mail-archiver) or [Open Archiver](https://github.com/LogicLabs-OU/OpenArchiver) server. Browse and search archived mail, filter by date and supported folder options, read messages in a simplified view, and save attachments when you choose to.
 
-MailBurrow is an early preview. A signed Android prerelease, [0.3.0-rc.9](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.3.0-rc.9), is available for 64-bit ARM phones; it is not in the app stores, and iPhone/iPad builds are source-only. See [project status](docs/testing/status.md).
+MailBurrow is an early preview. A signed Android prerelease, [0.3.0-rc.9](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.3.0-rc.9), is available for 64-bit ARM phones; it is not in the app stores, and iPhone/iPad builds are source-only. Open Archiver and several saved archives require a 0.4.0 build; the linked RC9 download supports Mail-Archiver and one saved archive. See [project status](docs/testing/status.md).
 
 <img src="docs/images/setup-screen.jpg" alt="MailBurrow setup in dark mode with empty server and API key fields, Connect to archive, Try the demo, Support and Privacy notice" width="270">
 
