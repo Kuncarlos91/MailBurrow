@@ -12,17 +12,17 @@
 <a class="skip" href="#main">Skip to content</a>
 <header><a class="brand" href="index.html">MailBurrow</a><nav aria-label="Main"><a href="index.html">Support</a><a href="setup.html">Setup</a><a aria-current="page" href="privacy.html">Privacy</a><a href="https://github.com/Kuncarlos91/MailBurrow">Source</a></nav></header>
 <main id="main" tabindex="-1">
-  <p class="notice">Effective November 5, 2026 &middot; Updated November 9, 2026</p>
+  <p class="notice">Effective November 5, 2026 &middot; Updated November 14, 2026</p>
   <p class="eyebrow">PRIVACY</p>
   <h1>MailBurrow Privacy Notice</h1>
   <p class="lead">MailBurrow is developed by {{PUBLIC_PROVIDER_NAME}}. Privacy contact: <a href="mailto:{{PUBLIC_CONTACT_EMAIL}}">{{PUBLIC_CONTACT_EMAIL}}</a>.</p>
   <p>This notice covers the read-only mobile client, voluntary app-support correspondence, the public source repository and these public support/privacy pages. MailBurrow was previously distributed as MailShelf. Earlier installations may still show that name.</p>
   <section id="scope"><h2>Your independently operated archive</h2>
-    <p>You configure your own Mail-Archiver server, HTTPS address, API key and any required Tailscale or private network. We do not provide customer archive hosting, mailbox provisioning, a mail relay or managed private networks.</p>
-    <p>The app sends archive requests directly to the endpoint you enter. The developer does not receive your archive credentials or mail through a MailBurrow-hosted production backend. Your archive operator controls synchronization, permissions, original mail, server records and backups.</p>
+    <p>You configure your own Mail-Archiver or Open Archiver servers, HTTPS addresses, API keys and any required Tailscale or private network. We do not provide customer archive hosting, mailbox provisioning, a mail relay or managed private networks.</p>
+    <p>The app sends archive requests directly to the endpoint of the archive that is open; a saved key is never sent to another archive. The developer does not receive your archive credentials or mail through a MailBurrow-hosted production backend. Your archive operator controls synchronization, permissions, original mail, server records and backups.</p>
   </section>
   <section id="app-data"><h2>Information used to browse your mail</h2>
-    <p>Your server address, API key and selected account identifier are saved using platform secure storage to restore the connection. Authentication, relevant account/message identifiers, search text, filters and page requests are sent to the configured archive. Its responses provide account and folder information, subjects, senders, recipients, dates, snippets, message bodies and requested attachments for display or saving.</p>
+    <p>For each saved archive (up to 20), its name, server type, server address, API key and selected account or source identifier are saved using platform secure storage to restore and switch connections. Authentication, relevant account/message identifiers, search text, filters and page requests are sent to the configured archive. Its responses provide account and folder information, subjects, senders, recipients, dates, snippets, message bodies and requested attachments for display or saving. With Open Archiver, search results can also include text extracted from attachments, and an opened message is downloaded as its original message, which can include small inline images; separate attachment files still download only when you save one, and messages from sources that keep full original files are not opened.</p>
     <p>The app does not intentionally keep a local mail database. Message information and browsing state are processed in memory. HTTPS protects transport to the selected server; it does not prevent your archive operator from reading its stored mail. Your independent server, proxy and network providers may retain requests, access records and connection metadata under their own practices.</p>
   </section>
   <section id="demo"><h2>Demo mode</h2>
@@ -35,7 +35,7 @@
     <p>Remote resources are removed from displayed mail. Explicitly confirmed links can use HTTPS or unencrypted HTTP; the confirmation warns about HTTP. Link query parameters, including possible tracking identifiers, are not automatically removed and can reach the external browser or destination. This does not scan messages, links or attachments for malware or phishing.</p>
   </section>
   <section id="requests"><h2>Removing information and privacy requests</h2>
-    <p>Disconnect and forget connection removes the saved local connection record when successful. It does not revoke your server API key, delete your archive account, erase mail/logs/backups or remove exported files. We cannot administer independently operated archives. Direct those requests to your archive operator; manage saved files with your chosen file provider.</p>
+    <p>Forget on this device (Settings &rarr; Archives) or Disconnect and forget connection removes that archive's saved local record when successful. It does not revoke your server API key, delete your archive account, erase mail/logs/backups or remove exported files. We cannot administer independently operated archives. Direct those requests to your archive operator; manage saved files with your chosen file provider.</p>
     <p>To request access, correction or deletion of information you voluntarily sent to app support, email the privacy contact above, preferably from the address used for the original conversation. Describe the request without including keys, private server details or sensitive mail. We may need proportionate confirmation that the information concerns you before disclosing or changing it. We consider requests under applicable requirements; available rights and response requirements depend on your location and circumstances.</p>
   </section>
   <section id="support-data"><h2>Support correspondence and retention</h2>

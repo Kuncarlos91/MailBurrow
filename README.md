@@ -1,6 +1,6 @@
 # MailBurrow
 
-A read-only Android and iOS app for browsing your own [Mail-Archiver](https://github.com/s1t5/mail-archiver) server. Browse and search archived mail, filter by folder and date, read messages in a simplified view, and save attachments when you choose to.
+A read-only Android and iOS app for browsing your own [Mail-Archiver](https://github.com/s1t5/mail-archiver) or [Open Archiver](https://github.com/LogicLabs-OU/OpenArchiver) server. Browse and search archived mail, filter by folder and date, read messages in a simplified view, and save attachments when you choose to.
 
 MailBurrow is an early preview. A signed Android prerelease, [0.3.0-rc.9](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.3.0-rc.9), is available for 64-bit ARM phones; it is not in the app stores, and iPhone/iPad builds are source-only. See [project status](docs/testing/status.md).
 
@@ -8,17 +8,17 @@ MailBurrow is an early preview. A signed Android prerelease, [0.3.0-rc.9](https:
 
 > **Just want to look around first?** Tap **Try the demo** on the setup screen. It opens fictional sample mail built into the app, with no server, account or network needed. See [Try it without a server](#try-it-without-a-server).
 
-> **New here? Start with the [setup guide](docs/setup-guide.md).** It shows how MailBurrow, Mail-Archiver and your HTTPS address fit together, with step-by-step settings for Mail-Archiver's API, TrueNAS and Tailscale, and fixes for common connection errors.
+> **New here? Start with the [setup guide](docs/setup-guide.md).** It shows how MailBurrow, your archive server and your HTTPS address fit together, with step-by-step settings for Mail-Archiver's API, an Open Archiver read-only role, TrueNAS and Tailscale, and fixes for common connection errors.
 
 ## What you need before connecting
 
 MailBurrow is a client for an archive you run yourself. It is not a hosted email service and does not connect to Gmail or any mailbox with your email password.
 
-1. A [Mail-Archiver server](https://github.com/s1t5/mail-archiver) with your archived mail and API access turned on. TrueNAS is one way to host it, but not a requirement.
+1. A [Mail-Archiver](https://github.com/s1t5/mail-archiver) server with API access turned on, or an [Open Archiver](https://github.com/LogicLabs-OU/OpenArchiver) 0.6.2 server, with your archived mail. TrueNAS is one way to host either, but not a requirement.
 2. An **HTTPS address with a valid certificate** for that server, and an API key created on it.
 3. If your server is only reachable through **Tailscale**, your own Tailscale account with the Tailscale app connected on your phone. Any other working HTTPS setup is fine too.
 
-The [setup guide](docs/setup-guide.md) explains how the pieces fit together and the exact settings for Mail-Archiver, TrueNAS and Tailscale. The project does not host servers, provide accounts or set up private networks. Server permissions, retention, logs and backups are up to you or your server administrator.
+The [setup guide](docs/setup-guide.md) explains how the pieces fit together and the exact settings for Mail-Archiver, Open Archiver, TrueNAS and Tailscale. The project does not host servers, provide accounts or set up private networks. Server permissions, retention, logs and backups are up to you or your server administrator.
 
 ## Try it without a server
 
@@ -45,9 +45,11 @@ Signed releases are published on the [Releases page](https://github.com/Kuncarlo
 ## Connect
 
 1. Connect Tailscale first, if your server needs it.
-2. Enter your server address. `https://` is added if you leave it out.
-3. Enter your API key and tap **Connect to archive**.
-4. If your key can see more than one mail account, switch between them from the account row or Settings.
+2. Choose the server type: **Mail-Archiver** or **Open Archiver**.
+3. Enter your server address. `https://` is added if you leave it out.
+4. Enter your API key and tap **Connect to archive**.
+5. If your key can see more than one mail account or source, switch between them from the account row or Settings.
+6. To add another archive, tap the archive name above the account, then **Add archive**. **Settings → Archives** renames, changes or forgets saved archives.
 
 Your server address and key are saved in the device's secure storage. Never send them to app support. If the connection fails, see the [setup guide's checks](docs/setup-guide.md#if-something-goes-wrong) and [troubleshooting](docs/troubleshooting/README.md).
 

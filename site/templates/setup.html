@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
-  <meta name="description" content="Step-by-step setup for MailBurrow: enable Mail-Archiver's API, create a key, give your server an HTTPS address and connect the app.">
+  <meta name="description" content="Step-by-step setup for MailBurrow with Mail-Archiver or Open Archiver: create a read-only key, give your server an HTTPS address and connect the app.">
   <title>Set up MailBurrow</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -12,24 +12,28 @@
 <a class="skip" href="#main">Skip to content</a>
 <header><a class="brand" href="index.html">MailBurrow</a><nav aria-label="Main"><a href="index.html">Support</a><a aria-current="page" href="setup.html">Setup</a><a href="privacy.html">Privacy</a><a href="https://github.com/Kuncarlos91/MailBurrow">Source</a></nav></header>
 <main id="main" tabindex="-1">
-  <p class="notice">Updated November 14, 2026 &middot; Checked against Mail-Archiver's <a href="https://github.com/s1t5/mail-archiver/blob/main/doc/API.md">REST API guide</a>, the TrueNAS Mail Archiver and Tailscale apps, and Tailscale's HTTPS and Serve documentation. Menu names can change between versions.</p>
+  <p class="notice">Updated November 14, 2026 &middot; Checked against Mail-Archiver's <a href="https://github.com/s1t5/mail-archiver/blob/main/doc/API.md">REST API guide</a>, Open Archiver 0.6.2, the TrueNAS Mail Archiver, Open Archiver and Tailscale apps, and Tailscale's HTTPS and Serve documentation. Menu names can change between versions.</p>
   <p class="eyebrow">SETUP GUIDE</p>
   <h1>Connect MailBurrow to your archive.</h1>
-  <p class="lead">Four steps: turn on Mail-Archiver's API, create a key, give the server an HTTPS address, then connect the app.</p>
-  <p>MailBurrow reads the mail you already archive with <a href="https://github.com/s1t5/mail-archiver">Mail-Archiver</a>. It talks only to your Mail-Archiver server, over HTTPS, with an API key you create. Want to look around first? Tap <strong>Try the demo</strong> on the setup screen; it uses fictional mail built into the app and needs no server.</p>
-  <p><strong>Feature-branch builds:</strong> setup also offers <strong>Open Archiver</strong> for the 0.6.2 backend; this option is not in the published 0.3.0-rc.9 build. Choose the server type explicitly before entering its key. Changing the type clears the entered key. Open Archiver needs an HTTPS endpoint and a key for a user whose role can read the intended sources; sources that keep full original files cannot be opened. The steps below describe Mail-Archiver; full Open Archiver setup guidance awaits live validation. In these builds, <strong>Settings → Archives</strong> manages saved archives (Rename, Change address or key, Forget on this device, Add archive). Changing an address or key requires entering a key again; changing server type means adding another archive.</p>
-  <nav class="toc" aria-label="On this page"><a href="#how">How it works</a><a href="#need">What you need</a><a href="#api">1. Turn on the API</a><a href="#key">2. Create a key</a><a href="#https">3. HTTPS address</a><a href="#connect">4. Connect</a><a href="#problems">Problems</a></nav>
+  <p class="lead">Four steps: prepare your archive server, create a read-only key, give the server an HTTPS address, then connect the app.</p>
+  <p>MailBurrow reads the mail you already archive with <a href="https://github.com/s1t5/mail-archiver">Mail-Archiver</a> or <a href="https://github.com/LogicLabs-OU/OpenArchiver">Open Archiver</a>. It talks only to your own archive servers, over HTTPS, with API keys you create. Want to look around first? Tap <strong>Try the demo</strong> on the setup screen; it uses fictional mail built into the app and needs no server.</p>
+  <ul>
+    <li><strong>Mail-Archiver:</strong> follow steps 1 to 4.</li>
+    <li><strong>Open Archiver:</strong> follow <a href="#oa-role">Open Archiver steps 1 and 2</a>, then steps 3 and 4.</li>
+    <li><strong>Both:</strong> set up one, then add the other in the app. See <a href="#several">several archives</a>.</li>
+  </ul>
+  <nav class="toc" aria-label="On this page"><a href="#how">How it works</a><a href="#need">What you need</a><a href="#api">1. Turn on the API</a><a href="#key">2. Create a key</a><a href="#https">3. HTTPS address</a><a href="#oa-role">Open Archiver</a><a href="#connect">4. Connect</a><a href="#several">Several archives</a><a href="#problems">Problems</a></nav>
 
   <section id="how"><h2>How it works</h2>
     <ol class="flow">
       <li><strong>Your mail providers</strong> (IMAP, Microsoft 365)</li>
-      <li><strong>Mail-Archiver</strong> syncs and stores your mail, on TrueNAS or in Docker</li>
-      <li><strong>An HTTPS front door</strong>, such as Tailscale Serve or a reverse proxy, in front of Mail-Archiver's plain-HTTP port</li>
+      <li><strong>Mail-Archiver or Open Archiver</strong> syncs and stores your mail, on TrueNAS or in Docker</li>
+      <li><strong>An HTTPS front door</strong>, such as Tailscale Serve or a reverse proxy, in front of the server's plain-HTTP port</li>
       <li><strong>MailBurrow on your phone</strong> reads through that address with your API key</li>
     </ol>
     <ul>
-      <li><strong>Mail-Archiver does the archiving.</strong> MailBurrow never connects to Gmail, Outlook or any mail provider, and never sees your mailbox passwords.</li>
-      <li><strong>MailBurrow only reads.</strong> It lists accounts, folders and messages, runs searches and downloads attachments you ask for. It can't change, delete or send mail.</li>
+      <li><strong>Your archive server does the archiving.</strong> MailBurrow never connects to Gmail, Outlook or any mail provider, and never sees your mailbox passwords.</li>
+      <li><strong>MailBurrow only reads.</strong> It lists accounts or sources, folders and messages, runs searches and downloads attachments you ask for. It can't change, delete or send mail.</li>
       <li><strong>Nothing is kept on the phone.</strong> Messages are fetched when you open them and aren't stored for offline reading. Only the server address and API key are saved, in the phone's secure storage.</li>
       <li><strong>HTTPS is required.</strong> The app checks the server's certificate and refuses plain <code>http://</code> addresses, so your key is never sent unencrypted.</li>
     </ul>
@@ -39,11 +43,11 @@
     <div class="table"><table>
       <thead><tr><th scope="col">Piece</th><th scope="col">Required?</th><th scope="col">What it does</th></tr></thead>
       <tbody>
-        <tr><td><a href="https://github.com/s1t5/mail-archiver">Mail-Archiver</a> <strong>2607.3 or later</strong></td><td>Yes</td><td>Archives your mail and provides the API. The API is <strong>off by default</strong>.</td></tr>
-        <tr><td>A Mail-Archiver API key</td><td>Yes</td><td>Lets the app read the archive with your user's permissions.</td></tr>
+        <tr><td><a href="https://github.com/s1t5/mail-archiver">Mail-Archiver</a> <strong>2607.3 or later</strong>, or <a href="https://github.com/LogicLabs-OU/OpenArchiver">Open Archiver</a> <strong>0.6.2</strong></td><td>Yes, at least one</td><td>Archives your mail and provides the API. Mail-Archiver's API is <strong>off by default</strong>. Other Open Archiver versions haven't been tested.</td></tr>
+        <tr><td>An API key for that server</td><td>Yes</td><td>Lets the app read the archive with its user's permissions.</td></tr>
         <tr><td>An HTTPS address with a <strong>trusted certificate</strong></td><td>Yes</td><td>For example <code>https://archive.example.ts.net</code>. Self-signed certificates don't work.</td></tr>
         <tr><td><a href="https://tailscale.com/">Tailscale</a> on the server and the phone</td><td>Recommended</td><td>Private access from anywhere, plus a free trusted certificate through Tailscale Serve.</td></tr>
-        <tr><td>TrueNAS</td><td>Optional</td><td>One easy way to run Mail-Archiver, through its community app. Docker on any machine works too.</td></tr>
+        <tr><td>TrueNAS</td><td>Optional</td><td>One easy way to run either server, through its community app. Docker on any machine works too.</td></tr>
         <tr><td>Your own domain and a reverse proxy</td><td>Optional</td><td>An alternative to Tailscale for the HTTPS address.</td></tr>
       </tbody>
     </table></div>
@@ -78,8 +82,49 @@
     <p>Keep the key private. Never paste it into chats, issue reports or screenshots. If your phone is lost, revoke the key on the same <strong>API Keys</strong> page; an administrator can revoke any user's keys.</p>
   </section>
 
+  <section id="oa-role"><h2>Open Archiver step 1: Create a read-only role</h2>
+    <p>Open Archiver's API needs no setting to turn on. What matters is which user owns the key, because <strong>a key has its user's permissions</strong>. An administrator's key can see and change everything on the server, so give the phone its own user with a role that can only read the sources you want on it.</p>
+    <ol>
+      <li>Sign in to Open Archiver as an administrator.</li>
+      <li>Open <strong>Admin &rarr; Roles</strong> and create a role, for example &ldquo;MailBurrow read-only&rdquo;.</li>
+      <li>Enter this policy, replacing <code>SOURCE_ID</code> with the ID of the ingestion source the phone should read. To allow several sources, list each ID inside both pairs of brackets.
+        <pre><code>[
+  {
+    "action": ["read", "search"],
+    "subject": "ingestion",
+    "conditions": { "id": { "$in": ["SOURCE_ID"] } }
+  },
+  {
+    "action": ["read", "search"],
+    "subject": "archive",
+    "conditions": { "ingestionSourceId": { "$in": ["SOURCE_ID"] } }
+  }
+]</code></pre>
+        The first rule lets the user see the source; the second lets them read and search its mail. Nothing in it allows changing, deleting or exporting.</li>
+      <li>Create a user for the phone and give it this role.</li>
+    </ol>
+  </section>
+
+  <section id="oa-key"><h2>Open Archiver step 2: Create an API key</h2>
+    <ol>
+      <li>Sign in to Open Archiver as the phone's user from step 1, not as an administrator.</li>
+      <li>Open <strong>Settings &rarr; API Keys</strong> and choose <strong>Generate API Key</strong>. Give it a clear name such as &ldquo;MailBurrow phone&rdquo; and choose an expiry.</li>
+      <li>Copy the key straight away. It's shown only once.</li>
+    </ol>
+    <p>Keep the key private, as for Mail-Archiver. If your phone is lost, delete the key on the same page. When a key expires or is deleted, MailBurrow offers <strong>Enter a new key</strong> for that archive.</p>
+    <h3>What the app shows from Open Archiver</h3>
+    <ul>
+      <li><strong>Sources appear as accounts.</strong> Switch between them from the account row, as with Mail-Archiver accounts.</li>
+      <li><strong>Search counts are estimates,</strong> shown as &ldquo;about N matches&rdquo;. Browsing a source shows exact counts.</li>
+      <li><strong>There are no folders or server-wide totals.</strong> Open Archiver's API has no folder browsing, and its totals are for administrators only. The reader shows each message's folder path instead.</li>
+      <li><strong>Sources with Preserve Original File turned on are listed but their messages don't open.</strong> Those sources keep each full original message, attachments included, so opening one would download every attachment without asking. Use Open Archiver's website for those sources, or keep the phone's role to sources without that option.</li>
+      <li><strong>Searches can match text inside attachments.</strong> The matching text arrives with the results and is discarded with them; it isn't saved on the phone. Attachments themselves download only when you save one.</li>
+      <li><strong>Rate limit:</strong> by default, Open Archiver allows about 100 requests a minute per key. If you see <em>Too many requests</em>, wait a minute.</li>
+    </ul>
+  </section>
+
   <section id="https"><h2>Step 3: Give the server an HTTPS address</h2>
-    <p>Mail-Archiver serves plain HTTP. On TrueNAS the app's default web port is <code>30315</code>. Put one of the following in front of it.</p>
+    <p>Mail-Archiver and Open Archiver both serve plain HTTP. On TrueNAS, Mail-Archiver's default web port is <code>30315</code>; for Open Archiver, use the web port shown in its app settings. Put one of the following in front of each server.</p>
     <h3 id="tailscale">Option A: Tailscale Serve (recommended)</h3>
     <p>Tailscale Serve gives your server an address like <code>https://truenas.your-tailnet.ts.net</code> with a certificate phones trust, reachable only from devices signed in to your Tailscale network.</p>
     <ol>
@@ -89,6 +134,9 @@
         Replace <code>30315</code> with your port if it differs. The output shows your HTTPS address. <code>--bg</code> keeps it running in the background.</li>
       <li>Check it: <code>tailscale serve status</code> should show <code>https://&lt;machine&gt;.&lt;tailnet&gt;.ts.net</code> forwarding to your port.</li>
     </ol>
+    <p><strong>Two servers on one machine:</strong> each needs its own HTTPS port. Keep the first on the default port, and give the second one another port, such as <code>8443</code>:</p>
+    <pre><code>tailscale serve --bg --https=8443 &lt;second-server-port&gt;</code></pre>
+    <p>Its address then ends in <code>:8443</code>, for example <code>https://truenas.your-tailnet.ts.net:8443</code>. Enter it in the app with the port.</p>
     <p><strong>On TrueNAS</strong> with the Tailscale community app:</p>
     <ul>
       <li>Follow <a href="https://tailscale.com/kb/1483/truenas">Tailscale's TrueNAS guide</a> to install the app with an auth key. Then edit the app: <strong>untick Userspace</strong> and <strong>tick Host Network</strong>, so Tailscale can reach the Mail Archiver app's port on the host.</li>
@@ -118,15 +166,26 @@
     <ol>
       <li>Install MailBurrow. The signed Android preview is on <a href="https://github.com/Kuncarlos91/MailBurrow/releases">GitHub Releases</a> (64-bit ARM phones); compare the APK's SHA-256 with the one in the release notes. iPhone and iPad builds are from source for now.</li>
       <li>If you use Tailscale, install the <strong>Tailscale</strong> app on your phone, sign in to the same Tailscale network and turn it on.</li>
-      <li>Optional check: open your HTTPS address in the phone's browser. You should see Mail-Archiver's sign-in page with no certificate warning.</li>
-      <li>Open MailBurrow and enter:
+      <li>Optional check: open your HTTPS address in the phone's browser. You should see your server's sign-in page with no certificate warning.</li>
+      <li>Open MailBurrow and choose the server type, <strong>Mail-Archiver</strong> or <strong>Open Archiver</strong>. The app never guesses it.</li>
+      <li>Enter:
         <ul>
-          <li><strong>HTTPS server address:</strong> for example <code>truenas.your-tailnet.ts.net</code>. <code>https://</code> is added if you leave it out.</li>
-          <li><strong>API key:</strong> the <code>ma_&hellip;</code> key from step 2.</li>
+          <li><strong>HTTPS server address:</strong> for example <code>truenas.your-tailnet.ts.net</code>, with <code>:8443</code> or another port if you used one. <code>https://</code> is added if you leave it out. Don't add <code>/api</code>.</li>
+          <li><strong>API key:</strong> the key from step 2.</li>
         </ul></li>
       <li>Tap <strong>Connect to archive</strong>.</li>
     </ol>
-    <p>If the key can see more than one mail account, switch between them from the account row or in Settings. <strong>Disconnect and forget connection</strong> in Settings removes the address and key from the phone; it doesn't revoke the key on the server.</p>
+    <p>If the key can see more than one mail account or source, switch between them from the account row or in Settings. <strong>Disconnect and forget connection</strong> in Settings removes the open archive's address and key from the phone; it doesn't revoke the key on the server.</p>
+  </section>
+
+  <section id="several"><h2>Several archives</h2>
+    <p>MailBurrow can keep up to 20 archives, for example a Mail-Archiver and an Open Archiver server, and switch between them without entering keys again.</p>
+    <ul>
+      <li><strong>Add one:</strong> tap the archive name above the account on the Mail tab, then <strong>Add archive</strong>. Choose its type, then enter its address and key.</li>
+      <li><strong>Switch:</strong> tap the archive name and pick another. The previous archive's mail is cleared before the new one loads, and each archive remembers the account or source you last used in it. If one can't be reached, the app says which, and offers <strong>Retry saved connection</strong> and your other archives. <strong>Cancel</strong> stops waiting.</li>
+      <li><strong>Manage:</strong> <strong>Settings &rarr; Archives</strong> lets you rename an archive, change its address or key, or forget it on this device. Changing an address or key always asks for the key again; the saved key is never sent to a new address. To use another server type, add it as a new archive.</li>
+    </ul>
+    <p>Only one archive is open at a time. There's no combined inbox or search across archives.</p>
   </section>
 
   <section id="problems"><h2>If something goes wrong</h2>
@@ -136,9 +195,10 @@
         <tr><td>Enter a valid HTTPS server address&hellip;</td><td>The address has <code>http://</code>, a username and password, a query or a fragment</td><td>Enter just the host name, or <code>https://</code> plus host name and optional path</td></tr>
         <tr><td>Unable to connect. Check your HTTPS address and private network.</td><td>Tailscale is off on the phone, the address is wrong, or Serve or the proxy isn't running</td><td>Turn on Tailscale, open the address in the phone's browser, check <code>tailscale serve status</code></td></tr>
         <tr><td>The server certificate could not be verified.</td><td>Self-signed or untrusted certificate</td><td>Use Tailscale Serve or a Let's Encrypt certificate</td></tr>
-        <tr><td>Your API key was not accepted.</td><td>Key mistyped, expired or revoked, or its user is inactive</td><td>Create a new key and enter it again</td></tr>
-        <tr><td>Archive API or message unavailable.</td><td>The API isn't enabled, Mail-Archiver is older than 2607.3, the address points at the wrong service, or the message is outside the key's accounts</td><td>Check <code>Api__Enabled=true</code> and the version, then the address</td></tr>
-        <tr><td>Too many requests. Wait and retry.</td><td>More than the rate limit (120 a minute by default)</td><td>Wait a minute</td></tr>
+        <tr><td>Your API key was not accepted.</td><td>Key mistyped, expired or revoked, or its user is inactive</td><td>Create a new key and enter it again; for a saved archive, use <strong>Enter a new key</strong></td></tr>
+        <tr><td>This source keeps full original messages&hellip;</td><td>The Open Archiver source has Preserve Original File turned on</td><td>Read it on Open Archiver's website; MailBurrow doesn't open those messages</td></tr>
+        <tr><td>Archive API or message unavailable.</td><td>Mail-Archiver's API isn't enabled or it's older than 2607.3, the wrong server type is chosen, the address points at the wrong service, or the message is outside the key's accounts or sources</td><td>Check the server type, <code>Api__Enabled=true</code> and the version, then the address</td></tr>
+        <tr><td>Too many requests. Wait and retry.</td><td>More than the rate limit (120 a minute by default for Mail-Archiver, about 100 for Open Archiver)</td><td>Wait a minute</td></tr>
         <tr><td>The server took too long to respond.</td><td>Slow connection or busy server</td><td>Retry; check the server is running</td></tr>
       </tbody>
     </table></div>
@@ -147,7 +207,7 @@
 
   <section id="security"><h2>Privacy and security in short</h2>
     <ul>
-      <li>Treat the API key as read access to its user's archived mail. Use a regular user, not an administrator, and only the accounts you need.</li>
+      <li>Treat the API key as read access to its user's archived mail. Use a regular user, not an administrator, with only the accounts or sources you need. For Open Archiver, use the read-only role from Open Archiver step 1.</li>
       <li>Your server keeps its own access logs. MailBurrow has no analytics or crash reporting. See the <a href="privacy.html">privacy notice</a>.</li>
       <li>MailBurrow downloads an attachment only when you choose to, and saves it where you pick.</li>
       <li>Report security problems privately through <a href="https://github.com/Kuncarlos91/MailBurrow/security">the repository's Security tab</a>.</li>
