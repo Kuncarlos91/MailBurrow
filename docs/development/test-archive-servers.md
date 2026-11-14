@@ -62,3 +62,24 @@ The reader needs a custom role with two rules, one on its source and one on that
 ## What this does not prove
 
 A successful export only proves the files match the demo data. Whether the server ingested every message and attachment, how it stores and returns them, and whether a restricted key is isolated from other sources are separate checks, run against the live test server. Record them with the server's exact version.
+
+## Phone memory check with stress mail
+
+[generate_stress_mail.py](../../tools/generate_stress_mail.py) writes `stress-mail.zip`: ten fictional messages for the 0.4.0 release check of memory on the phone. They include long bodies, quoted-printable and base64 encodings, legacy character sets, six inline images, 30 levels of nesting, 400 parts, about 190 KiB of headers, one message just under the app's 10 MiB message limit and one just over it. Output is deterministic and uses only `stress.example` addresses.
+
+```
+python tools/generate_stress_mail.py --out build/stress-eml
+```
+
+1. In the test Open Archiver, add an **EML Import** source from `build/stress-eml/stress-mail.zip`. Leave **Preserve Original File** off.
+2. Add that source's ID to the phone reader's role policy (see the [setup guide](../setup-guide.md#open-archiver-step-1-create-a-read-only-role)).
+3. Connect the phone by USB, open MailBurrow on that source, then for each message run [sample_app_memory.ps1](../../tools/sample_app_memory.ps1) on Windows:
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File tools\sample_app_memory.ps1 -Label text-1m
+   ```
+
+   Open the message, wait until it shows, go back, then press Ctrl+C. The script prints the start, peak and growth of the app's resident memory, plus the kernel's high-water mark since the app started. It reads only the app's `/proc/<pid>/status` through adb and prints no content.
+4. Open each message twice in a row for the repeated-open check. **over-limit** must show the "too large" message rather than opening. For the cancellation check, open **near-limit** and press Back while it loads: the app should return at once and memory should fall back.
+
+Keep the measured numbers in the maintainer's private release records, as the [0.4.0 candidate guide](../releasing/android-0.4.0.md) says; the public guide lists only the check.
