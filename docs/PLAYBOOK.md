@@ -164,3 +164,5 @@ The Open Archiver lab checker validates Phase 3 list/search/detail field contrac
 | 2026-11-06 | No offline or local mail cache; mail is fetched only when the user asks to view it | Decision to limit privacy risk: no message lists, bodies or attachments are kept on the device between views. Offline reading is out of scope; do not add a cache, prefetching or a local mail database without a new maintainer decision. |
 
 Update affected behavior and decisions with future changes. See [maintenance rules](development/documentation.md).
+
+Synthetic phone-memory fixtures must retain their intended MIME structure after import. Legacy-charset alternatives are selected bodies, CID images are explicitly inline, and the many-parts fixture uses body parts. The RSS sampler parses field names independent of proc ordering and does not use cross-UID signal permission as a process-liveness test; sampled peaks and process-lifetime VmHWM have different limits, and before/after snapshots do not establish peak memory. See [lab stress checks](development/test-archive-servers.md#phone-memory-check-with-stress-mail).
