@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../account_selector.dart';
 import '../archive_models.dart';
+import '../archive_picker.dart';
 import '../archive_backend.dart';
 import '../demo/demo_banner.dart';
 import '../pagination.dart';
@@ -105,6 +106,21 @@ class _ArchiveHomeState extends State<ArchiveHome> {
       return;
     }
     await session.switchAccount(choice);
+  }
+
+  Future<void> chooseArchive() async {
+    if (!session.canSwitchArchive) return;
+    final choice = await showArchivePicker(
+      context,
+      archives: session.archives,
+      activeId: session.activeArchiveId,
+    );
+    if (!mounted || choice == null || session.setup) return;
+    if (choice == addArchiveChoice) {
+      session.openSetup();
+      return;
+    }
+    await session.switchArchive(choice);
   }
 
   Future<void> chooseFolder() async {
@@ -241,12 +257,42 @@ class _ArchiveHomeState extends State<ArchiveHome> {
         ),
       );
     }
+    final opening = s.switchingArchive;
+    if (opening != null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('MailBurrow')),
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 24),
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      'Opening ${opening.label}…',
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(archiveDetails(opening), textAlign: TextAlign.center),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     final mailView = MailView(
       session: s,
       scrollController: mailScroll,
       searchFocus: searchFocus,
       searchFieldKey: searchFieldKey,
       onChooseAccount: chooseAccount,
+      onChooseArchive: chooseArchive,
       onChooseFilters: chooseFilters,
       onChooseFolder: chooseFolder,
       onChoosePage: choosePage,

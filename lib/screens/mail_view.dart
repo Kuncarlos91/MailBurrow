@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../account_selector.dart';
+import '../archive_picker.dart';
 import '../message_date.dart';
 import '../state/archive_session.dart';
 import 'message_reader.dart';
@@ -15,6 +16,7 @@ class MailView extends StatelessWidget {
     required this.searchFocus,
     required this.searchFieldKey,
     required this.onChooseAccount,
+    this.onChooseArchive,
     required this.onChooseFilters,
     required this.onChooseFolder,
     required this.onChoosePage,
@@ -24,6 +26,7 @@ class MailView extends StatelessWidget {
   final FocusNode searchFocus;
   final GlobalKey searchFieldKey;
   final VoidCallback onChooseAccount;
+  final VoidCallback? onChooseArchive;
   final VoidCallback onChooseFilters;
   final VoidCallback onChooseFolder;
   final VoidCallback onChoosePage;
@@ -35,6 +38,7 @@ class MailView extends StatelessWidget {
     final page = s.page;
     final totalPages = s.totalPages;
     final folders = s.capabilities.folders;
+    final archive = s.activeArchive;
     return CustomScrollView(
       controller: scrollController,
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -42,6 +46,21 @@ class MailView extends StatelessWidget {
         SliverToBoxAdapter(
           child: Column(
             children: [
+              if (archive != null)
+                ListTile(
+                  key: const ValueKey('current-archive'),
+                  dense: true,
+                  visualDensity: VisualDensity.compact,
+                  leading: const Icon(Icons.dns_outlined),
+                  title: Text(
+                    archive.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(archiveDetails(archive)),
+                  trailing: const Icon(Icons.unfold_more),
+                  onTap: s.canSwitchArchive ? onChooseArchive : null,
+                ),
               ListTile(
                 key: const ValueKey('current-mail-account'),
                 leading: const Icon(Icons.account_circle_outlined),
