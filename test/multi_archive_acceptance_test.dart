@@ -483,7 +483,11 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Change $hostB'), findsOneWidget);
       await tester.enterText(find.widgetWithText(TextField, 'API key'), 'rotated');
-      await tester.ensureVisible(find.text('Save and connect'));
+      await tester.scrollUntilVisible(
+        find.text('Save and connect'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.tap(find.text('Save and connect'));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('current-archive')), findsOneWidget);
