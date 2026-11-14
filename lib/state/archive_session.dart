@@ -92,7 +92,7 @@ class ArchiveSession extends ChangeNotifier {
   ArchiveServerType setupServerType = ArchiveServerType.mailArchiver;
 
   void chooseServerType(ArchiveServerType value) {
-    if (busy || value == setupServerType) return;
+    if (busy || reconfiguring != null || value == setupServerType) return;
     setupServerType = value;
     keyInput.clear();
     error = null;
@@ -126,6 +126,11 @@ class ArchiveSession extends ChangeNotifier {
   // The archive "Retry saved connection" opens after a failed switch; null
   // means the active saved connection.
   String? _retryArchiveId;
+
+  /// The saved archive whose address or key setup is changing, or null when
+  /// setup adds an archive. Its server type cannot change: a different type
+  /// is a new archive.
+  ConnectionProfile? reconfiguring;
 
   /// The open archive's saved profile, if any.
   ConnectionProfile? get activeArchive => demo || api == null
@@ -356,8 +361,15 @@ class ArchiveSession extends ChangeNotifier {
   /// [savedKey] and the saved [serverType] when restoring.
   /// [preferredAccountId] is the saved account as text; it is matched against
   /// each account's ID in its text form.
-  Future<void> connect([String? savedKey, String? preferredAccountId]) =>
-      _connect(savedKey, preferredAccountId, null);
+  ///
+  /// While [reconfiguring], the entered address and key replace that saved
+  /// archive's once they are validated; the saved key is never sent.
+  Future<void> connect([String? savedKey, String? preferredAccountId]) {
+    final target = savedKey == null ? reconfiguring : null;
+    return target == null
+        ? _connect(savedKey, preferredAccountId, null)
+        : _connect(null, target.accountId, target.id);
+  }
 
   /// [profileId] names the saved archive being opened by [switchArchive].
   Future<void> _connect(
@@ -395,6 +407,19 @@ class ArchiveSession extends ChangeNotifier {
       }
       server.text = uri.toString();
       final type = savedKey == null ? setupServerType : serverType;
+      if (savedKey == null &&
+          profileId != null &&
+          archives.any(
+            (item) =>
+                item.id != profileId &&
+                item.serverType == type &&
+                item.server == uri.toString(),
+          )) {
+        error =
+            'Another saved archive already uses this server type and address.';
+        _notify();
+        return;
+      }
       final created = candidate = _backendFactory(type, uri, key);
       final accounts = await created.accounts();
       if (accounts.isEmpty) throw const ArchiveFailure(404);
@@ -409,7 +434,7 @@ class ArchiveSession extends ChangeNotifier {
       final pages = result.totalPages.clamp(1, 1000000);
       String savedId;
       try {
-        savedId = savedKey == null
+        savedId = savedKey == null && profileId == null
             ? await _store.add(
                 serverType: type,
                 server: uri.toString(),
@@ -464,6 +489,7 @@ class ArchiveSession extends ChangeNotifier {
       hasSavedConnection = true;
       activeArchiveId = savedId;
       _retryArchiveId = null;
+      reconfiguring = null;
       keyInput.clear();
       _notify();
       await _refreshArchives();
@@ -729,13 +755,64 @@ class ArchiveSession extends ChangeNotifier {
   }
 
   void openSetup() {
+    if (reconfiguring != null) server.text = api?.server.toString() ?? '';
+    reconfiguring = null;
     keyInput.clear();
     setup = true;
     error = null;
     _notify();
   }
 
+  /// Opens setup to change the saved archive [id]'s address or key. The
+  /// address starts as saved, the key must be entered again, and the server
+  /// type is fixed.
+  void openReconfigure(String id) {
+    if (busy || demo) return;
+    final profile = archives.where((item) => item.id == id).firstOrNull;
+    if (profile == null) return;
+    reconfiguring = profile;
+    setupServerType = profile.serverType;
+    server.text = profile.server;
+    keyInput.clear();
+    setup = true;
+    error = null;
+    _notify();
+  }
+
+  /// Renames the saved archive [id]. Returns false if it could not be saved.
+  Future<bool> renameArchive(String id, String label) async {
+    try {
+      await _store.rename(id, label);
+      return true;
+    } catch (_) {
+      return false;
+    } finally {
+      if (!_disposed) await _refreshArchives();
+    }
+  }
+
+  /// Forgets the saved archive [id] from this device. Forgetting the open
+  /// archive closes it and returns to setup without opening another.
+  /// Returns false if it could not be removed.
+  Future<bool> forgetArchive(String id) async {
+    if (busy && !mailLoading) return false;
+    if (!demo && api != null && id == activeArchiveId) {
+      await forgetConnection();
+      return api == null;
+    }
+    try {
+      await _store.forget(id);
+      return true;
+    } catch (_) {
+      return false;
+    } finally {
+      if (!_disposed) await _refreshArchives();
+    }
+  }
+
   void cancelSetup() {
+    if (reconfiguring != null) server.text = api?.server.toString() ?? '';
+    reconfiguring = null;
     keyInput.clear();
     setup = false;
     setupServerType = serverType;
@@ -770,6 +847,7 @@ class ArchiveSession extends ChangeNotifier {
       hasSavedConnection = false;
       activeArchiveId = null;
       _retryArchiveId = null;
+      reconfiguring = null;
       error = null;
       _notify();
       await _refreshArchives();

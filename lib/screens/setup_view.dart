@@ -15,6 +15,7 @@ class SetupView extends StatelessWidget {
     final busy = session.busy;
     final type = session.setupServerType;
     final openArchiver = type == ArchiveServerType.openArchiver;
+    final changing = session.reconfiguring;
     // Saved archives are listed when setup is the landing screen. With one
     // saved archive, "Retry saved connection" already covers it.
     final landing = session.api == null;
@@ -25,10 +26,22 @@ class SetupView extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        Text(
-          'A home for your\nemail history.',
-          style: Theme.of(context).textTheme.headlineLarge,
-        ),
+        if (changing == null)
+          Text(
+            'A home for your\nemail history.',
+            style: Theme.of(context).textTheme.headlineLarge,
+          )
+        else ...[
+          Text(
+            'Change ${changing.label}',
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Enter the API key again; the saved key is never sent to a changed address. To use another server type, add it as a new archive.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
         if (landing && session.savedArchivesUnreadable) ...[
           const SizedBox(height: 12),
           Text(
@@ -74,7 +87,7 @@ class SetupView extends StatelessWidget {
             ],
             selected: {type},
             showSelectedIcon: false,
-            onSelectionChanged: busy
+            onSelectionChanged: busy || changing != null
                 ? null
                 : (selection) => session.chooseServerType(selection.single),
           ),
@@ -119,14 +132,16 @@ class SetupView extends StatelessWidget {
         const SizedBox(height: 20),
         FilledButton(
           onPressed: busy ? null : () => session.connect(),
-          child: const Text('Connect to archive'),
+          child: Text(
+            changing == null ? 'Connect to archive' : 'Save and connect',
+          ),
         ),
-        if (session.hasSavedConnection)
+        if (session.hasSavedConnection && changing == null)
           TextButton(
             onPressed: busy ? null : session.retrySaved,
             child: const Text('Retry saved connection'),
           ),
-        if (!session.demo) ...[
+        if (!session.demo && changing == null) ...[
           const SizedBox(height: 12),
           OutlinedButton.icon(
             onPressed: busy ? null : session.startDemo,

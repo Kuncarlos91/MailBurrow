@@ -361,6 +361,61 @@ class ConnectionStore {
     await _storage.delete(key: _indexEntry);
   });
 
+  /// Renames the readable profile [id]. The label is cleaned with
+  /// [cleanLabel]. Throws [SavedArchiveMissing] when [id] is not saved and
+  /// [FormatException] when the index cannot be read.
+  Future<void> rename(String id, String label) => _serialized(() async {
+    final index = await _readIndex();
+    final profiles = [...?index?.profiles];
+    final at = profiles.indexWhere((item) => item.id == id);
+    if (index == null || at < 0) throw SavedArchiveMissing();
+    final current = profiles[at];
+    profiles[at] = (
+      id: current.id,
+      label: cleanLabel(label, current.server),
+      serverType: current.serverType,
+      server: current.server,
+      accountId: current.accountId,
+    );
+    await _writeIndex(index.active, profiles, index.unreadable);
+  });
+
+  /// Forgets the readable profile [id] and its key; other profiles are kept.
+  /// Forgetting the active profile leaves none active. Server mail and keys
+  /// on the server are not touched. Throws [SavedArchiveMissing] when [id] is
+  /// not saved and [FormatException] when the index cannot be read.
+  Future<void> forget(String id) => _serialized(() async {
+    final index = await _readIndex();
+    if (index == null || !index.profiles.any((item) => item.id == id)) {
+      throw SavedArchiveMissing();
+    }
+    await _writeIndex(
+      index.active == id ? null : index.active,
+      [
+        for (final item in index.profiles)
+          if (item.id != id) item,
+      ],
+      index.unreadable,
+    );
+    await _deleteQuietly('$_keyPrefix$id');
+  });
+
+  /// A label as saved: control characters become spaces, surrounding space
+  /// is removed, an empty label becomes [defaultLabel] of [server], and the
+  /// result is cut to [maxLabelLength] UTF-16 units without splitting a
+  /// character.
+  static String cleanLabel(String label, String server) {
+    final text = label.replaceAll(RegExp(r'[\x00-\x1F\x7F]+'), ' ').trim();
+    if (text.isEmpty) return defaultLabel(server);
+    final runes = text.runes.toList();
+    var result = text;
+    while (result.length > maxLabelLength) {
+      runes.removeLast();
+      result = String.fromCharCodes(runes).trimRight();
+    }
+    return result;
+  }
+
   /// Forgets the active connection: its profile, its key and any legacy
   /// record. Other profiles are kept. An unreadable index is preserved and
   /// causes a format failure; this is not an all-archives reset.
