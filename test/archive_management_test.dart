@@ -197,6 +197,7 @@ void main() {
       // Add a second Mail-Archiver archive, then try to move a.example onto
       // its address.
       session.openSetup();
+      session.chooseServerType(ArchiveServerType.mailArchiver);
       session.server.text = 'c.example';
       session.keyInput.text = 'key-c';
       await session.connect();
