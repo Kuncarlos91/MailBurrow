@@ -69,11 +69,51 @@ Future<Map<String, String>> keyEntries() async => {
     if (entry.key.startsWith('connection.key.')) entry.key: entry.value,
 };
 
+class ResetFailureEntries extends SecureEntries {
+  String? failDelete;
+  bool failListing = false;
+  @override
+  Future<Map<String, String>> readAll() async {
+    if (failListing) throw StateError('storage unavailable');
+    return super.readAll();
+  }
+  @override
+  Future<void> delete({required String key}) async {
+    if (key == failDelete) throw StateError('delete failed');
+    return super.delete(key: key);
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() => FlutterSecureStorage.setMockInitialValues({}));
 
   group('store', () {
+    test('adding before migration preserves the legacy archive', () async {
+      await storage.write(key: 'connection', value: ConnectionStore.encode(
+        serverType: ArchiveServerType.mailArchiver, server: first,
+        key: 'legacy-key', accountId: '2'));
+      await store.add(serverType: ArchiveServerType.openArchiver,
+        server: second, key: 'new-key', accountId: '1');
+      final profiles = await store.profiles();
+      expect(profiles, hasLength(2));
+      final legacy = profiles.firstWhere((profile) => profile.server == first);
+      expect((await store.connection(legacy.id)).key, 'legacy-key');
+      expect((await store.connection(legacy.id)).accountId, '2');
+      expect((await store.read())?.key, 'new-key');
+    });
+
+    test('an unreadable legacy record is preserved and offers reset', () async {
+      await storage.write(key: 'connection', value: '{"version":99}');
+      expect((await store.overview()).unreadable, isTrue);
+      await expectLater(store.add(serverType: ArchiveServerType.mailArchiver,
+        server: second, key: 'new-key', accountId: null), throwsFormatException);
+      expect(await storage.read(key: 'connection'), '{"version":99}');
+      await store.reset();
+      expect((await store.overview()).unreadable, isFalse);
+      expect(await storage.readAll(), isEmpty);
+    });
+
     test('add keeps other archives and makes the new one active', () async {
       final a = await store.add(
         serverType: ArchiveServerType.mailArchiver,
@@ -201,6 +241,34 @@ void main() {
         throwsFormatException,
       );
       expect(await storage.read(key: 'connections'), '{broken');
+    });
+
+    test('reset failures keep the index and allow a complete retry', () async {
+      const id = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+      for (final fail in ['connection.key.$id', 'connection', 'connections']) {
+        FlutterSecureStorage.setMockInitialValues({
+          'connections': '{"version":99}',
+          'connection.key.$id': 'saved-key',
+          'connection': 'legacy',
+          'unrelated': 'keep',
+        });
+        final entries = ResetFailureEntries()..failDelete = fail;
+        final failing = ConnectionStore(entries: entries);
+        await expectLater(failing.reset(), throwsStateError);
+        expect(await storage.read(key: 'connections'), '{"version":99}');
+        entries.failDelete = null;
+        await failing.reset();
+        expect(await storage.readAll(), {'unrelated': 'keep'});
+      }
+    });
+
+    test('reset listing failure leaves every entry untouched', () async {
+      final before = {'connections': '{"version":99}', 'connection': 'legacy',
+        'connection.key.abc': 'saved-key'};
+      FlutterSecureStorage.setMockInitialValues(before);
+      final entries = ResetFailureEntries()..failListing = true;
+      await expectLater(ConnectionStore(entries: entries).reset(), throwsStateError);
+      expect(await storage.readAll(), before);
     });
 
     test('reset removes every saved archive, key and legacy record only', () async {
@@ -362,6 +430,26 @@ void main() {
       expect(session.activeArchive, isNull);
       session.exitDemo();
       expect(session.setup, isTrue);
+    });
+
+    test('failed reset stays available and reports failure until retry succeeds', () async {
+      const id = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+      FlutterSecureStorage.setMockInitialValues({
+        'connections': '{"version":99}', 'connection.key.$id': 'saved-key',
+      });
+      final entries = ResetFailureEntries()..failDelete = 'connection.key.$id';
+      final value = ArchiveSession(store: ConnectionStore(entries: entries));
+      addTearDown(value.dispose);
+      await value.restore();
+      await value.resetSavedArchives();
+      expect(value.error, 'Could not remove the saved archives. Try again.');
+      expect(value.savedArchivesUnreadable, isTrue);
+      expect(await storage.read(key: 'connection.key.$id'), 'saved-key');
+      entries.failDelete = null;
+      await value.resetSavedArchives();
+      expect(value.savedArchivesUnreadable, isFalse);
+      expect(value.error, isNull);
+      expect(await storage.readAll(), isEmpty);
     });
 
     test('the reset is offered only for an unreadable index', () async {

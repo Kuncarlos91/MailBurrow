@@ -338,7 +338,9 @@ void main() {
       expect(created, 0, reason: 'no request is sent with the saved key');
       expect(session.api, isNull);
       expect(session.setup, isTrue);
-      expect(session.error, contains('Saved connection unavailable'));
+      expect(session.error,
+          contains('Saved archives on this device cannot be read'));
+      expect(session.savedArchivesUnreadable, isTrue);
     },
   );
 
@@ -371,7 +373,9 @@ void main() {
         expect(created, 0);
         expect(session.api, isNull);
         expect(session.setup, isTrue);
-        expect(session.error, contains('Saved connection unavailable'));
+        expect(session.error,
+            contains('Saved archives on this device cannot be read'));
+        expect(session.savedArchivesUnreadable, isTrue);
         expect(
           await savedConnectionText(),
           encoded,

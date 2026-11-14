@@ -196,7 +196,17 @@ class ConnectionStore {
     required String key,
     required String? accountId,
   }) => _serialized(() async {
-    final index = await _readIndex() ?? ConnectionIndex.empty;
+    var existing = await _readIndex();
+    if (existing == null) {
+      final legacy = await _storage.read(key: _legacyEntry);
+      if (legacy != null) {
+        // Adding another archive must not discard a legacy archive when its
+        // startup migration failed or has not run yet.
+        await _migrate(decode(legacy));
+        existing = await _readIndex();
+      }
+    }
+    final index = existing ?? ConnectionIndex.empty;
     final match = index.profiles
         .where((item) => item.serverType == serverType && item.server == server)
         .firstOrNull;
@@ -319,6 +329,14 @@ class ConnectionStore {
   Future<SavedArchives> overview() => _serialized(() async {
     final text = await _storage.read(key: _indexEntry);
     if (text == null) {
+      final legacy = await _storage.read(key: _legacyEntry);
+      if (legacy != null) {
+        try {
+          decode(legacy);
+        } on FormatException {
+          return (active: null, profiles: const <ConnectionProfile>[], unreadable: true);
+        }
+      }
       return (active: null, profiles: const <ConnectionProfile>[], unreadable: false);
     }
     try {
@@ -334,11 +352,13 @@ class ConnectionStore {
   /// stored entries cannot be listed, nothing is removed and this throws.
   Future<void> reset() => _serialized(() async {
     final all = await _storage.readAll();
-    await _storage.delete(key: _indexEntry);
-    await _deleteQuietly(_legacyEntry);
+    // Keep the index until all credentials are removed. On failure, setup
+    // can still offer a retry instead of claiming every key was forgotten.
     for (final name in [...all.keys]) {
-      if (name.startsWith(_keyPrefix)) await _deleteQuietly(name);
+      if (name.startsWith(_keyPrefix)) await _storage.delete(key: name);
     }
+    await _storage.delete(key: _legacyEntry);
+    await _storage.delete(key: _indexEntry);
   });
 
   /// Forgets the active connection: its profile, its key and any legacy
