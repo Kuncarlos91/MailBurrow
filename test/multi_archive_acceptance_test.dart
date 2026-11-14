@@ -26,7 +26,8 @@ const hostB = 'b.example';
 
 /// How a synthetic server behaves.
 class LabServer {
-  LabServer({this.acceptedKey, this.capabilities = ArchiveCapabilities.full});
+  LabServer({this.acceptedKey, ArchiveCapabilities? capabilities})
+    : capabilities = capabilities ?? ArchiveCapabilities.full;
   final ArchiveCapabilities capabilities;
 
   /// The only key the server accepts; null accepts any key.
