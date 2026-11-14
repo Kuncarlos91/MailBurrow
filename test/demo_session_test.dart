@@ -22,11 +22,12 @@ class RecordingStore extends ConnectionStore {
   }
 
   @override
-  Future<void> write({
+  Future<String> write({
     required ArchiveServerType serverType,
     required String server,
     required String key,
     required String? accountId,
+    String? profileId,
   }) {
     calls.add('write');
     return super.write(
@@ -34,7 +35,42 @@ class RecordingStore extends ConnectionStore {
       server: server,
       key: key,
       accountId: accountId,
+      profileId: profileId,
     );
+  }
+
+  @override
+  Future<String> add({
+    required ArchiveServerType serverType,
+    required String server,
+    required String key,
+    required String? accountId,
+  }) {
+    calls.add('add');
+    return super.add(
+      serverType: serverType,
+      server: server,
+      key: key,
+      accountId: accountId,
+    );
+  }
+
+  @override
+  Future<SavedConnection> connection(String id) {
+    calls.add('connection');
+    return super.connection(id);
+  }
+
+  @override
+  Future<SavedArchives> overview() {
+    calls.add('overview');
+    return super.overview();
+  }
+
+  @override
+  Future<void> reset() {
+    calls.add('reset');
+    return super.reset();
   }
 
   @override
@@ -145,7 +181,7 @@ void main() {
     await session.applyFilters(const SearchFilters(direction: 'outgoing'));
     session.exitDemo();
 
-    expect(store.calls, isEmpty, reason: 'no read, write or delete');
+    expect(store.calls, isEmpty, reason: 'no secure-storage call');
     expect(await savedRaw(), before);
     expect(session.setup, isTrue);
     expect(session.demo, isFalse);
@@ -231,7 +267,7 @@ void main() {
     expect(session.api, isA<RealArchive>());
     expect(session.account!.id, '7');
     await expectLater(demo.accounts(), throwsA(isA<StateError>()));
-    expect(store.calls, ['write']);
+    expect(store.calls, ['add', 'overview']);
     expect(
       jsonDecode((await savedRaw())!) as Map<String, dynamic>,
       containsPair('server', 'https://archive.example.com'),

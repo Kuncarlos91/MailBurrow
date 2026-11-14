@@ -147,7 +147,16 @@ class MemoryBackend implements ArchiveBackend {
 class FailingStore extends ConnectionStore {
   const FailingStore();
   @override
-  Future<void> write({
+  Future<String> write({
+    required ArchiveServerType serverType,
+    required String server,
+    required String key,
+    required String? accountId,
+    String? profileId,
+  }) async => throw Exception('storage unavailable');
+
+  @override
+  Future<String> add({
     required ArchiveServerType serverType,
     required String server,
     required String key,
