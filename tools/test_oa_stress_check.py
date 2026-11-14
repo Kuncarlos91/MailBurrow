@@ -1,4 +1,8 @@
 import io
+import email
+from email.message import EmailMessage
+from email.policy import SMTP
+from unittest.mock import patch
 import json
 import unittest
 
@@ -82,6 +86,124 @@ class StressCheckTest(unittest.TestCase):
         out = io.StringIO()
         self.assertEqual(check.main(["http://lab.example", "--source", SOURCE], key="k", out=out), 2)
         self.assertEqual(check.main(["https://lab.example", "--source", "../x"], key="k", out=out), 2)
+
+    def test_unknown_mime_values_are_never_printed(self):
+        secret = "sentinel-private-value"
+        raw = ("Content-Type: text/plain; charset=" + secret + "\r\n"
+               "Content-Transfer-Encoding: " + secret + "\r\n\r\nshort").encode()
+        def transport(url, headers):
+            if "ingestion-source" in url:
+                return 200, {}, json.dumps({"items": [{"id": "m1", "subject": "Stress 01 text-1m: case"}]}).encode()
+            return 200, {}, detail(raw)
+        code, text = run(transport)
+        self.assertEqual(code, 1)
+        self.assertNotIn(secret, text)
+        self.assertIn("other", text)
+
+    def test_legacy_charsets_in_skipped_parts_do_not_pass(self):
+        msg = EmailMessage(policy=SMTP)
+        msg.set_content("First selected UTF-8 body", charset="utf-8")
+        for charset in ("iso-8859-1", "windows-1252"):
+            msg.add_attachment("later".encode(), maintype="text", subtype="plain",
+                               params={"charset": charset})
+        facts = check.structure(msg.as_bytes())
+        self.assertFalse(check.EXPECTED["legacy-charsets"][1](facts))
+
+    def test_bodies_inside_an_ignored_rfc822_part_do_not_pass(self):
+        inner = EmailMessage(policy=SMTP)
+        inner.set_content("café", charset="iso-8859-1")
+        inner.add_alternative("<p>€</p>", subtype="html", charset="windows-1252")
+        outer = EmailMessage(policy=SMTP)
+        outer.set_type("message/rfc822")
+        outer.set_payload([inner])
+        self.assertFalse(check.EXPECTED["legacy-charsets"][1](check.structure(outer.as_bytes())))
+
+    def test_tiny_unreferenced_images_do_not_pass(self):
+        msg = EmailMessage(policy=SMTP)
+        msg.set_content("No image references")
+        for i in range(6):
+            msg.add_attachment(b"tiny", maintype="image", subtype="png",
+                               disposition="inline", cid=f"<img-{i}>")
+        self.assertFalse(check.EXPECTED["inline-images-6m"][1](check.structure(msg.as_bytes())))
+
+    def test_structures_beyond_app_limits_are_invalid(self):
+        for depth in (33, 60):
+            msg = EmailMessage(policy=SMTP)
+            msg.set_content("leaf")
+            for i in range(depth):
+                parent = EmailMessage(policy=SMTP)
+                parent.make_mixed()
+                parent.attach(msg)
+                msg = parent
+            self.assertFalse(check.structure(msg.as_bytes())["valid"])
+
+    def test_bad_listing_does_not_count_as_success(self):
+        for status, body in [(401, b"{}"), (200, b'{"items":[null]}')]:
+            code, text = run(lambda url, headers: (status, {}, body))
+            self.assertEqual(code, 1)
+            self.assertIn("not tested", text)
+
+    def test_rejects_unsafe_base_urls_before_contact(self):
+        for url in ("https://user:pass@lab.example", "https://lab.example#fragment",
+                    "https://lab.example?query=1", "https://lab.example:bad"):
+            def transport(*args):
+                self.fail("must not contact the server")
+            self.assertEqual(check.main([url, "--source", SOURCE], key="k",
+                                        transport=transport, out=io.StringIO()), 2)
+
+    def test_invalid_raw_bytes_and_duplicate_cases_fail_safely(self):
+        for duplicate in (False, True):
+            requests = []
+            def transport(url, headers):
+                requests.append(url)
+                if "ingestion-source" in url:
+                    item = {"id": "m1", "subject": "Stress 01 text-1m: case"}
+                    return 200, {}, json.dumps({"items": [item] * (2 if duplicate else 1)}).encode()
+                return 200, {}, b'{"raw":{"type":"Buffer","data":[true]}}'
+            code, text = run(transport)
+            self.assertEqual(code, 1)
+            self.assertIn("ERROR", text)
+            if duplicate:
+                self.assertEqual(len(requests), 1)
+
+    def test_transport_caps_reads_and_rejects_oversize(self):
+        class Response:
+            code = 200
+            headers = {}
+            def __init__(self, oversized):
+                self.oversized = oversized
+                self.read_size = None
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                pass
+            def read(self, size):
+                self.read_size = size
+                return b"x" * (size if self.oversized else 1)
+        class Opener:
+            def __init__(self, response):
+                self.response = response
+            def open(self, request, timeout):
+                self.method = request.get_method()
+                return self.response
+        for oversized in (False, True):
+            response = Response(oversized)
+            opener = Opener(response)
+            with patch.object(check, "MIB", 16), patch.object(check, "WIRE_LIMIT", 100), \
+                 patch.object(check.urllib.request, "build_opener", return_value=opener):
+                if oversized:
+                    with self.assertRaises(ValueError):
+                        check.bounded_transport("https://lab.example", {})
+                else:
+                    self.assertEqual(check.bounded_transport("https://lab.example", {})[2], b"x")
+            self.assertEqual(response.read_size, 117)
+            self.assertEqual(opener.method, "GET")
+
+    def test_deep_json_fails_without_a_traceback_or_server_text(self):
+        body = b'{"items":' + b'[' * 1200 + b'0' + b']' * 1200 + b'}'
+        code, text = run(lambda url, headers: (200, {}, body))
+        self.assertEqual(code, 1)
+        self.assertIn("not tested", text)
 
     def test_case_names_from_subjects(self):
         self.assertEqual(check.case_of("Stress 03 base64-text-1m: 1 MiB base64 text"), "base64-text-1m")
