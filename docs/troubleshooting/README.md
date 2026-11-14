@@ -105,3 +105,5 @@ A direct Gradle release after tests can fail on missing IntegrationTestPlugin be
 ### Opt-in local Android file diagnostics
 
 A local diagnostic build can add `--dart-define=MAILSHELF_FILE_DIAGNOSTICS=true`. Default builds do not enable this tracing. Native events use only fixed MailShelfFiles categories for grant retention, saved-reference registration, release and the Open outcome; never add URIs, file names, provider exception messages, attachment bytes, server settings or keys. This is local logcat output, not an analytics upload. Read only the MailShelfFiles tag and do not share broad device logs.
+
+On feature-branch builds with opening cancellation, Cancel is unavailable during the secure-storage commit and once the archive is open. Before that commit, cancelling returns to setup without activating the abandoned attempt; Retry starts another attempt.

@@ -98,6 +98,7 @@ class ArchiveSession extends ChangeNotifier {
     error = null;
     _notify();
   }
+
   ArchiveAccount? account;
   List<ArchiveFolder> folders = [];
   String? selectedFolder;
@@ -146,10 +147,15 @@ class ArchiveSession extends ChangeNotifier {
   int _openingToken = 0;
   int _connectToken = 0;
   ArchiveBackend? _pendingCandidate;
+  int? _committingConnectToken;
 
   /// True while the saved archive is being opened at startup or from the
   /// picker, so the progress screen can offer Cancel.
-  bool get canCancelOpening => restoring || switchingArchive != null;
+  bool get canCancelOpening =>
+      !_disposed &&
+      api == null &&
+      _committingConnectToken == null &&
+      (restoring || switchingArchive != null);
 
   /// Stops opening an archive at startup or from the picker without waiting
   /// for the server to answer or time out, and returns to setup with the
@@ -225,6 +231,7 @@ class ArchiveSession extends ChangeNotifier {
     mailRequestId++;
     searchTimer?.cancel();
     api?.close();
+    _pendingCandidate?.close();
     server.dispose();
     keyInput.dispose();
     search.dispose();
@@ -264,10 +271,10 @@ class ArchiveSession extends ChangeNotifier {
       (!busy || mailLoading);
 
   /// Reloads [archives] from the store. Failures keep the current list.
-  Future<void> _refreshArchives() async {
+  Future<void> _refreshArchives({bool Function()? isCurrent}) async {
     try {
       final saved = await _store.overview();
-      if (_disposed) return;
+      if (_disposed || (isCurrent != null && !isCurrent())) return;
       archives = saved.profiles;
       savedArchivesUnreadable = saved.unreadable;
       _savedActiveId = saved.active;
@@ -307,15 +314,17 @@ class ArchiveSession extends ChangeNotifier {
       }
     } finally {
       if (current()) {
-        await _refreshArchives();
-        if (api == null && _keyRefused) reconnectArchiveId = _savedActiveId;
-        if (savedArchivesUnreadable && api == null) {
-          error =
-              'Saved archives on this device cannot be read by this version of MailBurrow.';
+        await _refreshArchives(isCurrent: current);
+        if (current()) {
+          if (api == null && _keyRefused) reconnectArchiveId = _savedActiveId;
+          if (savedArchivesUnreadable && api == null) {
+            error =
+                'Saved archives on this device cannot be read by this version of MailBurrow.';
+          }
+          restoring = false;
+          busy = mailLoading;
+          _notify();
         }
-        restoring = false;
-        busy = mailLoading;
-        _notify();
       }
     }
   }
@@ -495,6 +504,7 @@ class ArchiveSession extends ChangeNotifier {
       final created = candidate = _backendFactory(type, uri, key);
       _pendingCandidate = created;
       final accounts = await created.accounts();
+      if (stale()) return;
       if (accounts.isEmpty) throw const ArchiveFailure(404);
       final preferred = accounts
           .where((item) => item.id == preferredAccountId)
@@ -507,6 +517,10 @@ class ArchiveSession extends ChangeNotifier {
       final pages = result.totalPages.clamp(1, 1000000);
       // A cancelled attempt saves and activates nothing.
       if (stale()) return;
+      // Once persistence begins it cannot be cancelled atomically. Disable
+      // Cancel before entering the store, and finish this commit consistently.
+      _committingConnectToken = token;
+      _notify();
       String savedId;
       try {
         savedId = savedKey == null && profileId == null
@@ -577,6 +591,7 @@ class ArchiveSession extends ChangeNotifier {
         _notify();
       }
     } finally {
+      if (_committingConnectToken == token) _committingConnectToken = null;
       if (identical(_pendingCandidate, candidate)) _pendingCandidate = null;
       if (!adopted) candidate?.close();
       if (!stale()) {
@@ -636,9 +651,7 @@ class ArchiveSession extends ChangeNotifier {
       return;
     }
     if (_disposed || !identical(api, requestApi)) return;
-    onAccountChanged?.call(
-      () => !_disposed && account?.id == choiceId,
-    );
+    onAccountChanged?.call(() => !_disposed && account?.id == choiceId);
     _clearBrowsing();
     account = choice;
     accountNotice = null;
