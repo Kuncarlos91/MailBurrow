@@ -109,6 +109,29 @@ class ArchiveSession extends ChangeNotifier {
   bool busy = true, setup = true;
   bool hasSavedConnection = false;
 
+  /// The readable saved archives, without keys, in saved order.
+  List<ConnectionProfile> archives = const [];
+
+  /// The saved profile of the open connection, or null for none or the demo.
+  String? activeArchiveId;
+
+  /// True when saved archives exist but this build cannot read them. Only
+  /// then does setup offer the all-archives reset.
+  bool savedArchivesUnreadable = false;
+
+  /// The archive being opened from the picker or setup, for its progress
+  /// screen; null otherwise.
+  ConnectionProfile? switchingArchive;
+
+  // The archive "Retry saved connection" opens after a failed switch; null
+  // means the active saved connection.
+  String? _retryArchiveId;
+
+  /// The open archive's saved profile, if any.
+  ConnectionProfile? get activeArchive => demo || api == null
+      ? null
+      : archives.where((item) => item.id == activeArchiveId).firstOrNull;
+
   /// True while the built-in demo archive is open. The demo is never saved:
   /// entering, browsing and exiting it never read, write or delete the saved
   /// connection, so a real connection saved earlier is kept.
@@ -173,6 +196,27 @@ class ArchiveSession extends ChangeNotifier {
 
   bool get canSwitchAccount => !accountSwitching && (!busy || mailLoading);
 
+  /// True when another saved archive can be opened now.
+  bool get canSwitchArchive =>
+      !demo &&
+      switchingArchive == null &&
+      !accountSwitching &&
+      (!busy || mailLoading);
+
+  /// Reloads [archives] from the store. Failures keep the current list.
+  Future<void> _refreshArchives() async {
+    try {
+      final saved = await _store.overview();
+      if (_disposed) return;
+      archives = saved.profiles;
+      savedArchivesUnreadable = saved.unreadable;
+      if (api != null && !demo) activeArchiveId = saved.active;
+    } catch (_) {
+      // Storage is unavailable; the picker keeps what it last showed.
+    }
+    _notify();
+  }
+
   Future<void> restore() async {
     restoring = true;
     busy = true;
@@ -196,8 +240,113 @@ class ArchiveSession extends ChangeNotifier {
       }
     } finally {
       if (!_disposed) {
+        await _refreshArchives();
+        if (savedArchivesUnreadable && api == null) {
+          error =
+              'Saved archives on this device cannot be read by this version of MailBurrow.';
+        }
         restoring = false;
         busy = mailLoading;
+        _notify();
+      }
+    }
+  }
+
+  /// Retries the saved connection that failed last: the archive a failed
+  /// switch tried to open, otherwise the active saved connection.
+  Future<void> retrySaved() async {
+    final id = _retryArchiveId;
+    if (id != null && archives.any((item) => item.id == id)) {
+      await switchArchive(id);
+    } else {
+      _retryArchiveId = null;
+      await restore();
+    }
+  }
+
+  /// Opens the saved archive [id] with its saved key and account.
+  ///
+  /// The open archive's content is cleared and its requests cancelled before
+  /// the destination is contacted, so its mail is never shown under the new
+  /// label. The destination becomes active only once it answers; if it fails,
+  /// setup shows a destination-specific error with Retry and the saved
+  /// archives, and the previous archive stays saved and active for restart.
+  Future<void> switchArchive(String id) async {
+    if (!canSwitchArchive) return;
+    final profile = archives.where((item) => item.id == id).firstOrNull;
+    if (profile == null) return;
+    if (!setup && api != null && id == activeArchiveId) return;
+    api?.close();
+    _invalidateRequests();
+    _clearBrowsing();
+    activeQuery = '';
+    activeMailPage = 1;
+    searchElapsed = Duration.zero;
+    reloadPending = false;
+    api = null;
+    activeArchiveId = null;
+    account = null;
+    accountNotice = null;
+    accountLoading = false;
+    accountSwitchGeneration++;
+    mailRequestFailed = false;
+    messages = [];
+    keyInput.clear();
+    switchingArchive = profile;
+    _retryArchiveId = id;
+    busy = true;
+    error = null;
+    _notify();
+    String? failure;
+    try {
+      final saved = await _store.connection(id);
+      if (_disposed) return;
+      serverType = saved.serverType;
+      setupServerType = saved.serverType;
+      server.text = saved.server;
+      await _connect(saved.key, saved.accountId, id);
+      failure = api == null ? error : null;
+    } on FormatException {
+      failure = 'Its saved details cannot be read. Add it again.';
+    } catch (_) {
+      failure = 'Could not read its saved details from this device.';
+    } finally {
+      if (!_disposed) {
+        switchingArchive = null;
+        if (api == null) {
+          setup = true;
+          hasSavedConnection = true;
+          server.clear();
+          error =
+              'Could not open ${profile.label} (${profile.serverType.label}). ${failure ?? ''}'
+                  .trim();
+        }
+        busy = mailLoading;
+        _notify();
+      }
+    }
+  }
+
+  /// The explicit all-archives reset, offered only when the saved archives
+  /// cannot be read: removes every saved archive and key from this device.
+  /// No server is contacted and no server mail is changed.
+  Future<void> resetSavedArchives() async {
+    if (!savedArchivesUnreadable || busy || api != null) return;
+    busy = true;
+    error = null;
+    _notify();
+    try {
+      await _store.reset();
+      if (_disposed) return;
+      hasSavedConnection = false;
+      _retryArchiveId = null;
+      activeArchiveId = null;
+    } catch (_) {
+      if (!_disposed) error = 'Could not remove the saved archives. Try again.';
+    } finally {
+      if (!_disposed) {
+        await _refreshArchives();
+        busy = false;
         _notify();
       }
     }
@@ -207,7 +356,15 @@ class ArchiveSession extends ChangeNotifier {
   /// [savedKey] and the saved [serverType] when restoring.
   /// [preferredAccountId] is the saved account as text; it is matched against
   /// each account's ID in its text form.
-  Future<void> connect([String? savedKey, String? preferredAccountId]) async {
+  Future<void> connect([String? savedKey, String? preferredAccountId]) =>
+      _connect(savedKey, preferredAccountId, null);
+
+  /// [profileId] names the saved archive being opened by [switchArchive].
+  Future<void> _connect(
+    String? savedKey,
+    String? preferredAccountId,
+    String? profileId,
+  ) async {
     mailRequestFailed = false;
     accountSwitchGeneration++;
     accountLoading = false;
@@ -250,13 +407,36 @@ class ArchiveSession extends ChangeNotifier {
       final result = await created.emails(selected.id, '', 1);
       final items = result.items;
       final pages = result.totalPages.clamp(1, 1000000);
+      String savedId;
       try {
-        await _store.write(
-          serverType: type,
-          server: uri.toString(),
-          key: key,
-          accountId: selected.id,
-        );
+        savedId = savedKey == null
+            ? await _store.add(
+                serverType: type,
+                server: uri.toString(),
+                key: key,
+                accountId: selected.id,
+              )
+            : await _store.write(
+                serverType: type,
+                server: uri.toString(),
+                key: key,
+                accountId: selected.id,
+                profileId: profileId,
+              );
+      } on TooManySavedArchives {
+        if (!_disposed) {
+          error =
+              'Connected to the server, but this device already has the most saved archives MailBurrow allows (${ConnectionStore.maxProfiles}). Forget one first.';
+          _notify();
+        }
+        return;
+      } on SavedArchiveMissing {
+        if (!_disposed) {
+          error =
+              'Connected to the server, but this archive is no longer saved on this device.';
+          _notify();
+        }
+        return;
       } catch (_) {
         if (!_disposed) {
           error =
@@ -282,8 +462,11 @@ class ArchiveSession extends ChangeNotifier {
       totalPages = pages;
       setup = false;
       hasSavedConnection = true;
+      activeArchiveId = savedId;
+      _retryArchiveId = null;
       keyInput.clear();
       _notify();
+      await _refreshArchives();
       await loadFolders();
     } catch (failure) {
       if (!_disposed) {
@@ -585,8 +768,11 @@ class ArchiveSession extends ChangeNotifier {
       keyInput.clear();
       setup = true;
       hasSavedConnection = false;
+      activeArchiveId = null;
+      _retryArchiveId = null;
       error = null;
       _notify();
+      await _refreshArchives();
     } catch (_) {
       if (!_disposed) {
         error = 'Could not remove the saved connection.';

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../archive_picker.dart';
 import '../archive_server_type.dart';
 import '../public_information.dart';
 import '../state/archive_session.dart';
@@ -14,6 +15,13 @@ class SetupView extends StatelessWidget {
     final busy = session.busy;
     final type = session.setupServerType;
     final openArchiver = type == ArchiveServerType.openArchiver;
+    // Saved archives are listed when setup is the landing screen. With one
+    // saved archive, "Retry saved connection" already covers it.
+    final landing = session.api == null;
+    final showArchives =
+        landing &&
+        session.archives.isNotEmpty &&
+        (session.archives.length > 1 || !session.hasSavedConnection);
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -21,6 +29,38 @@ class SetupView extends StatelessWidget {
           'A home for your\nemail history.',
           style: Theme.of(context).textTheme.headlineLarge,
         ),
+        if (landing && session.savedArchivesUnreadable) ...[
+          const SizedBox(height: 12),
+          Text(
+            'Saved archives on this device cannot be read by this version of MailBurrow. Update the app, or remove them all and add your archives again.',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: busy ? null : () => _confirmReset(context),
+            icon: const Icon(Icons.delete_sweep_outlined),
+            label: const Text('Remove all saved archives…'),
+          ),
+        ],
+        if (showArchives) ...[
+          const SizedBox(height: 12),
+          Text(
+            'Saved archives',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          for (final profile in session.archives)
+            SavedArchiveTile(
+              profile: profile,
+              onTap: busy || !session.canSwitchArchive
+                  ? null
+                  : () => session.switchArchive(profile.id),
+            ),
+          const SizedBox(height: 8),
+          Text(
+            'Or add an archive',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+        ],
         const SizedBox(height: 12),
         // The choice replaces the introduction line, which moves to the
         // notes below, so the form keeps its height on small screens.
@@ -83,7 +123,7 @@ class SetupView extends StatelessWidget {
         ),
         if (session.hasSavedConnection)
           TextButton(
-            onPressed: busy ? null : session.restore,
+            onPressed: busy ? null : session.retrySaved,
             child: const Text('Retry saved connection'),
           ),
         if (!session.demo) ...[
@@ -116,5 +156,28 @@ class SetupView extends StatelessWidget {
           ),
       ],
     );
+  }
+
+  Future<void> _confirmReset(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove all saved archives?'),
+        content: const Text(
+          'This removes every saved archive and API key from this device. Mail on your servers is not changed. You will need to enter your API keys again.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Remove all'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await session.resetSavedArchives();
   }
 }

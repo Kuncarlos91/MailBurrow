@@ -147,7 +147,16 @@ class MemoryBackend implements ArchiveBackend {
 class FailingStore extends ConnectionStore {
   const FailingStore();
   @override
-  Future<void> write({
+  Future<String> write({
+    required ArchiveServerType serverType,
+    required String server,
+    required String key,
+    required String? accountId,
+    String? profileId,
+  }) async => throw Exception('storage unavailable');
+
+  @override
+  Future<String> add({
     required ArchiveServerType serverType,
     required String server,
     required String key,
@@ -329,7 +338,9 @@ void main() {
       expect(created, 0, reason: 'no request is sent with the saved key');
       expect(session.api, isNull);
       expect(session.setup, isTrue);
-      expect(session.error, contains('Saved connection unavailable'));
+      expect(session.error,
+          contains('Saved archives on this device cannot be read'));
+      expect(session.savedArchivesUnreadable, isTrue);
     },
   );
 
@@ -362,7 +373,9 @@ void main() {
         expect(created, 0);
         expect(session.api, isNull);
         expect(session.setup, isTrue);
-        expect(session.error, contains('Saved connection unavailable'));
+        expect(session.error,
+            contains('Saved archives on this device cannot be read'));
+        expect(session.savedArchivesUnreadable, isTrue);
         expect(
           await savedConnectionText(),
           encoded,
