@@ -2,7 +2,9 @@
 
 All notable changes to MailBurrow are recorded here. Versions follow the app version shown in Settings.
 
-## Unreleased (feature/open-archiver)
+## 0.4.0 (build26) - unreleased
+
+Release preparation is not artifact or device sign-off. Candidate plan and gates: [Android 0.4.0 candidate](docs/releasing/android-0.4.0.md).
 
 Support for a second archive server type, Open Archiver 0.6.2. Mail-Archiver users see a new server-type choice in setup; their saved connections are unchanged.
 
