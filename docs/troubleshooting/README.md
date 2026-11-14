@@ -12,7 +12,7 @@ If Android says **App not installed** when updating, the new APK was signed with
 
 On feature-branch builds using saved-archive format v3, an unreadable or newer-format archive index is preserved. Ordinary Connect and Forget do not reset that index. Retry with a compatible build and report only the app version and sanitized error; do not share secure-storage contents or uninstall/clear app data as a first recovery step. If no compatible build helps, setup offers **Remove all saved archives…** only in this situation; after confirmation it removes every saved archive and key on this device (never server mail), and you add your archives again with their keys. If removal fails, retry the confirmed reset: it retains the unreadable index until credentials have been removed successfully. An unreadable legacy connection also offers this reset.
 
-On feature-branch builds with several saved archives, a failed switch shows the archive's name and returns to setup: use **Retry saved connection** for that archive, or pick another from **Saved archives**. The previously open archive stays saved. Check that archive's server and private network as for a single connection.
+On feature-branch builds with several saved archives, a failed switch shows the archive's name and returns to setup: use **Retry saved connection** for that archive, or pick another from **Saved archives**. The previously open archive stays saved. Check that archive's server and private network as for a single connection. If its key was revoked or expired, use **Enter a new key for <name>** and paste a new key for that archive; the saved key is not sent again.
 
 ## Connection and request failures
 

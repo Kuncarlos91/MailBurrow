@@ -132,6 +132,26 @@ class ArchiveSession extends ChangeNotifier {
   /// is a new archive.
   ConnectionProfile? reconfiguring;
 
+  /// The saved archive whose key the server refused when it was last
+  /// opened, offered "Enter a new key" in setup; null otherwise.
+  String? reconnectArchiveId;
+
+  // The failure of the last connection attempt, and the saved active
+  // profile ID from the store (also while nothing is open).
+  Object? _lastConnectFailure;
+  String? _savedActiveId;
+
+  /// The archive [reconnectArchiveId] names, if it is still saved.
+  ConnectionProfile? get reconnectArchive => api != null
+      ? null
+      : archives.where((item) => item.id == reconnectArchiveId).firstOrNull;
+
+  bool get _keyRefused {
+    final failure = _lastConnectFailure;
+    return failure is ArchiveFailure &&
+        (failure.status == 401 || failure.status == 403);
+  }
+
   /// The open archive's saved profile, if any.
   ConnectionProfile? get activeArchive => demo || api == null
       ? null
@@ -215,6 +235,7 @@ class ArchiveSession extends ChangeNotifier {
       if (_disposed) return;
       archives = saved.profiles;
       savedArchivesUnreadable = saved.unreadable;
+      _savedActiveId = saved.active;
       if (api != null && !demo) activeArchiveId = saved.active;
     } catch (_) {
       // Storage is unavailable; the picker keeps what it last showed.
@@ -224,6 +245,8 @@ class ArchiveSession extends ChangeNotifier {
 
   Future<void> restore() async {
     reconfiguring = null;
+    reconnectArchiveId = null;
+    _lastConnectFailure = null;
     keyInput.clear();
     restoring = true;
     busy = true;
@@ -248,6 +271,7 @@ class ArchiveSession extends ChangeNotifier {
     } finally {
       if (!_disposed) {
         await _refreshArchives();
+        if (api == null && _keyRefused) reconnectArchiveId = _savedActiveId;
         if (savedArchivesUnreadable && api == null) {
           error =
               'Saved archives on this device cannot be read by this version of MailBurrow.';
@@ -302,6 +326,8 @@ class ArchiveSession extends ChangeNotifier {
     keyInput.clear();
     switchingArchive = profile;
     _retryArchiveId = id;
+    reconnectArchiveId = null;
+    _lastConnectFailure = null;
     busy = true;
     error = null;
     _notify();
@@ -324,6 +350,7 @@ class ArchiveSession extends ChangeNotifier {
         if (api == null) {
           setup = true;
           hasSavedConnection = true;
+          if (_keyRefused) reconnectArchiveId = id;
           server.clear();
           error =
               'Could not open ${profile.label} (${profile.serverType.label}). ${failure ?? ''}'
@@ -380,6 +407,7 @@ class ArchiveSession extends ChangeNotifier {
     String? preferredAccountId,
     String? profileId,
   ) async {
+    _lastConnectFailure = null;
     mailRequestFailed = false;
     accountSwitchGeneration++;
     accountLoading = false;
@@ -493,11 +521,13 @@ class ArchiveSession extends ChangeNotifier {
       activeArchiveId = savedId;
       _retryArchiveId = null;
       reconfiguring = null;
+      reconnectArchiveId = null;
       keyInput.clear();
       _notify();
       await _refreshArchives();
       await loadFolders();
     } catch (failure) {
+      _lastConnectFailure = failure;
       if (!_disposed) {
         error = readableError(failure);
         _notify();
@@ -814,6 +844,16 @@ class ArchiveSession extends ChangeNotifier {
   }
 
   void cancelSetup() {
+    if (api == null) {
+      // Leaving a key change started from setup itself: stay on setup.
+      if (reconfiguring == null) return;
+      reconfiguring = null;
+      server.clear();
+      keyInput.clear();
+      error = null;
+      _notify();
+      return;
+    }
     if (reconfiguring != null) server.text = api?.server.toString() ?? '';
     reconfiguring = null;
     keyInput.clear();

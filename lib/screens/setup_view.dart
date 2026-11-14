@@ -24,6 +24,8 @@ class SetupView extends StatelessWidget {
         session.archives.isNotEmpty &&
         (session.archives.length > 1 || !session.hasSavedConnection);
     return ListView(
+      // Opening the change form starts at its heading.
+      key: ValueKey(changing?.id),
       padding: const EdgeInsets.all(24),
       children: [
         if (changing == null)
@@ -136,6 +138,14 @@ class SetupView extends StatelessWidget {
             changing == null ? 'Connect to archive' : 'Save and connect',
           ),
         ),
+        if (session.reconnectArchive case final refused?
+            when changing == null)
+          FilledButton.tonal(
+            onPressed: busy
+                ? null
+                : () => session.openReconfigure(refused.id),
+            child: Text('Enter a new key for ${refused.label}'),
+          ),
         if (session.hasSavedConnection && changing == null)
           TextButton(
             onPressed: busy ? null : session.retrySaved,
@@ -164,7 +174,7 @@ class SetupView extends StatelessWidget {
           'Configure your own server and private-network access. If your server uses Tailscale, connect its app first. Connection details are saved securely on this device.',
         ),
         const PublicInformationLinks(),
-        if (session.api != null)
+        if (session.api != null || changing != null)
           TextButton(
             onPressed: busy ? null : session.cancelSetup,
             child: const Text('Cancel'),
