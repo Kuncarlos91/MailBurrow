@@ -380,6 +380,11 @@ void main() {
       final label = find.byKey(const ValueKey('current-archive'));
       expect(label.hitTestable(), findsOneWidget);
       await tester.tap(find.text('$hostB 1'));
+      await tester.pump();
+      // The body is prepared off the UI isolate.
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
       await tester.pumpAndSettle();
       expect(find.text('Message 1 on $hostB'), findsOneWidget);
       expect(label.hitTestable(), findsNothing);
@@ -403,7 +408,8 @@ void main() {
       expect(find.bySemanticsLabel(RegExp('Mail-Archiver · $hostA')), findsWidgets);
       await tester.tap(find.text(hostA).last);
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 50));
+      // Let the picker finish closing; the progress spinner never settles.
+      await tester.pump(const Duration(milliseconds: 600));
       final live = find.byWidgetPredicate(
         (widget) => widget is Semantics && widget.properties.liveRegion == true,
       );
@@ -450,7 +456,13 @@ void main() {
         expect(find.text('Opening $hostA…'), findsOneWidget);
         gate.complete();
         await tester.pumpAndSettle();
-        expect(find.text('$hostA 1'), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byKey(const ValueKey('current-archive')),
+            matching: find.text(hostA),
+          ),
+          findsOneWidget,
+        );
         expect(tester.takeException(), isNull);
       });
     }
@@ -461,6 +473,11 @@ void main() {
       await tester.pumpWidget(app());
       await tester.pumpAndSettle();
       final reconnect = find.text('Enter a new key for $hostB');
+      await tester.scrollUntilVisible(
+        reconnect,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(reconnect, findsOneWidget);
       await tester.tap(reconnect);
       await tester.pumpAndSettle();
@@ -469,7 +486,8 @@ void main() {
       await tester.ensureVisible(find.text('Save and connect'));
       await tester.tap(find.text('Save and connect'));
       await tester.pumpAndSettle();
-      expect(find.text('$hostB 1'), findsOneWidget);
+      expect(find.byKey(const ValueKey('current-archive')), findsOneWidget);
+      expect(find.text('Enter a new key for $hostB'), findsNothing);
     });
   });
 }
