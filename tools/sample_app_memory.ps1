@@ -7,7 +7,9 @@ Prints the app's resident memory (RSS) about four times a second until you
 press Ctrl+C, then prints the starting value, the peak and the kernel's
 high-water mark (VmHWM, the highest RSS since the app started). Run it once
 per test case: start it, open the message in the app, wait until it is shown,
-go back, then press Ctrl+C.
+go back, then press Ctrl+C. Samples can miss short spikes; VmHWM covers
+the whole process lifetime, not just the current message. Before/after
+dumpsys snapshots alone do not establish the peak-memory gate.
 
 Reads only /proc/<pid>/status of the MailBurrow process through adb. It sends
 nothing anywhere and prints no message content, addresses or keys.
@@ -34,20 +36,20 @@ $ErrorActionPreference = "Stop"
 if (-not (Test-Path $Adb)) { $Adb = "adb" }
 
 $appPid = (& $Adb shell pidof $Package 2>$null | Out-String).Trim()
-if (-not $appPid) {
+if ($LASTEXITCODE -ne 0 -or $appPid -notmatch '^\d+$') {
     Write-Host "MailBurrow is not running on the phone. Open it first, then run this again."
     exit 1
 }
 $probe = (& $Adb shell "grep VmRSS /proc/$appPid/status" 2>$null | Out-String).Trim()
 if (-not $probe) {
     Write-Host "This phone does not allow reading the app's memory this way."
-    Write-Host "Use instead, before and after opening the message:"
+    Write-Host "For diagnostic before/after snapshots only (not a peak-memory pass), use:"
     Write-Host "  & `"$Adb`" shell dumpsys meminfo $Package | findstr TOTAL"
     exit 1
 }
 
-function Read-Kb([string]$line) {
-    if ($line -match '(\d+)\s*kB') { return [int64]$Matches[1] }
+function Read-Kb([string]$line, [string]$field) {
+    if ($line -match ('(?:^|\s)' + [regex]::Escape($field) + ':\s*(\d+)\s*kB')) { return [int64]$Matches[1] }
     return $null
 }
 
@@ -55,12 +57,12 @@ $start = $null; $peak = 0; $hwm = 0
 Write-Host "Sampling $Package (pid $appPid) for '$Label'. Open the message now; press Ctrl+C when done."
 # One adb call runs the sampling loop on the phone, so samples aren't slowed
 # by starting adb each time.
-$loop = "while kill -0 $appPid 2>/dev/null; do grep -E 'VmRSS|VmHWM' /proc/$appPid/status | tr '\n' ' '; echo; sleep 0.25; done"
+$loop = "while [ -r /proc/$appPid/status ]; do grep -E 'VmRSS|VmHWM' /proc/$appPid/status | tr '\n' ' '; echo; sleep 0.25; done"
 try {
     & $Adb shell $loop | ForEach-Object {
-        $parts = $_ -split 'VmHWM:'
-        $rss = Read-Kb ($parts[0])
-        if ($parts.Count -gt 1) { $h = Read-Kb ($parts[1]); if ($h) { $hwm = $h } }
+        $rss = Read-Kb $_ 'VmRSS'
+        $h = Read-Kb $_ 'VmHWM'
+        if ($null -ne $h) { $hwm = $h }
         if ($rss) {
             if ($null -eq $start) { $start = $rss }
             if ($rss -gt $peak) {
@@ -69,7 +71,8 @@ try {
             }
         }
     }
-    Write-Host "The app stopped (it may have been closed or run out of memory)."
+    if ($null -eq $start) { throw "No readable RSS samples were received; memory validation is not established." }
+    Write-Host "Sampling ended; check whether the app exited or adb/proc access failed."
 }
 finally {
     if ($null -ne $start) {

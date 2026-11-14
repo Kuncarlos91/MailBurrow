@@ -63,7 +63,7 @@ Expected output: `build/app/outputs/flutter-apk/app-release.apk`. Freeze that ex
 
 ## Device check on the exact APK
 
-Install as an update over the current install on the reference phone (do not uninstall). Retain the earlier private-build results as historical evidence; they do not replace checks on this frozen APK. Verify the direct RC9-to-v3 migration on a preserved RC9 baseline as well as the current v3-to-v3 upgrade; do not erase a working baseline to manufacture that test. If a path was not exercised, record it as not tested. Then:
+Install as an update over the current install on the reference phone (do not uninstall). Retain the earlier private-build results as historical evidence; they do not replace checks on this frozen APK. Verify the current v3-to-v3 upgrade. The direct RC9-to-v3 path is explicitly not device-tested under the decision above; retain automated migration coverage and do not present it as a passed phone check. Do not uninstall the working baseline to recreate RC9. Then:
 
 1. Settings shows `0.4.0 (build 26)`; both saved archives and their selected accounts or sources come back without keys.
 2. Mail-Archiver: browse, search with filters, folders, read a long message, save and open an attachment.

@@ -97,13 +97,10 @@ def base64_text_1m(rng, msg):
 
 
 def legacy_charsets(rng, msg):
-    msg.set_content("UTF-8 part: café, naïve, 日本語.\n" + _text(rng, 20_000))
-    msg.add_attachment(("Latin-1 part: café, señor, über.\n" + _text(rng, 20_000)).encode("latin-1"),
-                       maintype="text", subtype="plain", disposition="inline",
-                       params={"charset": "iso-8859-1"})
-    msg.add_attachment(("Windows-1252 part: “quotes” – dash € euro.\n" + _text(rng, 20_000)).encode("cp1252"),
-                       maintype="text", subtype="plain", disposition="inline",
-                       params={"charset": "windows-1252"})
+    msg.set_content("Latin-1 body: café, señor, über.\n" + _text(rng, 20_000),
+                    charset="iso-8859-1", cte="quoted-printable")
+    msg.add_alternative("<p>Windows-1252 body: “quotes” – dash € euro.</p>" + _html(rng, 20_000),
+                        subtype="html", charset="windows-1252", cte="base64")
 
 
 def inline_images_6m(rng, msg):
@@ -116,7 +113,7 @@ def inline_images_6m(rng, msg):
     html_part = msg.get_payload()[1]
     for i, data in enumerate(images):
         html_part.add_related(data, maintype="image", subtype="png",
-                              cid=f"<stress-image-{i}@stress.example>", filename=f"image-{i + 1}.png")
+                              disposition="inline", cid=f"<stress-image-{i}@stress.example>", filename=f"image-{i + 1}.png")
 
 
 def nested_30(rng, msg):
@@ -134,10 +131,11 @@ def nested_30(rng, msg):
 
 def many_parts_400(rng, msg):
     """400 small parts (the app allows 500)."""
-    msg.set_content("First of 400 parts.\n" + _text(rng, 500))
-    for i in range(399):
-        msg.add_attachment(f"Part {i + 2}.\n{_text(rng, 200)}".encode(), maintype="text",
-                           subtype="plain", disposition="inline", filename=f"part-{i + 2:03d}.txt")
+    msg.make_mixed()
+    for i in range(400):
+        part = EmailMessage(policy=SMTP)
+        part.set_content(f"Body part {i + 1}.\n{_text(rng, 200)}")
+        msg.attach(part)
 
 
 def large_headers_200k(rng, msg):
@@ -162,7 +160,7 @@ CASES = [
     ("text-1m", "1 MiB plain text", text_1m),
     ("html-qp-2m", "2 MiB quoted-printable HTML", html_qp_2m),
     ("base64-text-1m", "1 MiB base64 text", base64_text_1m),
-    ("legacy-charsets", "UTF-8, Latin-1 and Windows-1252 parts", legacy_charsets),
+    ("legacy-charsets", "Latin-1 text and Windows-1252 HTML bodies", legacy_charsets),
     ("inline-images-6m", "six inline images, about 6 MiB", inline_images_6m),
     ("nested-30", "parts nested 30 levels deep", nested_30),
     ("many-parts-400", "400 parts", many_parts_400),

@@ -65,7 +65,7 @@ A successful export only proves the files match the demo data. Whether the serve
 
 ## Phone memory check with stress mail
 
-[generate_stress_mail.py](../../tools/generate_stress_mail.py) writes `stress-mail.zip`: ten fictional messages for the 0.4.0 release check of memory on the phone. They include long bodies, quoted-printable and base64 encodings, legacy character sets, six inline images, 30 levels of nesting, 400 parts, about 190 KiB of headers, one message just under the app's 10 MiB message limit and one just over it. Output is deterministic and uses only `stress.example` addresses.
+[generate_stress_mail.py](../../tools/generate_stress_mail.py) writes `stress-mail.zip`: ten fictional messages for the 0.4.0 release check of memory on the phone. They include long bodies, quoted-printable and base64 encodings, Latin-1 plain text and Windows-1252 HTML as the selected body alternatives, six explicitly inline CID images, 30 levels of nesting, 400 parts, about 190 KiB of headers, one message just under the app's 10 MiB message limit and one just over it. Output is deterministic and uses only `stress.example` addresses.
 
 ```
 python tools/generate_stress_mail.py --out build/stress-eml
@@ -79,7 +79,8 @@ python tools/generate_stress_mail.py --out build/stress-eml
    powershell -ExecutionPolicy Bypass -File tools\sample_app_memory.ps1 -Label text-1m
    ```
 
-   Open the message, wait until it shows, go back, then press Ctrl+C. The script prints the start, peak and growth of the app's resident memory, plus the kernel's high-water mark since the app started. It reads only the app's `/proc/<pid>/status` through adb and prints no content.
-4. Open each message twice in a row for the repeated-open check. **over-limit** must show the "too large" message rather than opening. For the cancellation check, open **near-limit** and press Back while it loads: the app should return at once and memory should fall back.
+   Start sampling before opening the message; wait until at least one RSS sample is printed, then open it. Wait until it shows, go back, then press Ctrl+C. The script prints the start, peak and growth of the app's resident memory, plus the kernel's high-water mark since the app started. It reads only the app's `/proc/<pid>/status` through adb and prints no content. Samples can miss spikes; VmHWM is process-lifetime data and may predate the current case. Record the process baseline and case order, and repeat with a fresh process when attributing a peak to one case. If proc access fails, before/after `dumpsys meminfo` is diagnostic only and does not pass the peak-memory gate.
+4. **Verify the imported fixtures:** the backend may normalize MIME or strip parts. Confirm the stored raw message retains the six inline images, intended charset alternatives, 30 nesting levels, 400 body parts and large headers before claiming those cases passed. Check actual detail response/message sizes: metadata can add wire bytes, so an over-limit refusal alone does not prove which cap was exercised. A normalized-away case is not tested and needs a replacement fixture.
+5. Open each message twice in a row for the repeated-open check. **over-limit** must show the "too large" message rather than opening. For the cancellation check, open **near-limit** and press Back while it loads: the app should return at once and memory should fall back.
 
 Keep the measured numbers in the maintainer's private release records, as the [0.4.0 candidate guide](../releasing/android-0.4.0.md) says; the public guide lists only the check.

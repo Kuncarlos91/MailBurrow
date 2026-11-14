@@ -28,6 +28,8 @@ Support for a second archive server type, Open Archiver 0.6.2. Mail-Archiver use
 
 - Clarify 0.4.0 versus RC9 setup compatibility, Open Archiver source selection and IP-based rate limits, and privacy disclosures for connection validation, search payloads and key cleanup.
 
+- Correct stress-fixture MIME roles and selected charset bodies; make memory sampling independent of proc field order and Android signal permissions, with explicit measurement limits.
+
 ## 0.3.0-rc.9 (build23) - 2026-11-10
 
 First public Android APK, published as a [GitHub prerelease](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.3.0-rc.9) from tag `v0.3.0-rc.9`. APK SHA-256 `8cf7b33f3a7a11ba5de8541f2e111d475224ecac591e2bebb8743ee572ed078b`. See the [candidate guide](docs/releasing/android-rc9.md) for the gates it passed.
