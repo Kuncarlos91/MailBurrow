@@ -30,6 +30,7 @@ Full list: [CHANGELOG](../../CHANGELOG.md).
 ## Release decisions
 
 - **Expired-key check:** the maintainer chose to release without it. A deleted key is confirmed refused (401) by the lab check; an expired key has not been tested, because the shortest expiry Open Archiver allowed ends on 2026-12-11. The release notes must say so. Run the check after that date and record the result here.
+- **Release type:** a normal GitHub release marked **latest**, not a prerelease (maintainer decision, 2026-11-13). The README and release notes keep the early-preview wording, and the known limits below are stated in the notes.
 - **Tested server versions:** Open Archiver `v0.6.2` (`logiclabshq/open-archiver@sha256:ec2e954959f7d0ee0089c4338437720da9b85520a23779cb6d7642943b3ae8e5`) and Mail-Archiver `2611.2` (`ghcr.io/s1t5/mailarchiver@sha256:4baca9cb9dc6f97f2824f62489ba649ededc1095c4555f4d8b87da71349f7ebc`).
 
 ## Before building
@@ -86,4 +87,4 @@ Installs as an update over 0.3.0-rc.9; saved connections are kept. Compare the A
 
 ## Publication handoff
 
-Only after the artifact and device checks and explicit maintainer approval: tag the tested `main` commit `v0.4.0`, upload the frozen APK with its checksum, download the uploaded APK and confirm identical bytes, then update the README, status page and website download links to 0.4.0.
+Only after the artifact and device checks and explicit maintainer approval: tag the tested `main` commit `v0.4.0`, create a normal GitHub release marked **latest** (not a prerelease), upload the frozen APK with its checksum, download the uploaded APK and confirm identical bytes, then update the README, status page and website download links to 0.4.0.
