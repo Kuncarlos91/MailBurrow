@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
@@ -54,6 +55,22 @@ class ConnectionStore {
   final SecureEntries entries;
 
   SecureEntries get _storage => entries;
+
+  // All instances use the same native store. Serialize complete transactions
+  // within this isolate, including reads that perform migration or cleanup.
+  static Future<void>? _pending;
+  static Future<T> _serialized<T>(Future<T> Function() operation) async {
+    final previous = _pending;
+    final done = Completer<void>();
+    _pending = done.future;
+    try {
+      if (previous != null) await previous;
+      return await operation();
+    } finally {
+      if (identical(_pending, done.future)) _pending = null;
+      done.complete();
+    }
+  }
   static const _legacyEntry = 'connection';
   static const _indexEntry = 'connections';
   static const _keyPrefix = 'connection.key.';
@@ -85,7 +102,9 @@ class ConnectionStore {
   /// The active saved connection, or null when none is active. Migrates a
   /// readable legacy record first. Throws [FormatException] when the active
   /// profile or a legacy record cannot be read; the stored values are kept.
-  Future<SavedConnection?> read() async {
+  Future<SavedConnection?> read() => _serialized(_read);
+
+  Future<SavedConnection?> _read() async {
     var index = await _readIndex();
     if (index == null) {
       final legacy = await _storage.read(key: _legacyEntry);
@@ -105,7 +124,9 @@ class ConnectionStore {
     await _removeOrphanKeys(index);
     final active = index.active;
     if (active == null) return null;
-    final profile = index.profiles.where((item) => item.id == active).firstOrNull;
+    final profile = index.profiles
+        .where((item) => item.id == active)
+        .firstOrNull;
     if (profile == null) {
       throw const FormatException('Saved connection is unreadable.');
     }
@@ -129,9 +150,23 @@ class ConnectionStore {
     required String server,
     required String key,
     required String? accountId,
+  }) => _serialized(
+    () => _write(
+      serverType: serverType,
+      server: server,
+      key: key,
+      accountId: accountId,
+    ),
+  );
+
+  Future<void> _write({
+    required ArchiveServerType serverType,
+    required String server,
+    required String key,
+    required String? accountId,
   }) async {
-    // An unreadable index is replaced, as an unreadable legacy record was.
-    final index = await _readIndexOrNull() ?? ConnectionIndex.empty;
+    // Absent and unreadable are distinct: never overwrite an unknown store.
+    final index = await _readIndex() ?? ConnectionIndex.empty;
     final profiles = [...index.profiles];
     final at = profiles.indexWhere((item) => item.id == index.active);
     final current = at < 0 ? null : profiles[at];
@@ -149,7 +184,8 @@ class ConnectionStore {
       await _writeIndex(current.id, profiles, index.unreadable);
       return;
     }
-    if (current == null && profiles.length >= maxProfiles) {
+    if (current == null &&
+        profiles.length + index.unreadable.length >= maxProfiles) {
       throw StateError('Too many saved archives.');
     }
     final profile = (
@@ -176,31 +212,33 @@ class ConnectionStore {
   }
 
   /// Forgets the active connection: its profile, its key and any legacy
-  /// record. Other profiles are kept.
-  Future<void> delete() async {
-    if (await _storage.read(key: _indexEntry) != null) {
-      final index = await _readIndexOrNull();
-      if (index == null) {
-        // Nothing in an unreadable index can be told apart, so forgetting
-        // clears it and every key entry, as forgetting one record did.
-        await _storage.delete(key: _indexEntry);
-        await _removeOrphanKeys(ConnectionIndex.empty);
-      } else {
-        final active = index.active;
-        final profiles = [
-          for (final item in index.profiles)
-            if (item.id != active) item,
-        ];
-        await _writeIndex(null, profiles, index.unreadable);
-        if (active != null) await _deleteQuietly('$_keyPrefix$active');
-      }
+  /// record. Other profiles are kept. An unreadable index is preserved and
+  /// causes a format failure; this is not an all-archives reset.
+  Future<void> delete() => _serialized(_delete);
+
+  Future<void> _delete() async {
+    final index = await _readIndex();
+    if (index == null) {
+      await _storage.delete(key: _legacyEntry);
+      return;
     }
-    await _storage.delete(key: _legacyEntry);
+    final active = index.active;
+    final profiles = [
+      for (final item in index.profiles)
+        if (item.id != active) item,
+    ];
+    final unreadable = [
+      for (final item in index.unreadable)
+        if (active == null || item is! Map || item['id'] != active) item,
+    ];
+    await _writeIndex(null, profiles, unreadable);
+    if (active != null) await _deleteQuietly('$_keyPrefix$active');
+    await _removeLegacy();
   }
 
-  /// Every saved profile, without keys, for the archive picker.
-  Future<List<ConnectionProfile>> profiles() async =>
-      (await _readIndex())?.profiles ?? const [];
+  /// Every readable saved profile, without keys, for the archive picker.
+  Future<List<ConnectionProfile>> profiles() =>
+      _serialized(() async => (await _readIndex())?.profiles ?? const []);
 
   Future<void> _migrate(SavedConnection saved) async {
     final profile = (
@@ -220,7 +258,7 @@ class ConnectionStore {
     await _removeLegacy();
   }
 
-  Future<void> _removeLegacy() => _storage.delete(key: _legacyEntry);
+  Future<void> _removeLegacy() => _deleteQuietly(_legacyEntry);
 
   Future<void> _removeOrphanKeys(ConnectionIndex index) async {
     final Map<String, String> all;
@@ -244,14 +282,6 @@ class ConnectionStore {
       await _storage.delete(key: name);
     } catch (_) {
       // An orphaned key entry is removed on the next read.
-    }
-  }
-
-  Future<ConnectionIndex?> _readIndexOrNull() async {
-    try {
-      return await _readIndex();
-    } on FormatException {
-      return null;
     }
   }
 
@@ -286,11 +316,16 @@ class ConnectionStore {
     final profiles = <ConnectionProfile>[];
     final unreadable = <Object?>[];
     final referenced = <String>{};
+    final counts = <String, int>{};
+    for (final item in list) {
+      final id = item is Map ? item['id'] : null;
+      if (id is String) counts[id] = (counts[id] ?? 0) + 1;
+    }
     for (final item in list) {
       final profile = _decodeProfile(item);
       final rawId = item is Map<String, dynamic> ? item['id'] : null;
-      if (rawId is String && _idPattern.hasMatch(rawId)) referenced.add(rawId);
-      if (profile == null || profiles.any((p) => p.id == profile.id)) {
+      if (rawId is String) referenced.add(rawId);
+      if (profile == null || counts[profile.id] != 1) {
         unreadable.add(item);
       } else {
         profiles.add(profile);
@@ -439,6 +474,6 @@ class ConnectionIndex {
   /// Entries this build cannot read, kept as stored.
   final List<Object?> unreadable;
 
-  /// Every well-formed profile ID in the index, readable or not.
+  /// Every text profile ID in the index, readable or not.
   final Set<String> referencedIds;
 }

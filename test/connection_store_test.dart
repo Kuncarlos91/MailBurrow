@@ -252,15 +252,20 @@ void main() {
       expect(await storage.read(key: 'connection.key.$active'), isNull);
     });
 
-    test('forgetting an unreadable index clears it and every key', () async {
-      FlutterSecureStorage.setMockInitialValues({
-        'connections': '{"version": 99}',
-        'connection.key.${ConnectionStore.newProfileId()}': 'k',
-        'connection': '{}',
-      });
-      await expectLater(store.read(), throwsFormatException);
-      await store.delete();
-      expect(await storage.readAll(), isEmpty);
+    test('unreadable indexes survive ordinary save and forget attempts', () async {
+      for (final text in ['{"version":99}', '{broken']) {
+        final values = {
+          'connections': text,
+          'connection.key.${ConnectionStore.newProfileId()}': 'preserved',
+          'connection': '{}',
+        };
+        FlutterSecureStorage.setMockInitialValues(values);
+        await expectLater(store.read(), throwsFormatException);
+        await expectLater(store.write(serverType: ArchiveServerType.mailArchiver,
+          server: first, key: 'new', accountId: null), throwsFormatException);
+        await expectLater(store.delete(), throwsFormatException);
+        expect(await storage.readAll(), values);
+      }
     });
 
     test('rejects an active profile that is unreadable or has no key', () async {
