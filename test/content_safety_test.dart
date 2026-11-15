@@ -53,8 +53,8 @@ void main() {
         home: Scaffold(
           body: MessageAttachments(
             api: api,
-            emailId: 1,
-            attachments: const [MailAttachment(2, 'invoice.pdf.exe', 2048)],
+            emailId: '1',
+            attachments: const [MailAttachment('2', 'invoice.pdf.exe', 2048)],
           ),
         ),
       ),
@@ -86,8 +86,8 @@ void main() {
             home: Scaffold(
               body: MessageAttachments(
                 api: api,
-                emailId: 1,
-                attachments: const [MailAttachment(2, 'report.pdf', 2048)],
+                emailId: '1',
+                attachments: const [MailAttachment('2', 'report.pdf', 2048)],
               ),
             ),
           ),
@@ -144,8 +144,8 @@ class InterruptedApi extends ArchiveApi {
   final failed = Completer<void>();
   @override
   Future<void> downloadAttachment(
-    int emailId,
-    int attachmentId,
+    String emailId,
+    String attachmentId,
     File destination, {
     AttachmentDownload? transfer,
     void Function(int)? onProgress,
@@ -161,8 +161,8 @@ class RecordingApi extends ArchiveApi {
   int downloads = 0;
   @override
   Future<void> downloadAttachment(
-    int emailId,
-    int attachmentId,
+    String emailId,
+    String attachmentId,
     File destination, {
     AttachmentDownload? transfer,
     void Function(int)? onProgress,

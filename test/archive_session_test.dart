@@ -5,14 +5,17 @@ import 'dart:io';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mailburrow/archive_models.dart';
+import 'package:mailburrow/archive_server_type.dart';
 import 'package:mailburrow/archive_errors.dart';
 import 'package:mailburrow/archive_backend.dart';
+import 'package:mailburrow/archive_capabilities.dart';
 import 'package:mailburrow/attachment_download.dart';
 import 'package:mailburrow/search_filters.dart';
 import 'package:mailburrow/state/archive_session.dart';
 import 'package:mailburrow/state/connection_store.dart';
 
 import 'support/fake_archive_backend.dart';
+import 'support/saved_connection.dart';
 
 /// Synthetic archive: two accounts, and mail results that a test can hold
 /// open per query to finish requests out of order.
@@ -39,30 +42,30 @@ class FakeArchiveApi extends FakeArchiveBackend {
   };
 
   @override
-  Future<List<dynamic>> accounts() async {
+  Future<List<ArchiveAccount>> accounts() async {
     if (failAccounts) throw const ArchiveFailure(500);
-    return accountList;
+    return accountList.map(ArchiveAccount.fromJson).toList();
   }
 
   @override
-  Future<List<ArchiveFolder>> folders(int id) async => [
+  Future<List<ArchiveFolder>> folders(String id) async => [
     ArchiveFolder('Inbox $id', 'INBOX-$id', 1, 0),
   ];
 
   @override
-  Future<Map<String, dynamic>> emails(
-    int id,
+  Future<MailPage> emails(
+    String id,
     String query,
     int page, {
     String? folder,
     dynamic filters,
-  }) {
+  }) async {
     mailRequests++;
-    if (failMail) return Future.error(const ArchiveFailure(500));
+    if (failMail) throw const ArchiveFailure(500);
     final hold = held['$id:$query'];
-    if (hold != null) return hold.future;
+    if (hold != null) return MailPage.fromJson(await hold.future);
     final label = query.isEmpty ? 'mail' : query;
-    return Future.value(FakeArchiveApi.page('account $id $label'));
+    return MailPage.fromJson(FakeArchiveApi.page('account $id $label'));
   }
 
   @override
@@ -88,54 +91,48 @@ class MemoryBackend implements ArchiveBackend {
   final Uri server;
   @override
   final String key;
+
+  @override
+  ArchiveCapabilities get capabilities => ArchiveCapabilities.full;
+
   bool closed = false;
 
   @override
-  Future<List<dynamic>> accounts() async => [
-    {'id': 7, 'emailAddress': 'memory@example.com'},
+  Future<List<ArchiveAccount>> accounts() async => const [
+    ArchiveAccount(id: '7', emailAddress: 'memory@example.com'),
   ];
 
   @override
-  Future<List<ArchiveFolder>> folders(int accountId) async => const [
+  Future<List<ArchiveFolder>> folders(String accountId) async => const [
     ArchiveFolder('Inbox', 'INBOX', 1, 0),
   ];
 
   @override
-  Future<Map<String, dynamic>> emails(
-    int accountId,
+  Future<MailPage> emails(
+    String accountId,
     String query,
     int page, {
     String? folder,
     SearchFilters filters = const SearchFilters(),
-  }) async => {
-    'items': [
-      {'id': 1, 'subject': 'From memory'},
-    ],
-    'page': 1,
-    'totalPages': 1,
-  };
+  }) async => const MailPage(
+    items: [MailSummary(id: '1', subject: 'From memory')],
+  );
 
   @override
-  Future<Map<String, dynamic>> message(int id) async => {
-    'id': id,
-    'subject': 'From memory',
-  };
+  Future<MailMessage> message(String id) async =>
+      const MailMessage(subject: 'From memory');
 
   @override
   Future<void> downloadAttachment(
-    int emailId,
-    int attachmentId,
+    String emailId,
+    String attachmentId,
     File destination, {
     AttachmentDownload? transfer,
     void Function(int receivedBytes)? onProgress,
   }) async {}
 
   @override
-  Future<Map<String, dynamic>> stats() async => {
-    'emails': 1,
-    'accounts': 1,
-    'attachments': 0,
-  };
+  Future<ArchiveStats> stats() async => const ArchiveStats(1, 1, 0);
 
   @override
   void cancelEmailRequests() {}
@@ -150,20 +147,29 @@ class MemoryBackend implements ArchiveBackend {
 class FailingStore extends ConnectionStore {
   const FailingStore();
   @override
-  Future<void> write({
+  Future<String> write({
+    required ArchiveServerType serverType,
     required String server,
     required String key,
-    required Object? accountId,
+    required String? accountId,
+    String? profileId,
+  }) async => throw Exception('storage unavailable');
+
+  @override
+  Future<String> add({
+    required ArchiveServerType serverType,
+    required String server,
+    required String key,
+    required String? accountId,
   }) async => throw Exception('storage unavailable');
 }
 
 List<String> subjects(ArchiveSession session) => [
-  for (final item in session.messages)
-    (item as Map<String, dynamic>)['subject'] as String,
+  for (final item in session.messages) item.subject!,
 ];
 
 Future<Map<String, dynamic>?> savedConnection() async {
-  final saved = await const FlutterSecureStorage().read(key: 'connection');
+  final saved = await savedConnectionText();
   return saved == null ? null : jsonDecode(saved) as Map<String, dynamic>;
 }
 
@@ -212,13 +218,15 @@ void main() {
     await connectFresh();
     expect(session.setup, isFalse);
     expect(session.busy, isFalse);
-    expect(session.account?['id'], 1);
+    expect(session.account?.id, '1');
     expect(subjects(session), ['account 1 mail 0']);
     expect(session.folders.single.path, 'INBOX-1');
     expect(session.keyInput.text, isEmpty);
     final saved = await savedConnection();
     expect(saved?['server'], 'https://archive.example.com');
-    expect(saved?['accountId'], 1);
+    expect(saved?['accountId'], '1');
+    expect(saved?['version'], 2);
+    expect(saved?['serverType'], 'mail-archiver');
   });
 
   test('restore reopens the remembered account', () async {
@@ -230,10 +238,151 @@ void main() {
       }),
     });
     await session.restore();
-    expect(session.account?['id'], 2);
+    expect(session.account?.id, '2');
     expect(session.accountNotice, isNull);
     expect(subjects(session), ['account 2 mail 0']);
   });
+
+  test(
+    'display-only account fields do not block saved-account restoration',
+    () async {
+      FlutterSecureStorage.setMockInitialValues({
+        'connection': jsonEncode({
+          'server': 'https://archive.example.com',
+          'key': 'test-only',
+          'accountId': 2,
+        }),
+      });
+      session.dispose();
+      session = ArchiveSession(
+        apiFactory: (server, key) {
+          api = FakeArchiveApi(server, key);
+          api.accountList = [
+            {'id': 1, 'emailAddress': 'one@example.com'},
+            {'id': 2, 'emailAddress': [], 'lastSync': 17, 'isEnabled': 'true'},
+          ];
+          return api;
+        },
+      );
+
+      await session.restore();
+
+      expect(session.setup, isFalse);
+      expect(session.error, isNull);
+      expect(session.accountNotice, isNull);
+      expect(session.account?.id, '2');
+      expect(session.account?.address, 'Email address not reported');
+      expect(session.account?.lastSync, isNull);
+      expect(session.account?.archivingEnabled, isNull);
+      expect(subjects(session), ['account 2 mail 0']);
+      expect(session.folders.single.path, 'INBOX-2');
+      expect(await savedConnection(), {
+        'version': 2,
+        'serverType': 'mail-archiver',
+        'server': 'https://archive.example.com',
+        'key': 'test-only',
+        'accountId': '2',
+      });
+    },
+  );
+
+  test('a saved connection from 0.3.0-rc.9 migrates to version 2', () async {
+    // Version 1: no version or server type, numeric account ID.
+    FlutterSecureStorage.setMockInitialValues({
+      'connection': jsonEncode({
+        'server': 'https://archive.example.com',
+        'key': 'test-only',
+        'accountId': 2,
+      }),
+    });
+    await session.restore();
+    expect(session.account?.id, '2');
+    expect(session.serverType, ArchiveServerType.mailArchiver);
+    expect(await savedConnection(), {
+      'version': 2,
+      'serverType': 'mail-archiver',
+      'server': 'https://archive.example.com',
+      'key': 'test-only',
+      'accountId': '2',
+    });
+
+    // The migrated value restores the same account after an app restart.
+    session.dispose();
+    session = newSession();
+    await session.restore();
+    expect(session.account?.id, '2');
+    expect(session.accountNotice, isNull);
+  });
+
+  test(
+    'an unknown saved server type is never probed with the saved key',
+    () async {
+      FlutterSecureStorage.setMockInitialValues({
+        'connection': jsonEncode({
+          'version': 2,
+          'serverType': 'some-future-server',
+          'server': 'https://archive.example.com',
+          'key': 'test-only',
+          'accountId': '2',
+        }),
+      });
+      var created = 0;
+      session.dispose();
+      session = ArchiveSession(
+        apiFactory: (server, key) {
+          created++;
+          return api = FakeArchiveApi(server, key);
+        },
+      );
+      await session.restore();
+      expect(created, 0, reason: 'no request is sent with the saved key');
+      expect(session.api, isNull);
+      expect(session.setup, isTrue);
+      expect(session.error,
+          contains('Saved archives on this device cannot be read'));
+      expect(session.savedArchivesUnreadable, isTrue);
+    },
+  );
+
+  for (final record in <Map<String, Object?>>[
+    {'serverType': 'some-future-server'},
+    {'serverType': 'mail-archiver'},
+    {'serverType': null},
+    {'version': null},
+    {'version': null, 'serverType': 'some-future-server'},
+  ]) {
+    test(
+      'ambiguous saved format $record is rejected without an API client',
+      () async {
+        final encoded = jsonEncode({
+          'server': 'https://archive.example.com',
+          'key': 'test-only',
+          'accountId': 2,
+          ...record,
+        });
+        FlutterSecureStorage.setMockInitialValues({'connection': encoded});
+        var created = 0;
+        session.dispose();
+        session = ArchiveSession(
+          apiFactory: (server, key) {
+            created++;
+            return api = FakeArchiveApi(server, key);
+          },
+        );
+        await session.restore();
+        expect(created, 0);
+        expect(session.api, isNull);
+        expect(session.setup, isTrue);
+        expect(session.error,
+            contains('Saved archives on this device cannot be read'));
+        expect(session.savedArchivesUnreadable, isTrue);
+        expect(
+          await savedConnectionText(),
+          encoded,
+        );
+      },
+    );
+  }
 
   test('restore explains a remembered account that is gone', () async {
     FlutterSecureStorage.setMockInitialValues({
@@ -244,7 +393,7 @@ void main() {
       }),
     });
     await session.restore();
-    expect(session.account?['id'], 1);
+    expect(session.account?.id, '1');
     expect(session.accountNotice, contains('no longer available'));
   });
 
@@ -280,18 +429,20 @@ void main() {
       final cancellations = api.cancelledMailRequests;
       var changed = false;
       session.onAccountChanged = (_) => changed = true;
-      await session.switchAccount({'id': 2, 'emailAddress': 'two@example.com'});
+      await session.switchAccount(
+        ArchiveAccount.fromJson({'id': 2, 'emailAddress': 'two@example.com'}),
+      );
 
       slow.complete(FakeArchiveApi.page('stale'));
       await slowLoad;
       expect(changed, isTrue);
       expect(api.cancelledMailRequests, greaterThan(cancellations));
-      expect(session.account?['id'], 2);
+      expect(session.account?.id, '2');
       expect(session.search.text, isEmpty);
       expect(subjects(session), ['account 2 mail 0']);
       expect(session.folders.single.path, 'INBOX-2');
       expect(session.accountLoading, isFalse);
-      expect((await savedConnection())?['accountId'], 2);
+      expect((await savedConnection())?['accountId'], '2');
     },
   );
 
@@ -408,7 +559,7 @@ void main() {
     session.keyInput.text = 'test-only';
     await session.connect();
     expect(session.api, same(backend));
-    expect(session.account?['id'], 7);
+    expect(session.account?.id, '7');
     expect(subjects(session), ['From memory']);
     expect(session.folders.single.path, 'INBOX');
     await session.forgetConnection();

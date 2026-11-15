@@ -38,11 +38,13 @@ File imports run once; they are not re-synced. Importing the same zip again may 
 python tools/oa_lab_check.py https://<test-server>:8443 --samples oa-samples --rate-limit
 ```
 
-It asks for an admin key, a reader key and, optionally, a deleted key, without echoing them (on Windows, paste with a right-click). It only sends `GET` requests, always verifies certificates and never follows redirects.
+It asks for an admin key, a reader key and, optionally, a revoked key and an expired key, without echoing them (on Windows, paste with a right-click). Open Archiver revokes keys rather than deleting them. For an expired key, create a reader key with the earliest expiry Open Archiver allows and run the check after that date; never give a revoked key at that prompt, because a 401 response cannot distinguish expiry from revocation, an invalid key or another rejection condition. The checker rejects reuse of the admin, reader or revoked key as the expiry fixture, but cannot establish the state of a different key: verify its expiry date, that it was previously usable and that it was never revoked. Leave the prompt empty until that fixture is available. It only sends `GET` requests, always verifies certificates and never follows redirects.
 
 **What a result means.** Every check is `PASS`, `FAIL` or `SKIP`, and required or `(optional)`. The last line reads `RESULT: all required checks passed` only when nothing failed **and** no required check was skipped; otherwise it reads `NOT PROVEN` and the script exits with 1. Search checks use known terms from the demo fixtures with positive controls (an admin search that must find the other source's term), so an empty or malformed response never counts as working.
 
-**Required fixtures:** the three demo zips imported as separate sources, and a reader limited to the Alex Rivera source (40 messages). **Optional:** a deleted key, a source imported with **Preserve Original File** (from `riverside-garden-club.zip`), and `--rate-limit`, which sends about 100 quick requests and rate-limits the reader key for about a minute. Optional checks that did not run are listed as `SKIP (optional)`, never as passes.
+**Phase 3 contract checks (v3):** the list items, search hits and opened-message response must have the fields and types MailBurrow's Open Archiver backend reads. IDs must pass its ID rule, storage paths its path rule, and the opened message must fit the app's 40 MiB response and 10 MiB message limits. Up to 12 attachments from the reader's source are downloaded and each must match its stated `sizeBytes` exactly. Malformed array members and raw bytes are rejected, timestamp bounds match the app, and paging is checked for the filter search as well as both search pages. Attachment sampling is capped at 12 message-detail requests and 12 downloads, including when messages have no valid attachment records. Problems are reported by field name only. The script also reports, without failing, whether the opened-message response states a `Content-Length` and whether the server compresses it when asked.
+
+**Required fixtures:** the three demo zips imported as separate sources, and a reader limited to the Alex Rivera source (40 messages). **Optional:** a revoked key, a source imported with **Preserve Original File** (from `riverside-garden-club.zip`), and `--rate-limit`, which sends about 100 quick requests and rate-limits the reader key for about a minute. Optional checks that did not run are listed as `SKIP (optional)`, never as passes.
 
 **What the summary can contain:** statuses, counts, sizes, booleans, and field or header names from fixed allowlists. Server-provided text (error messages, page bodies, header values, unknown field names) is never printed; unknown names are only counted. `--samples` saves fictional sample responses for future test fixtures; review them before committing.
 
@@ -60,3 +62,31 @@ The reader needs a custom role with two rules, one on its source and one on that
 ## What this does not prove
 
 A successful export only proves the files match the demo data. Whether the server ingested every message and attachment, how it stores and returns them, and whether a restricted key is isolated from other sources are separate checks, run against the live test server. Record them with the server's exact version.
+
+## Phone memory check with stress mail
+
+[generate_stress_mail.py](../../tools/generate_stress_mail.py) writes `stress-mail.zip`: ten fictional messages for the 0.4.0 release check of memory on the phone. They include long bodies, quoted-printable and base64 encodings, Latin-1 plain text and Windows-1252 HTML as the selected body alternatives, six explicitly inline CID images, 30 levels of nesting, 400 parts, about 190 KiB of headers, one message just under the app's 10 MiB message limit and one just over it. Output is deterministic and uses only `stress.example` addresses.
+
+```
+python tools/generate_stress_mail.py --out build/stress-eml
+```
+
+1. In the test Open Archiver, add an **EML Import** source from `build/stress-eml/stress-mail.zip`. Leave **Preserve Original File** off.
+2. Add that source's ID to the phone reader's role policy (see the [setup guide](../setup-guide.md#open-archiver-step-1-create-a-read-only-role)).
+3. Connect the phone by USB, open MailBurrow on that source, then for each message run [sample_app_memory.ps1](../../tools/sample_app_memory.ps1) on Windows:
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File tools\sample_app_memory.ps1 -Label text-1m
+   ```
+
+   Start sampling before opening the message; wait until at least one RSS sample is printed, then open it. Wait until it shows, go back, then press Ctrl+C. The script prints the start, peak and growth of the app's resident memory, plus the kernel's high-water mark since the app started. It reads only the app's `/proc/<pid>/status` through adb and prints no content. Samples can miss spikes; VmHWM is process-lifetime data and may predate the current case. Record the process baseline and case order, and repeat with a fresh process when attributing a peak to one case. If proc access fails, before/after `dumpsys meminfo` is diagnostic only and does not pass the peak-memory gate.
+4. **Verify the imported fixtures** with [oa_stress_check.py](../../tools/oa_stress_check.py), using the reader key and the stress source's ID:
+
+   ```
+   python tools/oa_stress_check.py https://<test-server>:8443 --source <SOURCE_ID>
+   ```
+
+   For each case it downloads the stored message once and prints the response and message sizes and whether the structure the case exercises was **kept** or **changed**. It prints no message text, addresses or the key. The backend may normalize MIME or strip parts. Confirm the stored raw message retains the six inline images, intended charset alternatives, 30 nesting levels, 400 body parts and large headers before claiming those cases passed. Check actual detail response/message sizes: metadata can add wire bytes, so an over-limit refusal alone does not prove which cap was exercised. A normalized-away case is not tested and needs a replacement fixture. The checker validates selected body alternatives, large referenced inline PNGs, body-part counts and app structural limits; duplicate case names, failed/malformed listings and invalid Buffer bytes fail verification. Unknown MIME names are reported only as “other.” Its host download budget is 41 MiB, enough to diagnose a 40 MiB cap violation; larger responses fail rather than being read without a limit. Passing verifies only these structural conditions, not exact byte-for-byte preservation or a phone-memory pass.
+5. Open each message twice in a row for the repeated-open check. **over-limit** must show the "too large" message rather than opening. For the cancellation check, open **near-limit** and press Back while it loads: the app should return at once and memory should fall back.
+
+Keep the measured numbers in the maintainer's private release records, as the [0.4.0 candidate guide](../releasing/android-0.4.0.md) says; the public guide lists only the check.

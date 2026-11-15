@@ -1,5 +1,26 @@
 import 'package:flutter/material.dart';
 
+import 'archive_capabilities.dart';
+
+/// Sort fields the filter sheet offers, keyed by [SearchFilters.sortBy].
+const searchSortFields = {
+  'sentDate': 'Sent date',
+  'receivedDate': 'Received date',
+  'subject': 'Subject',
+  'from': 'Sender',
+  'to': 'Recipient',
+};
+
+/// Sort orders the filter sheet offers, keyed by [SearchFilters.sortOrder].
+const searchSortOrders = {'desc': 'Descending', 'asc': 'Ascending'};
+
+/// Direction choices shared by the filter sheet and capability validation.
+const searchDirections = {
+  '': 'All mail',
+  'incoming': 'Incoming',
+  'outgoing': 'Outgoing',
+};
+
 class SearchFilters {
   const SearchFilters({
     this.from,
@@ -33,8 +54,15 @@ String dateLabel(DateTime value) =>
     '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 
 class SearchFiltersSheet extends StatefulWidget {
-  const SearchFiltersSheet({super.key, required this.filters});
+  const SearchFiltersSheet({
+    super.key,
+    required this.filters,
+    this.capabilities,
+  });
   final SearchFilters filters;
+
+  /// Limits the choices offered; null offers everything (Mail-Archiver).
+  final ArchiveCapabilities? capabilities;
   @override
   State<SearchFiltersSheet> createState() => _SearchFiltersSheetState();
 }
@@ -49,7 +77,16 @@ class _SearchFiltersSheetState extends State<SearchFiltersSheet> {
     reset(widget.filters);
   }
 
-  void reset(SearchFilters value) {
+  ArchiveCapabilities get capabilities =>
+      widget.capabilities ?? ArchiveCapabilities.full;
+
+  Map<String, String> offered(Map<String, String> all, Set<String> keys) => {
+    for (final entry in all.entries)
+      if (keys.contains(entry.key)) entry.key: entry.value,
+  };
+
+  void reset(SearchFilters filters) {
+    final value = capabilities.supported(filters);
     from = value.from;
     to = value.to;
     direction = value.direction;
@@ -165,25 +202,32 @@ class _SearchFiltersSheetState extends State<SearchFiltersSheet> {
               ),
             ],
           ),
-          const Text('Sent date range · inclusive'),
-          dateField('From', from, true),
-          dateField('To', to, false),
-          choice('Direction', direction, {
-            '': 'All mail',
-            'incoming': 'Incoming',
-            'outgoing': 'Outgoing',
-          }, (value) => direction = value),
-          choice('Sort by', sortBy, {
-            'sentDate': 'Sent date',
-            'receivedDate': 'Received date',
-            'subject': 'Subject',
-            'from': 'Sender',
-            'to': 'Recipient',
-          }, (value) => sortBy = value),
-          choice('Order', sortOrder, {
-            'desc': 'Descending',
-            'asc': 'Ascending',
-          }, (value) => sortOrder = value),
+          if (capabilities.dateRangeFilter) ...[
+            const Text('Sent date range · inclusive'),
+            dateField('From', from, true),
+            dateField('To', to, false),
+          ],
+          if (capabilities.directionFilter)
+            choice(
+              'Direction',
+              direction,
+              searchDirections,
+              (value) => direction = value,
+            ),
+          if (capabilities.sortFields.length > 1)
+            choice(
+              'Sort by',
+              sortBy,
+              offered(searchSortFields, capabilities.sortFields),
+              (value) => sortBy = value,
+            ),
+          if (capabilities.sortOrders.length > 1)
+            choice(
+              'Order',
+              sortOrder,
+              offered(searchSortOrders, capabilities.sortOrders),
+              (value) => sortOrder = value,
+            ),
           if (error != null)
             Text(
               error!,

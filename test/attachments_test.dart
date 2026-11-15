@@ -14,7 +14,7 @@ void main() {
       'fileName': 'report.pdf',
       'size': 2048,
     });
-    expect(attachment.id, 3);
+    expect(attachment.id, '3');
     expect(attachment.name, 'report.pdf');
     expect(attachmentSize(attachment.size), '2.0 KB');
     expect(attachmentSize(-1), 'Size unknown');

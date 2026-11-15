@@ -10,17 +10,27 @@ Settings shows the app version and build. Include it, with your device and OS ve
 
 If Android says **App not installed** when updating, the new APK was signed with a different key from the installed app (for example a debug build over a release build). Uninstall the old app first; you will need to enter your server and key again.
 
+From 0.4.0, saved archives use format v3. An unreadable or newer-format archive index is preserved. Ordinary Connect and Forget do not reset that index. Retry with a compatible build and report only the app version and sanitized error; do not share secure-storage contents or uninstall/clear app data as a first recovery step. If no compatible build helps, setup offers **Remove all saved archives…** only in this situation; after confirmation it removes every saved archive and key on this device (never server mail), and you add your archives again with their keys. If removal fails, retry the confirmed reset: it retains the unreadable index until credentials have been removed successfully. An unreadable legacy connection also offers this reset.
+
+With several saved archives, a failed switch shows the archive's name and returns to setup: use **Retry saved connection** for that archive, or pick another from **Saved archives**. The previously open archive stays saved. Check that archive's server and private network as for a single connection. If its key was revoked or expired, use **Enter a new key for <name>** and paste a new key for that archive; the saved key is not sent again.
+
 ## Connection and request failures
+
+From 0.4.0, setup asks for the server type (Mail-Archiver or Open Archiver); select it before entering the key. Changing type, reopening setup or cancelling setup clears the unsaved key; the saved active connection stays intact. If a connection fails after a type change, check the chosen type and re-enter that server’s key. Builds before 0.4.0 support Mail-Archiver only. Open Archiver setup, including the read-only role, is in the [setup guide](../setup-guide.md#open-archiver-step-1-create-a-read-only-role).
 
 | Symptom | Checks/recovery | Relevant component |
 | --- | --- | --- |
-| Unable to connect/timeout | Check the HTTPS host/base path and that any private network (such as Tailscale) is connected on the phone. Reconnect and Retry. Do not expose the home server to fix a phone issue. | archive_api.dart, state/archive_session.dart |
+| Unable to connect/timeout | Check the HTTPS host/base path and that any private network (such as Tailscale) is connected on the phone. Reconnect and Retry. Do not expose the home server to fix a phone issue. With no network but a VPN such as Tailscale still on, the error can take about 10 seconds; **Cancel** on the Connecting and Opening screens and in the account list stops waiting. | archive_api.dart, state/archive_session.dart |
 | Certificate could not be verified | Operator checks name/certificate/chain and device time. Never disable certificate validation. | validateServer, platform TLS |
 | Key not accepted (401) | Confirm the key belongs to this archive; the server operator can replace or revoke keys. Never paste a key into a report. | ArchiveFailure/readableError |
 | Permission denied (403) | Endpoint authorization differs: working stats do not prove mail/download access. Operator checks scope. | archive_api.dart |
 | API/message unavailable (404) | Check API compatibility and message/account existence; do not guess new paths. | archive_api.dart |
-| Too many requests (429) | Wait before retrying. | readableError |
-| Response too large | The app caps JSON responses at 8 MiB. Use the archive website for that response; review memory/performance before increasing limits. | decodeArchiveJson |
+| Too many requests (429) | Wait before retrying. Mail-Archiver allows 120 requests a minute by default, Open Archiver about 100 per client IP address. Multiple devices or keys behind one address may share its budget. | readableError |
+| This source keeps full original messages… (Open Archiver) | The source has Preserve Original File turned on, so its messages include every attachment. MailBurrow refuses them before downloading anything. Use Open Archiver's website for that source. | open_archiver_api.dart |
+| Open Archiver did not say whether this source keeps full original messages… | The source's settings didn't state Preserve Original File, so the app treats it as unsafe to open. Check the Open Archiver version (0.6.2 is tested). | open_archiver_api.dart |
+| Open this message from its mail list / Open the message again to save this attachment (Open Archiver) | The app opens only messages it listed in this session, and saves attachments only from a message it opened. Go back to the list, open the message, then save. | open_archiver_api.dart |
+| Only some Open Archiver sources appear | The key's user role decides which sources it can read. An administrator adds the source IDs to the role's policy (**Admin → Roles**). | Open Archiver role policy |
+| Response too large | Ordinary API responses are capped at 8 MiB; Open Archiver message detail has a 40 MiB response cap and a 10 MiB decoded-message cap. Use the archive website for that response; review memory/performance before increasing limits. | decodeArchiveJson |
 | Folders unavailable | Retry after network recovery. Check account permissions/returned folders. Missing Inbox may be a server sync issue; do not invent it locally. | loadFolders, flattenFolders |
 
 ## Mail, search and layout
@@ -99,3 +109,7 @@ A direct Gradle release after tests can fail on missing IntegrationTestPlugin be
 ### Opt-in local Android file diagnostics
 
 A local diagnostic build can add `--dart-define=MAILSHELF_FILE_DIAGNOSTICS=true`. Default builds do not enable this tracing. Native events use only fixed MailShelfFiles categories for grant retention, saved-reference registration, release and the Open outcome; never add URIs, file names, provider exception messages, attachment bytes, server settings or keys. This is local logcat output, not an analytics upload. Read only the MailShelfFiles tag and do not share broad device logs.
+
+While an archive is opening, Cancel is unavailable during the secure-storage commit and once the archive is open. Before that commit, cancelling returns to setup without activating the abandoned attempt; Retry starts another attempt.
+
+Reader cancellation fix: Back during a message load cancels that reader’s network calls rather than only hiding the result. Build 26 predates this fix; its successful navigation checks do not establish that its transport stopped. Validate a newer fixed APK separately, with its own source/hash and cancellation evidence.

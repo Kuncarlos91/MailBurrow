@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
-  <meta name="description" content="Setup and support for MailBurrow, an independent read-only Mail-Archiver client.">
+  <meta name="description" content="Setup and support for MailBurrow, an independent read-only client for Mail-Archiver and Open Archiver.">
   <title>MailBurrow Support</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -12,19 +12,19 @@
 <a class="skip" href="#main">Skip to content</a>
 <header><a class="brand" href="index.html">MailBurrow</a><nav aria-label="Main"><a aria-current="page" href="index.html">Support</a><a href="setup.html">Setup</a><a href="privacy.html">Privacy</a><a href="https://github.com/Kuncarlos91/MailBurrow">Source</a></nav></header>
 <main id="main" tabindex="-1">
-  <p class="notice">Updated November 11, 2026</p>
+  <p class="notice">Updated November 14, 2026</p>
   <p class="eyebrow">YOUR ARCHIVE, WITHIN REACH</p>
   <h1>A little help finding your mail.</h1>
-  <p class="lead">MailBurrow is an independent, read-only mobile viewer for Mail-Archiver. Developed by {{PUBLIC_PROVIDER_NAME}}.</p>
-  <p>MailBurrow was previously distributed as MailShelf, and earlier installations may still show that name. MailBurrow is an early preview for Android and iOS. A signed Android prerelease for 64-bit ARM phones is available from <a href="https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.3.0-rc.9">GitHub Releases</a>; there is no app-store release, and iPhone and iPad builds are from the <a href="https://github.com/Kuncarlos91/MailBurrow">source repository</a> only. The code is open source under the MIT License.</p>
+  <p class="lead">MailBurrow is an independent, read-only mobile viewer for Mail-Archiver and Open Archiver. Developed by {{PUBLIC_PROVIDER_NAME}}.</p>
+  <p>MailBurrow was previously distributed as MailShelf, and earlier installations may still show that name. MailBurrow is an early preview for Android and iOS. A signed Android prerelease for 64-bit ARM phones is available from <a href="https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.3.0-rc.9">GitHub Releases</a>; there is no app-store release, and iPhone and iPad builds are from the <a href="https://github.com/Kuncarlos91/MailBurrow">source repository</a> only. Open Archiver and several saved archives require a 0.4.0 build; the linked RC9 download supports Mail-Archiver and one saved archive. The code is open source under the MIT License.</p>
   <section id="demo"><h2>Try it without a server</h2>
     <p>Tap <strong>Try the demo</strong> on the setup screen to explore MailBurrow with fictional sample mail built into the app. The demo connects to no server and saves no connection; a &ldquo;Demo &middot; sample mail&rdquo; bar stays visible until you tap <strong>Exit</strong>.</p>
   </section>
   <section id="setup"><h2>Before you connect</h2>
-    <p>The <a href="setup.html">setup guide</a> has step-by-step settings for Mail-Archiver's API, TrueNAS and Tailscale, and fixes for common connection errors.</p>
-    <ol><li>Configure your own Mail-Archiver server with archived mail and API access enabled, or obtain access from your independent administrator.</li><li>Use a reachable HTTPS server address with a valid certificate and an API key issued by your archive operator. The app adds HTTPS if you omit the scheme.</li><li>If the server is private, configure and connect your own Tailscale or other required private network first.</li></ol>
+    <p>The <a href="setup.html">setup guide</a> has step-by-step settings for Mail-Archiver's API, an Open Archiver read-only role, TrueNAS and Tailscale, and fixes for common connection errors.</p>
+    <ol><li>Configure your own Mail-Archiver server with API access enabled or an Open Archiver 0.6.2 server, or obtain access from your independent administrator.</li><li>Use a reachable HTTPS server address with a valid certificate and an API key issued by your archive operator. The app adds HTTPS if you omit the scheme.</li><li>If the server is private, configure and connect your own Tailscale or other required private network first.</li></ol>
     <p>TrueNAS is one possible server host. MailBurrow does not provide hosting, email accounts, server administration or managed private networks. It does not connect directly to Gmail, sync from your email provider, or send, edit or delete messages.</p>
-    <p>For server setup, see the independent <a href="https://github.com/s1t5/mail-archiver">Mail-Archiver project</a>. MailBurrow is not the official Mail-Archiver or Tailscale app.</p>
+    <p>For server setup, see the independent <a href="https://github.com/s1t5/mail-archiver">Mail-Archiver project</a>. See also the independent <a href="https://github.com/LogicLabs-OU/OpenArchiver">Open Archiver project</a>. MailBurrow is not the official app of either server project or Tailscale.</p>
   </section>
   <section id="connection"><h2>Connection and account help</h2>
     <p>Check your network, required private-network connection and server availability, then refresh. Replace expired or revoked keys through your archive operator. Never disable certificate validation to solve a connection problem.</p>

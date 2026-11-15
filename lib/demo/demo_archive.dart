@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../archive_api.dart' show flattenFolders;
 import '../archive_backend.dart';
+import '../archive_capabilities.dart';
 import '../archive_errors.dart';
 import '../archive_models.dart';
 import '../attachment_download.dart';
@@ -30,8 +31,13 @@ const _pageSize = 25;
 /// with a real server. Attachments are copied from bundled files through the
 /// normal save flow.
 class DemoArchive implements ArchiveBackend {
-  DemoArchive._(Map<String, dynamic> data, this._bundle, this._latency)
-    : _accounts = (data['accounts'] as List<dynamic>)
+  DemoArchive._(
+    Map<String, dynamic> data,
+    this._bundle,
+    this._latency,
+    ArchiveCapabilities? capabilities,
+  ) : capabilities = capabilities ?? ArchiveCapabilities.full,
+      _accounts = (data['accounts'] as List<dynamic>)
           .cast<Map<String, dynamic>>(),
       _folders = data['folders'] as Map<String, dynamic>,
       _messages = (data['messages'] as List<dynamic>)
@@ -41,14 +47,23 @@ class DemoArchive implements ArchiveBackend {
 
   /// Loads the bundled demo archive. [latency] adds a short pause to list
   /// and search results so loading states appear as they would with a
-  /// server; tests pass [Duration.zero].
+  /// server; tests pass [Duration.zero]. [capabilities] narrows what the
+  /// demo supports, so tests can show the screens for a server without
+  /// folders, some filters or archive totals; the app always uses the full
+  /// demo.
   static Future<DemoArchive> load({
     AssetBundle? bundle,
     Duration latency = const Duration(milliseconds: 250),
+    ArchiveCapabilities? capabilities,
   }) async {
     final source = bundle ?? rootBundle;
     final text = await source.loadString(demoArchiveAsset, cache: false);
-    return DemoArchive.parse(text, bundle: source, latency: latency);
+    return DemoArchive.parse(
+      text,
+      bundle: source,
+      latency: latency,
+      capabilities: capabilities,
+    );
   }
 
   /// Builds a demo archive from already-loaded archive JSON. Attachments are
@@ -58,10 +73,12 @@ class DemoArchive implements ArchiveBackend {
     String archiveJson, {
     AssetBundle? bundle,
     Duration latency = const Duration(milliseconds: 250),
+    ArchiveCapabilities? capabilities,
   }) => DemoArchive._(
     jsonDecode(archiveJson) as Map<String, dynamic>,
     bundle ?? rootBundle,
     latency,
+    capabilities,
   );
 
   final AssetBundle _bundle;
@@ -80,6 +97,15 @@ class DemoArchive implements ArchiveBackend {
   @override
   String get key => 'demo';
 
+  @override
+  final ArchiveCapabilities capabilities;
+
+  /// A narrowed demo fails loudly when asked for something it does not
+  /// support, so tests catch screens that ignore capabilities.
+  void _require(bool supported, String what) {
+    if (!supported) throw StateError('Demo does not support $what');
+  }
+
   void _checkOpen() {
     if (_closed) throw StateError('Demo archive closed');
   }
@@ -90,36 +116,39 @@ class DemoArchive implements ArchiveBackend {
   }
 
   @override
-  Future<List<dynamic>> accounts() async {
+  Future<List<ArchiveAccount>> accounts() async {
     _checkOpen();
-    return [for (final account in _accounts) Map<String, dynamic>.of(account)];
+    return [for (final account in _accounts) ArchiveAccount.fromJson(account)];
   }
 
   @override
-  Future<List<ArchiveFolder>> folders(int accountId) async {
+  Future<List<ArchiveFolder>> folders(String accountId) async {
     _checkOpen();
-    final tree = _folders['$accountId'] as List<dynamic>?;
+    _require(capabilities.folders, 'folders');
+    final tree = _folders[accountId] as List<dynamic>?;
     if (tree == null) throw const ArchiveFailure(404);
     return flattenFolders(tree);
   }
 
   @override
-  Future<Map<String, dynamic>> emails(
-    int accountId,
+  Future<MailPage> emails(
+    String accountId,
     String query,
     int page, {
     String? folder,
     SearchFilters filters = const SearchFilters(),
   }) async {
+    _require(folder == null || capabilities.folders, 'folders');
+    _require(capabilities.allows(filters), 'these filters');
     await _pause();
-    if (!_accounts.any((account) => account['id'] == accountId)) {
+    if (!_accounts.any((account) => account['id'].toString() == accountId)) {
       throw const ArchiveFailure(404);
     }
     final needle = query.trim().toLowerCase();
     final from = filters.from == null ? null : dateLabel(filters.from!);
     final to = filters.to == null ? null : dateLabel(filters.to!);
     final matches = _messages.where((mail) {
-      if (mail['accountId'] != accountId) return false;
+      if (mail['accountId'].toString() != accountId) return false;
       if (folder != null && mail['folderName'] != folder) return false;
       if (filters.direction == 'incoming' && mail['isOutgoing'] == true) {
         return false;
@@ -164,53 +193,32 @@ class DemoArchive implements ArchiveBackend {
     final totalItems = matches.length;
     final totalPages = (totalItems + _pageSize - 1) ~/ _pageSize;
     final start = (math.max(page, 1) - 1) * _pageSize;
-    return {
-      'items': [
-        for (final mail in matches.skip(start).take(_pageSize)) _summary(mail),
+    return MailPage(
+      items: [
+        for (final mail in matches.skip(start).take(_pageSize))
+          MailSummary.fromJson(mail),
       ],
-      'page': page,
-      'totalPages': totalPages,
-      'totalItems': totalItems,
-    };
+      page: page,
+      totalPages: totalPages,
+      totalItems: totalItems,
+    );
   }
 
-  Map<String, dynamic> _summary(Map<String, dynamic> mail) => {
-    for (final field in const [
-      'id',
-      'accountId',
-      'subject',
-      'from',
-      'to',
-      'sentDate',
-      'receivedDate',
-      'hasAttachments',
-      'isOutgoing',
-      'folderName',
-    ])
-      field: mail[field],
-  };
-
-  Map<String, dynamic>? _find(int id) =>
-      _messages.where((mail) => mail['id'] == id).firstOrNull;
+  Map<String, dynamic>? _find(String id) =>
+      _messages.where((mail) => mail['id'].toString() == id).firstOrNull;
 
   @override
-  Future<Map<String, dynamic>> message(int id) async {
+  Future<MailMessage> message(String id) async {
     _checkOpen();
     final mail = _find(id);
     if (mail == null) throw const ArchiveFailure(404);
-    return {
-      ...mail,
-      'attachments': [
-        for (final file in mail['attachments'] as List<dynamic>)
-          Map<String, dynamic>.of(file as Map<String, dynamic>),
-      ],
-    };
+    return MailMessage.fromJson(mail);
   }
 
   @override
   Future<void> downloadAttachment(
-    int emailId,
-    int attachmentId,
+    String emailId,
+    String attachmentId,
     File destination, {
     AttachmentDownload? transfer,
     void Function(int receivedBytes)? onProgress,
@@ -218,9 +226,9 @@ class DemoArchive implements ArchiveBackend {
     _checkOpen();
     final mail = _find(emailId);
     final belongs = (mail?['attachments'] as List<dynamic>? ?? []).any(
-      (file) => (file as Map<String, dynamic>)['id'] == attachmentId,
+      (file) => (file as Map<String, dynamic>)['id'].toString() == attachmentId,
     );
-    final name = _attachmentFiles['$attachmentId'];
+    final name = _attachmentFiles[attachmentId];
     if (!belongs || name == null) throw const ArchiveFailure(404);
     final active = transfer ?? AttachmentDownload();
     active.throwIfStopped();
@@ -278,16 +286,17 @@ class DemoArchive implements ArchiveBackend {
   }
 
   @override
-  Future<Map<String, dynamic>> stats() async {
+  Future<ArchiveStats> stats() async {
     _checkOpen();
-    return {
-      'emails': _messages.length,
-      'accounts': _accounts.length,
-      'attachments': _messages.fold<int>(
+    _require(capabilities.archiveStats, 'archive totals');
+    return ArchiveStats(
+      _messages.length,
+      _accounts.length,
+      _messages.fold<int>(
         0,
         (total, mail) => total + (mail['attachments'] as List<dynamic>).length,
       ),
-    };
+    );
   }
 
   /// Nothing to cancel: results are computed locally, and the session already

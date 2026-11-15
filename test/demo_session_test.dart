@@ -3,12 +3,14 @@ import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mailburrow/archive_models.dart';
+import 'package:mailburrow/archive_server_type.dart';
 import 'package:mailburrow/demo/demo_archive.dart';
 import 'package:mailburrow/search_filters.dart';
 import 'package:mailburrow/state/archive_session.dart';
 import 'package:mailburrow/state/connection_store.dart';
 
 import 'support/fake_archive_backend.dart';
+import 'support/saved_connection.dart';
 
 /// Records every secure-storage call so tests can prove the demo makes none.
 class RecordingStore extends ConnectionStore {
@@ -20,13 +22,55 @@ class RecordingStore extends ConnectionStore {
   }
 
   @override
-  Future<void> write({
+  Future<String> write({
+    required ArchiveServerType serverType,
     required String server,
     required String key,
-    required Object? accountId,
+    required String? accountId,
+    String? profileId,
   }) {
     calls.add('write');
-    return super.write(server: server, key: key, accountId: accountId);
+    return super.write(
+      serverType: serverType,
+      server: server,
+      key: key,
+      accountId: accountId,
+      profileId: profileId,
+    );
+  }
+
+  @override
+  Future<String> add({
+    required ArchiveServerType serverType,
+    required String server,
+    required String key,
+    required String? accountId,
+  }) {
+    calls.add('add');
+    return super.add(
+      serverType: serverType,
+      server: server,
+      key: key,
+      accountId: accountId,
+    );
+  }
+
+  @override
+  Future<SavedConnection> connection(String id) {
+    calls.add('connection');
+    return super.connection(id);
+  }
+
+  @override
+  Future<SavedArchives> overview() {
+    calls.add('overview');
+    return super.overview();
+  }
+
+  @override
+  Future<void> reset() {
+    calls.add('reset');
+    return super.reset();
   }
 
   @override
@@ -41,25 +85,25 @@ class RealArchive extends FakeArchiveBackend {
   RealArchive(super.server, super.key);
   bool closedByApp = false;
   @override
-  Future<List<dynamic>> accounts() async => [
+  Future<List<ArchiveAccount>> accounts() async => [
     {'id': 7, 'emailAddress': 'owner@example.com'},
-  ];
+  ].map(ArchiveAccount.fromJson).toList();
   @override
-  Future<List<ArchiveFolder>> folders(int accountId) async => [];
+  Future<List<ArchiveFolder>> folders(String accountId) async => [];
   @override
-  Future<Map<String, dynamic>> emails(
-    int accountId,
+  Future<MailPage> emails(
+    String accountId,
     String query,
     int page, {
     String? folder,
     SearchFilters filters = const SearchFilters(),
-  }) async => {
+  }) async => MailPage.fromJson({
     'items': [
       {'id': 70, 'subject': 'Real archive message', 'from': 'a@example.com'},
     ],
     'page': page,
     'totalPages': 1,
-  };
+  });
   @override
   void close() => closedByApp = true;
 }
@@ -68,7 +112,7 @@ const savedJson =
     '{"server":"https://archive.example.com","key":"test-only","accountId":7}';
 
 Future<String?> savedRaw() =>
-    const FlutterSecureStorage().read(key: 'connection');
+    savedConnectionText();
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -112,7 +156,7 @@ void main() {
     expect(session.busy, isFalse);
     expect(session.error, isNull);
     expect(session.api!.server.host, 'demo.mailburrow.invalid');
-    expect(session.account!['id'], 1);
+    expect(session.account!.id, '1');
     expect(session.messages, hasLength(25));
     expect(session.totalPages, 2);
     expect(session.folders, isNotEmpty);
@@ -131,13 +175,13 @@ void main() {
     store.calls.clear();
 
     await session.startDemo();
-    await session.switchAccount({'id': 2, 'emailAddress': 'bakery'});
-    expect(session.account!['id'], 2);
+    await session.switchAccount(ArchiveAccount.fromJson({'id': 2, 'emailAddress': 'bakery'}));
+    expect(session.account!.id, '2');
     expect(session.messages, isNotEmpty);
     await session.applyFilters(const SearchFilters(direction: 'outgoing'));
     session.exitDemo();
 
-    expect(store.calls, isEmpty, reason: 'no read, write or delete');
+    expect(store.calls, isEmpty, reason: 'no secure-storage call');
     expect(await savedRaw(), before);
     expect(session.setup, isTrue);
     expect(session.demo, isFalse);
@@ -199,7 +243,7 @@ void main() {
       () async {
     latency = const Duration(milliseconds: 40);
     await session.startDemo();
-    final pending = session.switchAccount({'id': 3, 'emailAddress': 'club'});
+    final pending = session.switchAccount(ArchiveAccount.fromJson({'id': 3, 'emailAddress': 'club'}));
     await Future<void>.delayed(Duration.zero);
     session.exitDemo();
     await pending;
@@ -221,9 +265,9 @@ void main() {
 
     expect(session.demo, isFalse);
     expect(session.api, isA<RealArchive>());
-    expect(session.account!['id'], 7);
+    expect(session.account!.id, '7');
     await expectLater(demo.accounts(), throwsA(isA<StateError>()));
-    expect(store.calls, ['write']);
+    expect(store.calls, ['add', 'overview']);
     expect(
       jsonDecode((await savedRaw())!) as Map<String, dynamic>,
       containsPair('server', 'https://archive.example.com'),

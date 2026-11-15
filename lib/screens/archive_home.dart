@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../account_selector.dart';
 import '../archive_models.dart';
+import '../archive_picker.dart';
 import '../archive_backend.dart';
 import '../demo/demo_banner.dart';
 import '../pagination.dart';
@@ -91,8 +92,8 @@ class _ArchiveHomeState extends State<ArchiveHome> {
 
   Future<void> chooseAccount() async {
     final requestApi = session.api;
-    final id = session.account?['id'];
-    if (requestApi == null || id is! int || !session.canSwitchAccount) return;
+    final id = session.account?.id;
+    if (requestApi == null || id == null || !session.canSwitchAccount) return;
     final choice = await showAccountSelector(
       context,
       api: requestApi,
@@ -107,7 +108,23 @@ class _ArchiveHomeState extends State<ArchiveHome> {
     await session.switchAccount(choice);
   }
 
+  Future<void> chooseArchive() async {
+    if (!session.canSwitchArchive) return;
+    final choice = await showArchivePicker(
+      context,
+      archives: session.archives,
+      activeId: session.activeArchiveId,
+    );
+    if (!mounted || choice == null || session.setup) return;
+    if (choice == addArchiveChoice) {
+      session.openSetup();
+      return;
+    }
+    await session.switchArchive(choice);
+  }
+
   Future<void> chooseFolder() async {
+    if (!session.capabilities.folders) return;
     final choice = await showModalBottomSheet<ArchiveFolder>(
       context: context,
       showDragHandle: true,
@@ -178,11 +195,15 @@ class _ArchiveHomeState extends State<ArchiveHome> {
   }
 
   Future<void> chooseFilters() async {
+    if (!session.capabilities.hasFilterChoices) return;
     final updated = await showModalBottomSheet<SearchFilters>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => SearchFiltersSheet(filters: session.filters),
+      builder: (_) => SearchFiltersSheet(
+        filters: session.filters,
+        capabilities: session.capabilities,
+      ),
     );
     if (updated == null || !mounted) return;
     await session.applyFilters(updated);
@@ -229,6 +250,45 @@ class _ArchiveHomeState extends State<ArchiveHome> {
                     liveRegion: true,
                     child: Text('Connecting to your archive…'),
                   ),
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: s.canCancelOpening ? s.cancelOpening : null,
+                    child: const Text('Cancel'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    final opening = s.switchingArchive;
+    if (opening != null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('MailBurrow')),
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 24),
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      'Opening ${opening.label}…',
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(archiveDetails(opening), textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: s.canCancelOpening ? s.cancelOpening : null,
+                    child: const Text('Cancel'),
+                  ),
                 ],
               ),
             ),
@@ -242,6 +302,7 @@ class _ArchiveHomeState extends State<ArchiveHome> {
       searchFocus: searchFocus,
       searchFieldKey: searchFieldKey,
       onChooseAccount: chooseAccount,
+      onChooseArchive: chooseArchive,
       onChooseFilters: chooseFilters,
       onChooseFolder: chooseFolder,
       onChoosePage: choosePage,

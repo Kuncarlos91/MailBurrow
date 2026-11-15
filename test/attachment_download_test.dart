@@ -30,8 +30,8 @@ void main() {
           attachmentByteLimit: 4,
         );
         await api.downloadAttachment(
-          1,
-          2,
+          '1',
+          '2',
           destination,
           onProgress: progress.add,
         );
@@ -71,8 +71,8 @@ void main() {
           attachmentByteLimit: 4,
         );
         await api.downloadAttachment(
-          1,
-          2,
+          '1',
+          '2',
           destination,
           onProgress: progress.add,
         );
@@ -94,7 +94,7 @@ void main() {
           attachmentByteLimit: 4,
         );
         await expectLater(
-          api.downloadAttachment(1, 2, destination),
+          api.downloadAttachment('1', '2', destination),
           throwsA(isA<AttachmentTooLarge>()),
         );
         expect(response.listened, isFalse);
@@ -124,7 +124,7 @@ void main() {
             attachmentByteLimit: 4,
           );
           await expectLater(
-            api.downloadAttachment(1, 2, destination, onProgress: progress.add),
+            api.downloadAttachment('1', '2', destination, onProgress: progress.add),
             throwsA(isA<AttachmentTooLarge>()),
           );
           expect(progress, [2]);
@@ -156,8 +156,8 @@ void main() {
           );
           await expectLater(
             api.downloadAttachment(
-              1,
-              2,
+              '1',
+              '2',
               destination,
               onProgress: (bytes) => written = bytes,
             ),
@@ -184,7 +184,7 @@ void main() {
         attachmentDeadline: const Duration(milliseconds: 25),
       );
       await expectLater(
-        api.downloadAttachment(1, 2, destination),
+        api.downloadAttachment('1', '2', destination),
         throwsA(isA<TimeoutException>()),
       );
       expect(client.closed, isTrue);
@@ -208,7 +208,7 @@ void main() {
             attachmentIdleTimeout: const Duration(milliseconds: 30),
           );
           await expectLater(
-            api.downloadAttachment(1, 2, destination),
+            api.downloadAttachment('1', '2', destination),
             throwsA(isA<TimeoutException>()),
           );
           expect(await destination.exists(), isFalse);
@@ -245,8 +245,8 @@ void main() {
             );
             final pendingAccount = api.accounts();
             final result = api.downloadAttachment(
-              1,
-              2,
+              '1',
+              '2',
               destination,
               transfer: transfer,
               onProgress: (_) {
@@ -289,7 +289,7 @@ void main() {
       () async {
         final api = ArchiveApi(Uri.parse('https://example.com'), 'test-only');
         await expectLater(
-          api.downloadAttachment(1, 2, destination, transfer: transfer),
+          api.downloadAttachment('1', '2', destination, transfer: transfer),
           throwsA(isA<AttachmentDownloadCancelled>()),
         );
         expect(created, isFalse);
@@ -314,7 +314,7 @@ void main() {
       await HttpOverrides.runZoned(() async {
         final api = ArchiveApi(Uri.parse('https://example.com'), 'test-only');
         await expectLater(
-          api.downloadAttachment(1, 2, destination),
+          api.downloadAttachment('1', '2', destination),
           throwsA(
             isA<ArchiveFailure>().having(
               (error) => error.status,
@@ -337,7 +337,7 @@ void main() {
       await HttpOverrides.runZoned(() async {
         final api = ArchiveApi(Uri.parse('https://example.com'), 'test-only');
         await expectLater(
-          api.downloadAttachment(1, 2, file),
+          api.downloadAttachment('1', '2', file),
           throwsA(isA<FileSystemException>()),
         );
         expect(file.output.closed, isTrue);

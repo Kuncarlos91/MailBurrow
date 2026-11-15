@@ -8,6 +8,8 @@ import 'package:mailburrow/app.dart';
 import 'package:mailburrow/screens/archive_home.dart';
 import 'package:mailburrow/search_filters.dart';
 
+import 'saved_connection.dart';
+
 const _server = 'https://archive.example.invalid';
 const _syntheticKey = 'test-only-smoke';
 
@@ -22,32 +24,32 @@ class _SyntheticArchive extends ArchiveApi {
       );
 
   @override
-  Future<List<dynamic>> accounts() async => [
+  Future<List<ArchiveAccount>> accounts() async => [
     {'id': 1, 'emailAddress': 'smoke@example.invalid', 'isEnabled': true},
-  ];
+  ].map(ArchiveAccount.fromJson).toList();
 
   @override
-  Future<List<ArchiveFolder>> folders(int id) async => [
+  Future<List<ArchiveFolder>> folders(String id) async => [
     const ArchiveFolder('Inbox', 'INBOX', 1, 0),
   ];
 
   @override
-  Future<Map<String, dynamic>> stats() async => {
+  Future<ArchiveStats> stats() async => ArchiveStats.fromJson({
     'emails': 1,
     'accounts': 1,
     'attachments': 0,
-  };
+  });
 
   @override
-  Future<Map<String, dynamic>> emails(
-    int id,
+  Future<MailPage> emails(
+    String id,
     String query,
     int page, {
     String? folder,
     SearchFilters filters = const SearchFilters(),
   }) async {
     lastQuery = query;
-    return {
+    return MailPage.fromJson({
       'items': [
         {
           'id': 1,
@@ -59,18 +61,18 @@ class _SyntheticArchive extends ArchiveApi {
       ],
       'page': 1,
       'totalPages': 1,
-    };
+    });
   }
 
   @override
-  Future<Map<String, dynamic>> message(int id) async => {
+  Future<MailMessage> message(String id) async => MailMessage.fromJson({
     'id': id,
     'from': 'sender@example.invalid',
     'to': 'smoke@example.invalid',
     'subject': 'Simulator test message',
     'textBody': 'Synthetic simulator message body.',
     'attachments': <dynamic>[],
-  };
+  });
 }
 
 Future<void> _settle(WidgetTester tester) async {
@@ -103,12 +105,13 @@ void runSmokeScenarios() {
   const storage = FlutterSecureStorage();
 
   // This suite is only for the newly created disposable simulator.
+  // Saved archives use a v3 index and one key entry per archive.
   setUp(() async {
-    await storage.delete(key: 'connection');
-    expect(await storage.read(key: 'connection'), isNull);
+    await storage.deleteAll();
+    expect(await savedConnectionText(), isNull);
   });
   tearDown(() async {
-    await storage.delete(key: 'connection');
+    await storage.deleteAll();
   });
 
   testWidgets('fresh native startup is blank and obscures the key', (
@@ -161,7 +164,7 @@ void runSmokeScenarios() {
     await tester.tap(find.text('Connect to archive'));
     await _settle(tester);
     expect(find.text('Simulator test message'), findsOneWidget);
-    final saved = await storage.read(key: 'connection');
+    final saved = await savedConnectionText();
     expect(saved, isNotNull);
     expect(jsonDecode(saved!)['server'], _server);
     expect(jsonDecode(saved)['key'], _syntheticKey);

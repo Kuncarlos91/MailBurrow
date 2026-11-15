@@ -7,11 +7,30 @@ import '../archive_models.dart';
 import '../archive_errors.dart';
 import '../archive_backend.dart';
 import '../demo/demo_archive.dart';
+import '../archive_capabilities.dart';
 import '../search_filters.dart';
+import '../archive_server_type.dart';
+import '../open_archiver_api.dart';
 import 'connection_store.dart';
 
-/// Creates the backend for a validated server address and key.
+/// Creates the backend for a validated server address and key, for every
+/// server type. Tests use it to supply one fake backend.
 typedef ArchiveApiFactory = ArchiveBackend Function(Uri server, String key);
+
+/// Creates the backend of [type] for a validated server address and key.
+typedef ArchiveBackendFactory =
+    ArchiveBackend Function(ArchiveServerType type, Uri server, String key);
+
+/// The real backend for each server type. There is no fallback: a type is
+/// only ever connected with its own client.
+ArchiveBackend createArchiveBackend(
+  ArchiveServerType type,
+  Uri server,
+  String key,
+) => switch (type) {
+  ArchiveServerType.mailArchiver => ArchiveApi(server, key),
+  ArchiveServerType.openArchiver => OpenArchiverApi(server, key),
+};
 
 /// Opens the built-in demo archive.
 typedef DemoArchiveLoader = Future<ArchiveBackend> Function();
@@ -28,13 +47,18 @@ typedef DemoArchiveLoader = Future<ArchiveBackend> Function();
 class ArchiveSession extends ChangeNotifier {
   ArchiveSession({
     ArchiveApiFactory? apiFactory,
+    ArchiveBackendFactory? backendFactory,
     DemoArchiveLoader? demoLoader,
     ConnectionStore store = const ConnectionStore(),
-  }) : _apiFactory = apiFactory ?? ArchiveApi.new,
+  }) : _backendFactory =
+           backendFactory ??
+           (apiFactory == null
+               ? createArchiveBackend
+               : (_, server, key) => apiFactory(server, key)),
        _demoLoader = demoLoader ?? DemoArchive.load,
        _store = store;
 
-  final ArchiveApiFactory _apiFactory;
+  final ArchiveBackendFactory _backendFactory;
   final DemoArchiveLoader _demoLoader;
   final ConnectionStore _store;
   final server = TextEditingController();
@@ -57,16 +81,122 @@ class ArchiveSession extends ChangeNotifier {
   void Function(bool Function() stillCurrent)? onAccountChanged;
 
   ArchiveBackend? api;
-  Map<String, dynamic>? account;
+
+  /// The server type of the current or restored connection. It is saved with
+  /// the connection and never detected.
+  ArchiveServerType serverType = ArchiveServerType.mailArchiver;
+
+  /// The type chosen in the setup form. It applies only when connecting from
+  /// setup and becomes [serverType] once that connection succeeds, so a
+  /// choice that is cancelled never changes the active connection.
+  ArchiveServerType setupServerType = ArchiveServerType.mailArchiver;
+
+  void chooseServerType(ArchiveServerType value) {
+    if (busy || reconfiguring != null || value == setupServerType) return;
+    setupServerType = value;
+    keyInput.clear();
+    error = null;
+    _notify();
+  }
+
+  ArchiveAccount? account;
   List<ArchiveFolder> folders = [];
   String? selectedFolder;
   SearchFilters filters = const SearchFilters();
   String? folderError;
   bool foldersBusy = false;
-  List<dynamic> messages = [];
+  List<MailSummary> messages = [];
   int tab = 0, page = 1, totalPages = 1;
   bool busy = true, setup = true;
   bool hasSavedConnection = false;
+
+  /// The readable saved archives, without keys, in saved order.
+  List<ConnectionProfile> archives = const [];
+
+  /// The saved profile of the open connection, or null for none or the demo.
+  String? activeArchiveId;
+
+  /// True when saved archives exist but this build cannot read them. Only
+  /// then does setup offer the all-archives reset.
+  bool savedArchivesUnreadable = false;
+
+  /// The archive being opened from the picker or setup, for its progress
+  /// screen; null otherwise.
+  ConnectionProfile? switchingArchive;
+
+  // The archive "Retry saved connection" opens after a failed switch; null
+  // means the active saved connection.
+  String? _retryArchiveId;
+
+  /// The saved archive whose address or key setup is changing, or null when
+  /// setup adds an archive. Its server type cannot change: a different type
+  /// is a new archive.
+  ConnectionProfile? reconfiguring;
+
+  /// The saved archive whose key the server refused when it was last
+  /// opened, offered "Enter a new key" in setup; null otherwise.
+  String? reconnectArchiveId;
+
+  // The failure of the last connection attempt, and the saved active
+  // profile ID from the store (also while nothing is open).
+  Object? _lastConnectFailure;
+  String? _savedActiveId;
+
+  // Bumped by [cancelOpening] (and by each new restore, switch or connection
+  // attempt) so an abandoned attempt changes nothing when it finishes.
+  int _openingToken = 0;
+  int _connectToken = 0;
+  ArchiveBackend? _pendingCandidate;
+  int? _committingConnectToken;
+
+  /// True while the saved archive is being opened at startup or from the
+  /// picker, so the progress screen can offer Cancel.
+  bool get canCancelOpening =>
+      !_disposed &&
+      api == null &&
+      _committingConnectToken == null &&
+      (restoring || switchingArchive != null);
+
+  /// Stops opening an archive at startup or from the picker without waiting
+  /// for the server to answer or time out, and returns to setup with the
+  /// saved archives and Retry. The abandoned attempt's client is closed and
+  /// its late result is ignored; nothing is saved or activated.
+  Future<void> cancelOpening() async {
+    // Once the destination has been adopted, it is open: nothing to cancel.
+    if (!canCancelOpening || _disposed || api != null) return;
+    final switching = switchingArchive != null;
+    _openingToken++;
+    _connectToken++;
+    _pendingCandidate?.close();
+    _pendingCandidate = null;
+    _invalidateRequests();
+    restoring = false;
+    switchingArchive = null;
+    if (switching) hasSavedConnection = true;
+    setup = true;
+    busy = false;
+    error = null;
+    server.clear();
+    keyInput.clear();
+    _notify();
+    await _refreshArchives();
+  }
+
+  /// The archive [reconnectArchiveId] names, if it is still saved.
+  ConnectionProfile? get reconnectArchive => api != null
+      ? null
+      : archives.where((item) => item.id == reconnectArchiveId).firstOrNull;
+
+  bool get _keyRefused {
+    final failure = _lastConnectFailure;
+    return failure is ArchiveFailure &&
+        (failure.status == 401 || failure.status == 403);
+  }
+
+  /// The open archive's saved profile, if any.
+  ConnectionProfile? get activeArchive => demo || api == null
+      ? null
+      : archives.where((item) => item.id == activeArchiveId).firstOrNull;
 
   /// True while the built-in demo archive is open. The demo is never saved:
   /// entering, browsing and exiting it never read, write or delete the saved
@@ -101,6 +231,7 @@ class ArchiveSession extends ChangeNotifier {
     mailRequestId++;
     searchTimer?.cancel();
     api?.close();
+    _pendingCandidate?.close();
     server.dispose();
     keyInput.dispose();
     search.dispose();
@@ -132,35 +263,201 @@ class ArchiveSession extends ChangeNotifier {
 
   bool get canSwitchAccount => !accountSwitching && (!busy || mailLoading);
 
+  /// True when another saved archive can be opened now.
+  bool get canSwitchArchive =>
+      !demo &&
+      switchingArchive == null &&
+      !accountSwitching &&
+      (!busy || mailLoading);
+
+  /// Reloads [archives] from the store. Failures keep the current list.
+  Future<void> _refreshArchives({bool Function()? isCurrent}) async {
+    try {
+      final saved = await _store.overview();
+      if (_disposed || (isCurrent != null && !isCurrent())) return;
+      archives = saved.profiles;
+      savedArchivesUnreadable = saved.unreadable;
+      _savedActiveId = saved.active;
+      if (api != null && !demo) activeArchiveId = saved.active;
+    } catch (_) {
+      // Storage is unavailable; the picker keeps what it last showed.
+    }
+    _notify();
+  }
+
   Future<void> restore() async {
+    final token = ++_openingToken;
+    bool current() => !_disposed && token == _openingToken;
+    reconfiguring = null;
+    reconnectArchiveId = null;
+    _lastConnectFailure = null;
+    keyInput.clear();
     restoring = true;
     busy = true;
     error = null;
     _notify();
     try {
       final saved = await _store.read();
-      if (_disposed) return;
+      if (!current()) return;
       if (saved != null) {
         hasSavedConnection = true;
+        serverType = saved.serverType;
+        setupServerType = saved.serverType;
         server.text = saved.server;
         await connect(saved.key, saved.accountId);
         return;
       }
     } catch (_) {
-      if (!_disposed) {
+      if (current()) {
         error = 'Saved connection unavailable. Enter your settings again.';
         _notify();
       }
     } finally {
-      if (!_disposed) {
-        restoring = false;
+      if (current()) {
+        await _refreshArchives(isCurrent: current);
+        if (current()) {
+          if (api == null && _keyRefused) reconnectArchiveId = _savedActiveId;
+          if (savedArchivesUnreadable && api == null) {
+            error =
+                'Saved archives on this device cannot be read by this version of MailBurrow.';
+          }
+          restoring = false;
+          busy = mailLoading;
+          _notify();
+        }
+      }
+    }
+  }
+
+  /// Retries the saved connection that failed last: the archive a failed
+  /// switch tried to open, otherwise the active saved connection.
+  Future<void> retrySaved() async {
+    final id = _retryArchiveId;
+    if (id != null && archives.any((item) => item.id == id)) {
+      await switchArchive(id);
+    } else {
+      _retryArchiveId = null;
+      await restore();
+    }
+  }
+
+  /// Opens the saved archive [id] with its saved key and account.
+  ///
+  /// The open archive's content is cleared and its requests cancelled before
+  /// the destination is contacted, so its mail is never shown under the new
+  /// label. The destination becomes active only once it answers; if it fails,
+  /// setup shows a destination-specific error with Retry and the saved
+  /// archives, and the previous archive stays saved and active for restart.
+  Future<void> switchArchive(String id) async {
+    if (!canSwitchArchive) return;
+    final profile = archives.where((item) => item.id == id).firstOrNull;
+    if (profile == null) return;
+    if (!setup && api != null && id == activeArchiveId) return;
+    reconfiguring = null;
+    api?.close();
+    _invalidateRequests();
+    _clearBrowsing();
+    activeQuery = '';
+    activeMailPage = 1;
+    searchElapsed = Duration.zero;
+    reloadPending = false;
+    api = null;
+    activeArchiveId = null;
+    account = null;
+    accountNotice = null;
+    accountLoading = false;
+    accountSwitchGeneration++;
+    mailRequestFailed = false;
+    messages = [];
+    keyInput.clear();
+    final token = ++_openingToken;
+    bool current() => !_disposed && token == _openingToken;
+    switchingArchive = profile;
+    _retryArchiveId = id;
+    reconnectArchiveId = null;
+    _lastConnectFailure = null;
+    busy = true;
+    error = null;
+    _notify();
+    String? failure;
+    try {
+      final saved = await _store.connection(id);
+      if (!current()) return;
+      serverType = saved.serverType;
+      setupServerType = saved.serverType;
+      server.text = saved.server;
+      await _connect(saved.key, saved.accountId, id);
+      failure = api == null ? error : null;
+    } on FormatException {
+      failure = 'Its saved details cannot be read. Add it again.';
+    } catch (_) {
+      failure = 'Could not read its saved details from this device.';
+    } finally {
+      if (current()) {
+        switchingArchive = null;
+        if (api == null) {
+          setup = true;
+          hasSavedConnection = true;
+          if (_keyRefused) reconnectArchiveId = id;
+          server.clear();
+          error =
+              'Could not open ${profile.label} (${profile.serverType.label}). ${failure ?? ''}'
+                  .trim();
+        }
         busy = mailLoading;
         _notify();
       }
     }
   }
 
-  Future<void> connect([String? savedKey, int? preferredAccountId]) async {
+  /// The explicit all-archives reset, offered only when the saved archives
+  /// cannot be read: removes every saved archive and key from this device.
+  /// No server is contacted and no server mail is changed.
+  Future<void> resetSavedArchives() async {
+    if (!savedArchivesUnreadable || busy || api != null) return;
+    busy = true;
+    error = null;
+    _notify();
+    try {
+      await _store.reset();
+      if (_disposed) return;
+      hasSavedConnection = false;
+      _retryArchiveId = null;
+      activeArchiveId = null;
+    } catch (_) {
+      if (!_disposed) error = 'Could not remove the saved archives. Try again.';
+    } finally {
+      if (!_disposed) {
+        await _refreshArchives();
+        busy = false;
+        _notify();
+      }
+    }
+  }
+
+  /// Connects with the key and server type entered in setup, or with
+  /// [savedKey] and the saved [serverType] when restoring.
+  /// [preferredAccountId] is the saved account as text; it is matched against
+  /// each account's ID in its text form.
+  ///
+  /// While [reconfiguring], the entered address and key replace that saved
+  /// archive's once they are validated; the saved key is never sent.
+  Future<void> connect([String? savedKey, String? preferredAccountId]) {
+    final target = savedKey == null ? reconfiguring : null;
+    return target == null
+        ? _connect(savedKey, preferredAccountId, null)
+        : _connect(null, target.accountId, target.id);
+  }
+
+  /// [profileId] names the saved archive being opened by [switchArchive].
+  Future<void> _connect(
+    String? savedKey,
+    String? preferredAccountId,
+    String? profileId,
+  ) async {
+    final token = ++_connectToken;
+    bool stale() => _disposed || token != _connectToken;
+    _lastConnectFailure = null;
     mailRequestFailed = false;
     accountSwitchGeneration++;
     accountLoading = false;
@@ -190,39 +487,86 @@ class ArchiveSession extends ChangeNotifier {
         return;
       }
       server.text = uri.toString();
-      final created = candidate = _apiFactory(uri, key);
+      final type = savedKey == null ? setupServerType : serverType;
+      if (savedKey == null &&
+          profileId != null &&
+          archives.any(
+            (item) =>
+                item.id != profileId &&
+                item.serverType == type &&
+                item.server == uri.toString(),
+          )) {
+        error =
+            'Another saved archive already uses this server type and address.';
+        _notify();
+        return;
+      }
+      final created = candidate = _backendFactory(type, uri, key);
+      _pendingCandidate = created;
       final accounts = await created.accounts();
+      if (stale()) return;
       if (accounts.isEmpty) throw const ArchiveFailure(404);
-      final available = accounts.cast<Map<String, dynamic>>();
-      final preferred = available
-          .where((item) => item['id'] == preferredAccountId)
+      final preferred = accounts
+          .where((item) => item.id == preferredAccountId)
           .firstOrNull;
-      final selected = preferred ?? available.first;
+      final selected = preferred ?? accounts.first;
       final accountUnavailable =
           preferredAccountId != null && preferred == null;
-      final result = await created.emails(selected['id'] as int, '', 1);
-      final items = result['items'] as List<dynamic>;
-      final pages = (result['totalPages'] as int).clamp(1, 1000000);
+      final result = await created.emails(selected.id, '', 1);
+      final items = result.items;
+      final pages = result.totalPages.clamp(1, 1000000);
+      // A cancelled attempt saves and activates nothing.
+      if (stale()) return;
+      // Once persistence begins it cannot be cancelled atomically. Disable
+      // Cancel before entering the store, and finish this commit consistently.
+      _committingConnectToken = token;
+      _notify();
+      String savedId;
       try {
-        await _store.write(
-          server: uri.toString(),
-          key: key,
-          accountId: selected['id'],
-        );
+        savedId = savedKey == null && profileId == null
+            ? await _store.add(
+                serverType: type,
+                server: uri.toString(),
+                key: key,
+                accountId: selected.id,
+              )
+            : await _store.write(
+                serverType: type,
+                server: uri.toString(),
+                key: key,
+                accountId: selected.id,
+                profileId: profileId,
+              );
+      } on TooManySavedArchives {
+        if (!stale()) {
+          error =
+              'Connected to the server, but this device already has the most saved archives MailBurrow allows (${ConnectionStore.maxProfiles}). Forget one first.';
+          _notify();
+        }
+        return;
+      } on SavedArchiveMissing {
+        if (!stale()) {
+          error =
+              'Connected to the server, but this archive is no longer saved on this device.';
+          _notify();
+        }
+        return;
       } catch (_) {
-        if (!_disposed) {
+        if (!stale()) {
           error =
               'Connected to the server, but could not save the connection securely. Retry or check device storage.';
           _notify();
         }
         return;
       }
-      if (_disposed) return;
+      if (stale()) return;
       if (!identical(api, created)) api?.close();
       _invalidateRequests();
       _clearBrowsing();
       api = created;
       adopted = true;
+      serverType = type;
+      setupServerType = type;
       demo = false;
       account = selected;
       accountNotice = accountUnavailable
@@ -232,17 +576,25 @@ class ArchiveSession extends ChangeNotifier {
       totalPages = pages;
       setup = false;
       hasSavedConnection = true;
+      activeArchiveId = savedId;
+      _retryArchiveId = null;
+      reconfiguring = null;
+      reconnectArchiveId = null;
       keyInput.clear();
       _notify();
+      await _refreshArchives();
       await loadFolders();
     } catch (failure) {
-      if (!_disposed) {
+      if (!stale()) {
+        _lastConnectFailure = failure;
         error = readableError(failure);
         _notify();
       }
     } finally {
+      if (_committingConnectToken == token) _committingConnectToken = null;
+      if (identical(_pendingCandidate, candidate)) _pendingCandidate = null;
       if (!adopted) candidate?.close();
-      if (!_disposed) {
+      if (!stale()) {
         if (!mailLoading) {
           busy = false;
           _notify();
@@ -255,13 +607,13 @@ class ArchiveSession extends ChangeNotifier {
     }
   }
 
-  Future<void> switchAccount(Map<String, dynamic> choice) async {
+  Future<void> switchAccount(ArchiveAccount choice) async {
     final requestApi = api;
+    final choiceId = choice.id;
     if (requestApi == null ||
         setup ||
         !canSwitchAccount ||
-        choice['id'] is! int ||
-        choice['id'] == account?['id']) {
+        choiceId == account?.id) {
       return;
     }
     // Invalidate old requests before awaiting storage; they must not reset busy
@@ -280,9 +632,10 @@ class ArchiveSession extends ChangeNotifier {
       // The demo is never saved, so its account choice is not stored either.
       if (!demo) {
         await _store.write(
+          serverType: serverType,
           server: requestApi.server.toString(),
           key: requestApi.key,
-          accountId: choice['id'],
+          accountId: choiceId,
         );
       }
     } catch (_) {
@@ -298,7 +651,7 @@ class ArchiveSession extends ChangeNotifier {
       return;
     }
     if (_disposed || !identical(api, requestApi)) return;
-    onAccountChanged?.call(() => !_disposed && account?['id'] == choice['id']);
+    onAccountChanged?.call(() => !_disposed && account?.id == choiceId);
     _clearBrowsing();
     account = choice;
     accountNotice = null;
@@ -356,20 +709,22 @@ class ArchiveSession extends ChangeNotifier {
     searchTimer = timer;
     try {
       final result = await requestApi.emails(
-        account!['id'] as int,
+        account!.id,
         query,
         requestedPage,
-        folder: selectedFolder,
-        filters: filters,
+        folder: requestApi.capabilities.folders ? selectedFolder : null,
+        filters: requestApi.capabilities.supported(filters),
       );
       if (current()) {
-        messages = result['items'] as List<dynamic>;
-        page = result['page'] as int;
-        totalPages = (result['totalPages'] as int).clamp(1, 1000000);
+        messages = result.items;
+        page = result.page;
+        totalPages = result.totalPages.clamp(1, 1000000);
         searchElapsed = watch.elapsed;
-        final total = result['totalItems'] as int?;
+        final total = result.totalItems;
         final count = total == null
             ? '${messages.length} messages on this page'
+            : (result.totalIsEstimate ?? capabilities.estimatedTotals)
+            ? 'about $total matches'
             : '$total matches';
         searchFeedback =
             '${query.isEmpty ? 'Messages loaded' : 'Search complete'} · $count · ${(watch.elapsedMilliseconds / 1000).toStringAsFixed(1)} s';
@@ -409,10 +764,22 @@ class ArchiveSession extends ChangeNotifier {
     }
   }
 
+  /// What the connected backend supports; [ArchiveCapabilities.full] while
+  /// disconnected, so setup and empty states keep their current controls.
+  ArchiveCapabilities get capabilities =>
+      api?.capabilities ?? ArchiveCapabilities.full;
+
   Future<void> loadFolders() async {
     final requestApi = api;
-    final accountId = account?['id'] as int?;
+    final accountId = account?.id;
     if (requestApi == null || accountId == null || foldersBusy) return;
+    if (!requestApi.capabilities.folders) {
+      // Nothing to browse: never ask a server for folders it does not have.
+      folders = [];
+      folderError = null;
+      selectedFolder = null;
+      return;
+    }
     final requestId = ++folderRequestId;
     bool current() =>
         !_disposed &&
@@ -442,7 +809,7 @@ class ArchiveSession extends ChangeNotifier {
   }
 
   Future<void> selectFolder(ArchiveFolder choice) async {
-    if (busy) return;
+    if (busy || !capabilities.folders) return;
     selectedFolder = choice.path.isEmpty ? null : choice.path;
     page = 1;
     totalPages = 1;
@@ -453,7 +820,7 @@ class ArchiveSession extends ChangeNotifier {
 
   Future<void> applyFilters(SearchFilters updated) async {
     if (busy) return;
-    filters = updated;
+    filters = capabilities.supported(updated);
     page = 1;
     totalPages = 1;
     messages = [];
@@ -479,13 +846,77 @@ class ArchiveSession extends ChangeNotifier {
   }
 
   void openSetup() {
+    if (reconfiguring != null) server.text = api?.server.toString() ?? '';
+    reconfiguring = null;
+    keyInput.clear();
     setup = true;
     error = null;
     _notify();
   }
 
+  /// Opens setup to change the saved archive [id]'s address or key. The
+  /// address starts as saved, the key must be entered again, and the server
+  /// type is fixed.
+  void openReconfigure(String id) {
+    if (busy || demo) return;
+    final profile = archives.where((item) => item.id == id).firstOrNull;
+    if (profile == null) return;
+    reconfiguring = profile;
+    setupServerType = profile.serverType;
+    server.text = profile.server;
+    keyInput.clear();
+    setup = true;
+    error = null;
+    _notify();
+  }
+
+  /// Renames the saved archive [id]. Returns false if it could not be saved.
+  Future<bool> renameArchive(String id, String label) async {
+    try {
+      await _store.rename(id, label);
+      return true;
+    } catch (_) {
+      return false;
+    } finally {
+      if (!_disposed) await _refreshArchives();
+    }
+  }
+
+  /// Forgets the saved archive [id] from this device. Forgetting the open
+  /// archive closes it and returns to setup without opening another.
+  /// Returns false if it could not be removed.
+  Future<bool> forgetArchive(String id) async {
+    if (busy && !mailLoading) return false;
+    if (!demo && api != null && id == activeArchiveId) {
+      await forgetConnection();
+      return api == null;
+    }
+    try {
+      await _store.forget(id);
+      return true;
+    } catch (_) {
+      return false;
+    } finally {
+      if (!_disposed) await _refreshArchives();
+    }
+  }
+
   void cancelSetup() {
+    if (api == null) {
+      // Leaving a key change started from setup itself: stay on setup.
+      if (reconfiguring == null) return;
+      reconfiguring = null;
+      server.clear();
+      keyInput.clear();
+      error = null;
+      _notify();
+      return;
+    }
+    if (reconfiguring != null) server.text = api?.server.toString() ?? '';
+    reconfiguring = null;
+    keyInput.clear();
     setup = false;
+    setupServerType = serverType;
     error = null;
     _notify();
   }
@@ -498,6 +929,8 @@ class ArchiveSession extends ChangeNotifier {
     try {
       await _store.delete();
       if (_disposed) return;
+      serverType = ArchiveServerType.mailArchiver;
+      setupServerType = ArchiveServerType.mailArchiver;
       api?.close();
       _invalidateRequests();
       _clearBrowsing();
@@ -513,8 +946,12 @@ class ArchiveSession extends ChangeNotifier {
       keyInput.clear();
       setup = true;
       hasSavedConnection = false;
+      activeArchiveId = null;
+      _retryArchiveId = null;
+      reconfiguring = null;
       error = null;
       _notify();
+      await _refreshArchives();
     } catch (_) {
       if (!_disposed) {
         error = 'Could not remove the saved connection.';
@@ -539,10 +976,10 @@ class ArchiveSession extends ChangeNotifier {
     var adopted = false;
     try {
       final created = candidate = await _demoLoader();
-      final accounts = (await created.accounts()).cast<Map<String, dynamic>>();
+      final accounts = await created.accounts();
       if (accounts.isEmpty) throw const ArchiveFailure(404);
       final selected = accounts.first;
-      final result = await created.emails(selected['id'] as int, '', 1);
+      final result = await created.emails(selected.id, '', 1);
       if (_disposed) return;
       if (!identical(api, created)) api?.close();
       _invalidateRequests();
@@ -553,8 +990,8 @@ class ArchiveSession extends ChangeNotifier {
       demo = true;
       account = selected;
       accountNotice = null;
-      messages = result['items'] as List<dynamic>;
-      totalPages = (result['totalPages'] as int).clamp(1, 1000000);
+      messages = result.items;
+      totalPages = result.totalPages.clamp(1, 1000000);
       setup = false;
       _notify();
       await loadFolders();

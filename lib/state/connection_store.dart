@@ -1,39 +1,684 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../archive_server_type.dart';
+
 /// A saved archive connection.
-typedef SavedConnection = ({String server, String key, int? accountId});
+///
+/// [accountId] is text for every server type: Mail-Archiver's numeric IDs are
+/// stored as their decimal string, and other servers use text IDs.
+typedef SavedConnection = ({
+  ArchiveServerType serverType,
+  String server,
+  String key,
+  String? accountId,
+});
 
-/// Saved server, API key and selected account, kept in platform secure
-/// storage under the existing `connection` key.
+/// One saved archive in the connection index, without its key.
+typedef ConnectionProfile = ({
+  String id,
+  String label,
+  ArchiveServerType serverType,
+  String server,
+  String? accountId,
+});
+
+/// Saving would exceed [ConnectionStore.maxProfiles].
+class TooManySavedArchives extends StateError {
+  TooManySavedArchives() : super('Too many saved archives.');
+}
+
+/// The saved archive to update is no longer in the index.
+class SavedArchiveMissing extends StateError {
+  SavedArchiveMissing() : super('Saved archive is no longer available.');
+}
+
+/// The saved archives as the picker shows them.
+typedef SavedArchives = ({
+  String? active,
+  List<ConnectionProfile> profiles,
+  bool unreadable,
+});
+
+/// Saved archive connections in platform secure storage.
+///
+/// Format version 3 (current, provisional until the multi-archive prototype
+/// is reviewed) keeps an **index** under `connections`, holding the version,
+/// the active profile ID (or null) and, per profile, its `id`, `label`,
+/// `serverType`, `server` and `accountId`. The index holds no keys. There is
+/// **one key entry per profile**, named `connection.key.` plus its ID. Writes
+/// are staged so that a failed write never breaks another profile or the working key: a
+/// new or changed key is written under a fresh ID before the index points to
+/// it, and an old key entry is deleted only after the index stops pointing to
+/// it. Key entries the index does not reference are removed when it is read.
+///
+/// Older builds kept one record under `connection`. Version 2 is
+/// `{"version": 2, "serverType", "server", "key", "accountId": "7" | null}`;
+/// version 1 (0.3.0-rc.9 and earlier) had no version or server type and a
+/// numeric `accountId`, and is read as Mail-Archiver, the only type those
+/// builds supported. A readable legacy record migrates to one profile; it is
+/// deleted only after the new entries are written. An unreadable one is left
+/// untouched. The saved key is never used to detect a server type.
+///
+/// [read] and [delete] act on the active profile. [write] updates the active
+/// profile, or the one named by its `profileId`, and makes it active. [add]
+/// saves a connection entered in setup. [overview] lists the saved archives
+/// for the picker, and [reset] is the explicit all-archives reset offered
+/// only when the index cannot be read.
 class ConnectionStore {
-  const ConnectionStore();
+  const ConnectionStore({this.entries = const SecureEntries()});
 
-  static const _storage = FlutterSecureStorage();
-  static const _entry = 'connection';
+  /// The secure-storage entries; tests substitute failing ones.
+  final SecureEntries entries;
 
-  /// The saved connection, or null when none is saved. Throws when the saved
-  /// value cannot be read or decoded.
-  Future<SavedConnection?> read() async {
-    final saved = await _storage.read(key: _entry);
-    if (saved == null) return null;
-    final data = jsonDecode(saved) as Map<String, dynamic>;
+  SecureEntries get _storage => entries;
+
+  // All instances use the same native store. Serialize complete transactions
+  // within this isolate, including reads that perform migration or cleanup.
+  static Future<void>? _pending;
+  static Future<T> _serialized<T>(Future<T> Function() operation) async {
+    final previous = _pending;
+    final done = Completer<void>();
+    _pending = done.future;
+    try {
+      if (previous != null) await previous;
+      return await operation();
+    } finally {
+      if (identical(_pending, done.future)) _pending = null;
+      done.complete();
+    }
+  }
+  static const _legacyEntry = 'connection';
+  static const _indexEntry = 'connections';
+  static const _keyPrefix = 'connection.key.';
+  static const legacyVersion = 2;
+  static const currentVersion = 3;
+  static const maxProfiles = 20;
+  static const maxLabelLength = 60;
+
+  static final _idPattern = RegExp(r'^[0-9a-f]{32}$');
+
+  /// A new random profile ID: 128 bits as lowercase hex.
+  static String newProfileId() {
+    final random = Random.secure();
+    return [
+      for (var i = 0; i < 16; i++)
+        random.nextInt(256).toRadixString(16).padLeft(2, '0'),
+    ].join();
+  }
+
+  /// The default label for a server address: its host.
+  static String defaultLabel(String server) {
+    final host = Uri.tryParse(server)?.host ?? '';
+    final label = host.isEmpty ? server : host;
+    return label.length > maxLabelLength
+        ? label.substring(0, maxLabelLength)
+        : label;
+  }
+
+  /// The active saved connection, or null when none is active. Migrates a
+  /// readable legacy record first. Throws [FormatException] when the active
+  /// profile or a legacy record cannot be read; the stored values are kept.
+  Future<SavedConnection?> read() => _serialized(_read);
+
+  Future<SavedConnection?> _read() async {
+    var index = await _readIndex();
+    if (index == null) {
+      final legacy = await _storage.read(key: _legacyEntry);
+      if (legacy == null) return null;
+      final saved = decode(legacy);
+      try {
+        await _migrate(saved);
+      } catch (_) {
+        // Keep the legacy record; the next start retries the migration.
+        return saved;
+      }
+      index = await _readIndex();
+      if (index == null) return saved;
+    } else {
+      await _removeLegacy();
+    }
+    await _removeOrphanKeys(index);
+    final active = index.active;
+    if (active == null) return null;
+    final profile = index.profiles
+        .where((item) => item.id == active)
+        .firstOrNull;
+    if (profile == null) {
+      throw const FormatException('Saved connection is unreadable.');
+    }
+    final key = await _storage.read(key: '$_keyPrefix${profile.id}');
+    if (key == null || key.isEmpty) {
+      throw const FormatException('Saved connection key is missing.');
+    }
     return (
-      server: data['server'] as String,
-      key: data['key'] as String,
-      accountId: data['accountId'] is int ? data['accountId'] as int : null,
+      serverType: profile.serverType,
+      server: profile.server,
+      key: key,
+      accountId: profile.accountId,
     );
   }
 
-  Future<void> write({
+  /// Saves a connection and makes it active: the active profile, or the
+  /// readable profile [profileId] when given. Changing only the selected
+  /// account rewrites the index; a changed server type, address or key is
+  /// staged under a fresh profile ID, so the previous one stays intact if any
+  /// write fails. Returns the profile's ID after the write. Throws
+  /// [SavedArchiveMissing] when [profileId] is no longer saved.
+  Future<String> write({
+    required ArchiveServerType serverType,
     required String server,
     required String key,
-    required Object? accountId,
-  }) => _storage.write(
-    key: _entry,
-    value: jsonEncode({'server': server, 'key': key, 'accountId': accountId}),
+    required String? accountId,
+    String? profileId,
+  }) => _serialized(
+    () => _write(
+      serverType: serverType,
+      server: server,
+      key: key,
+      accountId: accountId,
+      profileId: profileId,
+    ),
   );
 
-  Future<void> delete() => _storage.delete(key: _entry);
+  /// Saves a connection entered in setup and makes it active. A readable
+  /// profile with the same server type and address is updated in place
+  /// (staged, keeping its label); otherwise a new profile is added, and
+  /// other profiles are never changed. Returns the active profile's ID.
+  /// Throws [TooManySavedArchives] when [ConnectionStore.maxProfiles] would
+  /// be exceeded.
+  Future<String> add({
+    required ArchiveServerType serverType,
+    required String server,
+    required String key,
+    required String? accountId,
+  }) => _serialized(() async {
+    var existing = await _readIndex();
+    if (existing == null) {
+      final legacy = await _storage.read(key: _legacyEntry);
+      if (legacy != null) {
+        // Adding another archive must not discard a legacy archive when its
+        // startup migration failed or has not run yet.
+        await _migrate(decode(legacy));
+        existing = await _readIndex();
+      }
+    }
+    final index = existing ?? ConnectionIndex.empty;
+    final match = index.profiles
+        .where((item) => item.serverType == serverType && item.server == server)
+        .firstOrNull;
+    if (match != null) {
+      return _write(
+        serverType: serverType,
+        server: server,
+        key: key,
+        accountId: accountId,
+        profileId: match.id,
+      );
+    }
+    if (index.profiles.length + index.unreadable.length >= maxProfiles) {
+      throw TooManySavedArchives();
+    }
+    final profile = (
+      id: newProfileId(),
+      label: defaultLabel(server),
+      serverType: serverType,
+      server: server,
+      accountId: accountId,
+    );
+    await _storage.write(key: '$_keyPrefix${profile.id}', value: key);
+    try {
+      await _writeIndex(
+        profile.id,
+        [...index.profiles, profile],
+        index.unreadable,
+      );
+    } catch (_) {
+      await _deleteQuietly('$_keyPrefix${profile.id}');
+      rethrow;
+    }
+    await _removeLegacy();
+    return profile.id;
+  });
+
+  Future<String> _write({
+    required ArchiveServerType serverType,
+    required String server,
+    required String key,
+    required String? accountId,
+    String? profileId,
+  }) async {
+    // Absent and unreadable are distinct: never overwrite an unknown store.
+    final index = await _readIndex() ?? ConnectionIndex.empty;
+    final profiles = [...index.profiles];
+    final target = profileId ?? index.active;
+    final at = profiles.indexWhere((item) => item.id == target);
+    if (profileId != null && at < 0) {
+      throw SavedArchiveMissing();
+    }
+    final current = at < 0 ? null : profiles[at];
+    if (current != null &&
+        current.serverType == serverType &&
+        current.server == server &&
+        await _storage.read(key: '$_keyPrefix${current.id}') == key) {
+      profiles[at] = (
+        id: current.id,
+        label: current.label,
+        serverType: serverType,
+        server: server,
+        accountId: accountId,
+      );
+      await _writeIndex(current.id, profiles, index.unreadable);
+      return current.id;
+    }
+    if (current == null &&
+        profiles.length + index.unreadable.length >= maxProfiles) {
+      throw TooManySavedArchives();
+    }
+    final profile = (
+      id: newProfileId(),
+      label: current?.label ?? defaultLabel(server),
+      serverType: serverType,
+      server: server,
+      accountId: accountId,
+    );
+    await _storage.write(key: '$_keyPrefix${profile.id}', value: key);
+    if (at < 0) {
+      profiles.add(profile);
+    } else {
+      profiles[at] = profile;
+    }
+    try {
+      await _writeIndex(profile.id, profiles, index.unreadable);
+    } catch (_) {
+      await _deleteQuietly('$_keyPrefix${profile.id}');
+      rethrow;
+    }
+    if (current != null) await _deleteQuietly('$_keyPrefix${current.id}');
+    await _removeLegacy();
+    return profile.id;
+  }
+
+  /// The saved connection of the readable profile [id], with its key, without
+  /// changing which profile is active. Throws [FormatException] when the
+  /// profile or its key cannot be read.
+  Future<SavedConnection> connection(String id) => _serialized(() async {
+    final index = await _readIndex();
+    final profile = index?.profiles.where((item) => item.id == id).firstOrNull;
+    if (profile == null) {
+      throw const FormatException('Saved archive is unavailable.');
+    }
+    final key = await _storage.read(key: '$_keyPrefix${profile.id}');
+    if (key == null || key.isEmpty) {
+      throw const FormatException('Saved connection key is missing.');
+    }
+    return (
+      serverType: profile.serverType,
+      server: profile.server,
+      key: key,
+      accountId: profile.accountId,
+    );
+  });
+
+  /// The saved archives for the picker, without keys. [SavedArchives.unreadable]
+  /// is true when the index exists but this build cannot read it; that is
+  /// the only case in which the app offers [reset]. Storage failures throw.
+  Future<SavedArchives> overview() => _serialized(() async {
+    final text = await _storage.read(key: _indexEntry);
+    if (text == null) {
+      final legacy = await _storage.read(key: _legacyEntry);
+      if (legacy != null) {
+        try {
+          decode(legacy);
+        } on FormatException {
+          return (active: null, profiles: const <ConnectionProfile>[], unreadable: true);
+        }
+      }
+      return (active: null, profiles: const <ConnectionProfile>[], unreadable: false);
+    }
+    try {
+      final index = decodeIndex(text);
+      return (active: index.active, profiles: index.profiles, unreadable: false);
+    } on FormatException {
+      return (active: null, profiles: const <ConnectionProfile>[], unreadable: true);
+    }
+  });
+
+  /// The explicit all-archives reset: removes the index, every key entry and
+  /// any legacy record from this device. It never contacts a server. If the
+  /// stored entries cannot be listed, nothing is removed and this throws.
+  Future<void> reset() => _serialized(() async {
+    final all = await _storage.readAll();
+    // Keep the index until all credentials are removed. On failure, setup
+    // can still offer a retry instead of claiming every key was forgotten.
+    for (final name in [...all.keys]) {
+      if (name.startsWith(_keyPrefix)) await _storage.delete(key: name);
+    }
+    await _storage.delete(key: _legacyEntry);
+    await _storage.delete(key: _indexEntry);
+  });
+
+  /// Renames the readable profile [id]. The label is cleaned with
+  /// [cleanLabel]. Throws [SavedArchiveMissing] when [id] is not saved and
+  /// [FormatException] when the index cannot be read.
+  Future<void> rename(String id, String label) => _serialized(() async {
+    final index = await _readIndex();
+    final profiles = [...?index?.profiles];
+    final at = profiles.indexWhere((item) => item.id == id);
+    if (index == null || at < 0) throw SavedArchiveMissing();
+    final current = profiles[at];
+    profiles[at] = (
+      id: current.id,
+      label: cleanLabel(label, current.server),
+      serverType: current.serverType,
+      server: current.server,
+      accountId: current.accountId,
+    );
+    await _writeIndex(index.active, profiles, index.unreadable);
+  });
+
+  /// Forgets the readable profile [id] and its key; other profiles are kept.
+  /// Forgetting the active profile leaves none active. Server mail and keys
+  /// on the server are not touched. Throws [SavedArchiveMissing] when [id] is
+  /// not saved and [FormatException] when the index cannot be read.
+  Future<void> forget(String id) => _serialized(() async {
+    final index = await _readIndex();
+    if (index == null || !index.profiles.any((item) => item.id == id)) {
+      throw SavedArchiveMissing();
+    }
+    await _writeIndex(
+      index.active == id ? null : index.active,
+      [
+        for (final item in index.profiles)
+          if (item.id != id) item,
+      ],
+      index.unreadable,
+    );
+    await _deleteQuietly('$_keyPrefix$id');
+  });
+
+  /// A label as saved: control characters become spaces, surrounding space
+  /// is removed, an empty label becomes [defaultLabel] of [server], and the
+  /// result is cut to [maxLabelLength] UTF-16 units without splitting a
+  /// character.
+  static String cleanLabel(String label, String server) {
+    final text = label.replaceAll(RegExp(r'[\x00-\x1F\x7F]+'), ' ').trim();
+    if (text.isEmpty) return defaultLabel(server);
+    final runes = text.runes.toList();
+    var result = text;
+    while (result.length > maxLabelLength) {
+      runes.removeLast();
+      result = String.fromCharCodes(runes).trimRight();
+    }
+    return result;
+  }
+
+  /// Forgets the active connection: its profile, its key and any legacy
+  /// record. Other profiles are kept. An unreadable index is preserved and
+  /// causes a format failure; this is not an all-archives reset.
+  Future<void> delete() => _serialized(_delete);
+
+  Future<void> _delete() async {
+    final index = await _readIndex();
+    if (index == null) {
+      await _storage.delete(key: _legacyEntry);
+      return;
+    }
+    final active = index.active;
+    final profiles = [
+      for (final item in index.profiles)
+        if (item.id != active) item,
+    ];
+    final unreadable = [
+      for (final item in index.unreadable)
+        if (active == null || item is! Map || item['id'] != active) item,
+    ];
+    await _writeIndex(null, profiles, unreadable);
+    if (active != null) await _deleteQuietly('$_keyPrefix$active');
+    await _removeLegacy();
+  }
+
+  /// Every readable saved profile, without keys, for the archive picker.
+  Future<List<ConnectionProfile>> profiles() =>
+      _serialized(() async => (await _readIndex())?.profiles ?? const []);
+
+  Future<void> _migrate(SavedConnection saved) async {
+    final profile = (
+      id: newProfileId(),
+      label: defaultLabel(saved.server),
+      serverType: saved.serverType,
+      server: saved.server,
+      accountId: saved.accountId,
+    );
+    await _storage.write(key: '$_keyPrefix${profile.id}', value: saved.key);
+    try {
+      await _writeIndex(profile.id, [profile], const []);
+    } catch (_) {
+      await _deleteQuietly('$_keyPrefix${profile.id}');
+      rethrow;
+    }
+    await _removeLegacy();
+  }
+
+  Future<void> _removeLegacy() => _deleteQuietly(_legacyEntry);
+
+  Future<void> _removeOrphanKeys(ConnectionIndex index) async {
+    final Map<String, String> all;
+    try {
+      all = await _storage.readAll();
+    } catch (_) {
+      return;
+    }
+    // IDs of unreadable profiles count too, so their keys survive for a
+    // build that can read them.
+    final known = {for (final id in index.referencedIds) '$_keyPrefix$id'};
+    for (final name in [...all.keys]) {
+      if (name.startsWith(_keyPrefix) && !known.contains(name)) {
+        await _deleteQuietly(name);
+      }
+    }
+  }
+
+  Future<void> _deleteQuietly(String name) async {
+    try {
+      await _storage.delete(key: name);
+    } catch (_) {
+      // An orphaned key entry is removed on the next read.
+    }
+  }
+
+  Future<ConnectionIndex?> _readIndex() async {
+    final text = await _storage.read(key: _indexEntry);
+    return text == null ? null : decodeIndex(text);
+  }
+
+  Future<void> _writeIndex(
+    String? active,
+    List<ConnectionProfile> profiles,
+    List<Object?> unreadable,
+  ) => _storage.write(
+    key: _indexEntry,
+    value: encodeIndex(active, profiles, unreadable: unreadable),
+  );
+
+  /// Decodes the v3 index. Profiles that fail validation, or repeat an ID,
+  /// are kept aside unchanged in [ConnectionIndex.unreadable] and written
+  /// back as they were; an unknown version or shape throws
+  /// [FormatException].
+  static ConnectionIndex decodeIndex(String text) {
+    final data = jsonDecode(text);
+    if (data is! Map<String, dynamic> || data['version'] != currentVersion) {
+      throw const FormatException('Saved archives version is unknown.');
+    }
+    final list = data['profiles'];
+    final active = data['active'];
+    if (list is! List<dynamic> || (active != null && active is! String)) {
+      throw const FormatException('Saved archives are unreadable.');
+    }
+    final profiles = <ConnectionProfile>[];
+    final unreadable = <Object?>[];
+    final referenced = <String>{};
+    final counts = <String, int>{};
+    for (final item in list) {
+      final id = item is Map ? item['id'] : null;
+      if (id is String) counts[id] = (counts[id] ?? 0) + 1;
+    }
+    for (final item in list) {
+      final profile = _decodeProfile(item);
+      final rawId = item is Map<String, dynamic> ? item['id'] : null;
+      if (rawId is String) referenced.add(rawId);
+      if (profile == null || counts[profile.id] != 1) {
+        unreadable.add(item);
+      } else {
+        profiles.add(profile);
+      }
+    }
+    return ConnectionIndex(
+      active: active as String?,
+      profiles: profiles,
+      unreadable: unreadable,
+      referencedIds: referenced,
+    );
+  }
+
+  static ConnectionProfile? _decodeProfile(Object? value) {
+    if (value is! Map<String, dynamic>) return null;
+    final id = value['id'];
+    final label = value['label'];
+    final type = ArchiveServerType.fromId(value['serverType']);
+    final server = value['server'];
+    final account = value['accountId'];
+    if (id is! String ||
+        !_idPattern.hasMatch(id) ||
+        label is! String ||
+        label.length > maxLabelLength ||
+        type == null ||
+        server is! String ||
+        server.isEmpty ||
+        (account != null && account is! String)) {
+      return null;
+    }
+    return (
+      id: id,
+      label: label,
+      serverType: type,
+      server: server,
+      accountId: account as String?,
+    );
+  }
+
+  /// Encodes the v3 index.
+  static String encodeIndex(
+    String? active,
+    List<ConnectionProfile> profiles, {
+    List<Object?> unreadable = const [],
+  }) => jsonEncode({
+    'version': currentVersion,
+    'active': active,
+    'profiles': [
+      for (final item in profiles)
+        {
+          'id': item.id,
+          'label': item.label,
+          'serverType': item.serverType.id,
+          'server': item.server,
+          'accountId': item.accountId,
+        },
+      ...unreadable,
+    ],
+  });
+
+  /// Decodes a legacy single-connection record (version 1 or 2).
+  static SavedConnection decode(String saved) {
+    final data = jsonDecode(saved);
+    if (data is! Map<String, dynamic>) {
+      throw const FormatException('Saved connection is not an object.');
+    }
+    final server = data['server'];
+    final key = data['key'];
+    if (server is! String || key is! String) {
+      throw const FormatException('Saved connection is missing fields.');
+    }
+    final version = data['version'];
+    if (!data.containsKey('version') && !data.containsKey('serverType')) {
+      // Only untagged records are legacy. A null version or a serverType
+      // without a version must not bypass the current format validation.
+      // Version 1: Mail-Archiver only, numeric account ID.
+      final id = data['accountId'];
+      return (
+        serverType: ArchiveServerType.mailArchiver,
+        server: server,
+        key: key,
+        accountId: id is int ? '$id' : null,
+      );
+    }
+    if (version != legacyVersion) {
+      throw const FormatException('Saved connection version is unknown.');
+    }
+    final type = ArchiveServerType.fromId(data['serverType']);
+    if (type == null) {
+      throw const FormatException('Saved server type is unknown.');
+    }
+    final id = data['accountId'];
+    if (id != null && id is! String) {
+      throw const FormatException('Saved account is not text.');
+    }
+    return (
+      serverType: type,
+      server: server,
+      key: key,
+      accountId: id as String?,
+    );
+  }
+
+  /// Encodes a connection as a legacy version 2 record. Used to describe a
+  /// connection in tests and diagnostics; the app no longer writes it.
+  static String encode({
+    required ArchiveServerType serverType,
+    required String server,
+    required String key,
+    required String? accountId,
+  }) => jsonEncode({
+    'version': legacyVersion,
+    'serverType': serverType.id,
+    'server': server,
+    'key': key,
+    'accountId': accountId,
+  });
+}
+
+/// Secure-storage access used by [ConnectionStore].
+class SecureEntries {
+  const SecureEntries();
+  static const _storage = FlutterSecureStorage();
+  Future<String?> read({required String key}) => _storage.read(key: key);
+  Future<void> write({required String key, required String value}) =>
+      _storage.write(key: key, value: value);
+  Future<void> delete({required String key}) => _storage.delete(key: key);
+  Future<Map<String, String>> readAll() => _storage.readAll();
+}
+
+/// The decoded v3 index.
+class ConnectionIndex {
+  const ConnectionIndex({
+    required this.active,
+    required this.profiles,
+    this.unreadable = const [],
+    this.referencedIds = const {},
+  });
+
+  static const empty = ConnectionIndex(active: null, profiles: []);
+
+  /// The active profile ID, or null when none is active.
+  final String? active;
+  final List<ConnectionProfile> profiles;
+
+  /// Entries this build cannot read, kept as stored.
+  final List<Object?> unreadable;
+
+  /// Every text profile ID in the index, readable or not.
+  final Set<String> referencedIds;
 }

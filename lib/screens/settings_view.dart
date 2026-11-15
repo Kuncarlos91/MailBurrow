@@ -6,6 +6,7 @@ import '../build_information.dart';
 import '../public_information.dart';
 import '../state/archive_session.dart';
 import '../third_party_licenses.dart';
+import 'archives_page.dart';
 
 /// Settings tab: current account, connection settings, archive details,
 /// public information and disconnect.
@@ -33,19 +34,39 @@ class SettingsView extends StatelessWidget {
         Card(
           child: ListTile(
             leading: const Icon(Icons.dns_outlined),
-            title: Text(accountAddress(account ?? {})),
+            title: Text(accountAddress(account)),
             subtitle: Text(
-              session.demo ? 'Built-in demo, no server' : api?.server.host ?? '',
+              session.demo
+                  ? 'Built-in demo, no server'
+                  : api == null
+                  ? ''
+                  : '${session.serverType.label} · ${api.server.host}',
             ),
             trailing: const Icon(Icons.unfold_more),
             onTap: session.canSwitchAccount ? onChooseAccount : null,
           ),
         ),
-        ListTile(
-          title: const Text('Connection settings'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: busy ? null : session.openSetup,
-        ),
+        if (session.demo)
+          ListTile(
+            title: const Text('Connection settings'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: busy ? null : session.openSetup,
+          )
+        else
+          ListTile(
+            title: const Text('Archives'),
+            subtitle: const Text(
+              'Rename, change the address or key of, forget or add archives saved on this device',
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: busy
+                ? null
+                : () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => ArchivesPage(session: session),
+                    ),
+                  ),
+          ),
         if (session.demo)
           const ListTile(
             leading: Icon(Icons.science_outlined),
@@ -55,10 +76,10 @@ class SettingsView extends StatelessWidget {
             ),
           )
         else
-          const ListTile(
-            title: Text('Server and private network'),
+          ListTile(
+            title: const Text('Server and private network'),
             subtitle: Text(
-              'You manage your Mail-Archiver server, HTTPS address, API keys and Tailscale setup. This app does not host or configure those services.',
+              'You manage your ${session.serverType.label} server, HTTPS address, API keys and Tailscale setup. This app does not host or configure those services.',
             ),
           ),
         const ListTile(

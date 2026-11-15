@@ -5,6 +5,12 @@ class ArchiveResponseTooLarge implements Exception {
   const ArchiveResponseTooLarge();
 }
 
+/// A message the app declines to open; [reason] is shown to the user.
+class ArchiveMessageRefused implements Exception {
+  const ArchiveMessageRefused(this.reason);
+  final String reason;
+}
+
 class ArchiveFailure implements Exception {
   const ArchiveFailure(this.status);
   final int status;
@@ -14,6 +20,7 @@ String readableError(Object error) {
   if (error is ArchiveResponseTooLarge) {
     return 'This server response is too large for the app preview. Open your archive website to view it.';
   }
+  if (error is ArchiveMessageRefused) return error.reason;
   if (error is ArchiveFailure) {
     return switch (error.status) {
       401 => 'Your API key was not accepted.',

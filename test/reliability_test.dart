@@ -10,30 +10,29 @@ import 'package:mailburrow/screens/archive_home.dart';
 import 'package:mailburrow/screens/message_reader.dart';
 
 import 'support/fake_archive_backend.dart';
+import 'support/saved_connection.dart';
 
 class RecoveryApi extends ArchiveApi {
   RecoveryApi() : super(Uri.parse('https://example.com'), 'test-only');
   bool offline = true;
   int accountRequests = 0;
   @override
-  Future<List<dynamic>> accounts() async {
+  Future<List<ArchiveAccount>> accounts() async {
     accountRequests++;
     if (offline) throw const SocketException('private server detail');
-    return [
-      {'id': 1, 'emailAddress': 'test@example.com'},
-    ];
+    return const [ArchiveAccount(id: '1', emailAddress: 'test@example.com')];
   }
 
   @override
-  Future<Map<String, dynamic>> emails(
-    int id,
+  Future<MailPage> emails(
+    String id,
     String query,
     int page, {
     String? folder,
     dynamic filters,
-  }) async => {'items': <dynamic>[], 'page': 1, 'totalPages': 1};
+  }) async => const MailPage(items: []);
   @override
-  Future<List<ArchiveFolder>> folders(int id) async => [];
+  Future<List<ArchiveFolder>> folders(String id) async => [];
 }
 
 class ReaderApi extends FakeArchiveBackend {
@@ -41,11 +40,11 @@ class ReaderApi extends FakeArchiveBackend {
   final response = Completer<Map<String, dynamic>>();
   int requests = 0;
   @override
-  Future<Map<String, dynamic>> message(int id) {
+  Future<MailMessage> message(String id) {
     requests++;
     return requests == 1
         ? Future.error(const ArchiveFailure(401))
-        : response.future;
+        : response.future.then(MailMessage.fromJson);
   }
 }
 
@@ -54,26 +53,28 @@ class LandscapeApi extends RecoveryApi {
     offline = false;
   }
   @override
-  Future<Map<String, dynamic>> emails(
-    int id,
+  Future<MailPage> emails(
+    String id,
     String query,
     int page, {
     String? folder,
     dynamic filters,
-  }) async => {
+  }) async => MailPage.fromJson({
     'items': List.generate(
       30,
       (i) => {'id': i, 'from': 'Sender $i', 'subject': 'Landscape message $i'},
     ),
     'page': 1,
     'totalPages': 2,
-  };
+  });
 }
 
 class StartupApi extends RecoveryApi {
   final pendingAccounts = Completer<List<dynamic>>();
   @override
-  Future<List<dynamic>> accounts() => pendingAccounts.future;
+  Future<List<ArchiveAccount>> accounts() => pendingAccounts.future.then(
+    (accounts) => accounts.map(ArchiveAccount.fromJson).toList(),
+  );
 }
 
 class SearchApi extends LandscapeApi {
@@ -81,8 +82,8 @@ class SearchApi extends LandscapeApi {
   String? lastFolder;
   int? lastPage;
   @override
-  Future<Map<String, dynamic>> emails(
-    int id,
+  Future<MailPage> emails(
+    String id,
     String query,
     int page, {
     String? folder,
@@ -98,12 +99,12 @@ class SearchApi extends LandscapeApi {
 class DelayedSearchApi extends SearchApi {
   final pending = Completer<Map<String, dynamic>>();
   @override
-  Future<List<ArchiveFolder>> folders(int id) async => [
+  Future<List<ArchiveFolder>> folders(String id) async => [
     const ArchiveFolder('Inbox', 'INBOX', 30, 0),
   ];
   @override
-  Future<Map<String, dynamic>> emails(
-    int id,
+  Future<MailPage> emails(
+    String id,
     String query,
     int page, {
     String? folder,
@@ -111,7 +112,7 @@ class DelayedSearchApi extends SearchApi {
   }) {
     if (query == 'slow') {
       lastQuery = query;
-      return pending.future;
+      return pending.future.then(MailPage.fromJson);
     }
     return super.emails(id, query, page, folder: folder, filters: filters);
   }
@@ -126,15 +127,15 @@ class SwitchingArchiveApi extends RecoveryApi {
   bool closed = false;
   final delayedFolders = Completer<List<ArchiveFolder>>();
   @override
-  Future<List<ArchiveFolder>> folders(int id) async => delayFolders
+  Future<List<ArchiveFolder>> folders(String id) async => delayFolders
       ? delayedFolders.future
       : [ArchiveFolder(folderName, folderName, 1, 0)];
   @override
-  Future<Map<String, dynamic>> stats() async => {
+  Future<ArchiveStats> stats() async => ArchiveStats.fromJson({
     'emails': 0,
     'accounts': 1,
     'attachments': 0,
-  };
+  });
   @override
   void close() {
     closed = true;
@@ -163,8 +164,8 @@ class PagingApi extends LandscapeApi {
     'totalPages': pageCount,
   };
   @override
-  Future<Map<String, dynamic>> emails(
-    int id,
+  Future<MailPage> emails(
+    String id,
     String query,
     int page, {
     String? folder,
@@ -175,9 +176,9 @@ class PagingApi extends LandscapeApi {
     pageRequests++;
     if (holdNext) {
       holdNext = false;
-      return pendingPage.future;
+      return pendingPage.future.then(MailPage.fromJson);
     }
-    return Future.value(response(page));
+    return Future.value(MailPage.fromJson(response(page)));
   }
 }
 
@@ -185,8 +186,8 @@ class SectionRecoveryApi extends PagingApi {
   bool networkOffline = false;
   bool mailDenied = false;
   @override
-  Future<Map<String, dynamic>> emails(
-    int id,
+  Future<MailPage> emails(
+    String id,
     String query,
     int page, {
     String? folder,
@@ -200,15 +201,15 @@ class SectionRecoveryApi extends PagingApi {
   }
 
   @override
-  Future<List<ArchiveFolder>> folders(int id) async {
+  Future<List<ArchiveFolder>> folders(String id) async {
     if (networkOffline) throw const SocketException('private detail');
     return [];
   }
 
   @override
-  Future<Map<String, dynamic>> stats() async {
+  Future<ArchiveStats> stats() async {
     if (networkOffline) throw const SocketException('private detail');
-    return {'emails': 30, 'accounts': 1, 'attachments': 0};
+    return const ArchiveStats(30, 1, 0);
   }
 }
 
@@ -676,7 +677,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(oldApi.closed, isTrue);
         expect(
-          await const FlutterSecureStorage().read(key: 'connection'),
+          await savedConnectionText(),
           isNull,
         );
         final fields = find.byType(TextField);
@@ -913,11 +914,23 @@ void main() {
         );
         expect(
           jsonDecode(
-            (await const FlutterSecureStorage().read(key: 'connection'))!,
+            (await savedConnectionText())!,
           ),
           succeeds
-              ? {...jsonDecode(saved) as Map<String, dynamic>, 'accountId': 1}
-              : jsonDecode(saved),
+              ? {
+                  ...jsonDecode(saved) as Map<String, dynamic>,
+                  'version': 2,
+                  'serverType': 'mail-archiver',
+                  'accountId': '1',
+                }
+              // The readable rc.9 record migrates on startup even when the
+              // server is unreachable; nothing is lost.
+              : {
+                  ...jsonDecode(saved) as Map<String, dynamic>,
+                  'version': 2,
+                  'serverType': 'mail-archiver',
+                  'accountId': null,
+                },
         );
       },
     );
@@ -1017,9 +1030,14 @@ void main() {
       );
       expect(
         jsonDecode(
-          (await const FlutterSecureStorage().read(key: 'connection'))!,
+          (await savedConnectionText())!,
         ),
-        {...jsonDecode(saved) as Map<String, dynamic>, 'accountId': 1},
+        {
+          ...jsonDecode(saved) as Map<String, dynamic>,
+          'version': 2,
+          'serverType': 'mail-archiver',
+          'accountId': '1',
+        },
       );
     },
   );
@@ -1045,7 +1063,7 @@ void main() {
               builder: (context) => TextButton(
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => MessageReader(api: api, id: 1),
+                    builder: (_) => MessageReader(api: api, id: '1'),
                   ),
                 ),
                 child: const Text('Read message'),

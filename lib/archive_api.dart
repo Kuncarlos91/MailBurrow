@@ -4,14 +4,25 @@ import 'dart:io';
 import 'dart:isolate';
 import 'dart:typed_data';
 import 'archive_backend.dart';
+import 'archive_capabilities.dart';
 import 'archive_models.dart';
 import 'archive_errors.dart';
 import 'search_filters.dart';
 import 'attachment_download.dart';
+import 'message_load.dart';
 
 // Preserve existing imports while consumers migrate to the shared contract.
 export 'archive_models.dart';
 export 'archive_errors.dart';
+
+// Mail-Archiver uses numeric wire IDs. Keep that restriction in its adapter,
+// rather than imposing it on every backend or interpolating opaque path input.
+String _mailArchiverId(String id) {
+  if (!RegExp(r'^(0|[1-9][0-9]*)$').hasMatch(id)) {
+    throw const FormatException('Invalid Mail-Archiver identifier.');
+  }
+  return id;
+}
 
 Uri validateServer(String value) {
   final input = value.trim();
@@ -58,9 +69,21 @@ Future<dynamic> decodeArchiveJson(
 Future<dynamic> _decodeArchiveBytes(Uint8List bytes) =>
     Isolate.run(() => jsonDecode(utf8.decode(bytes)));
 
+/// How long to wait for a connection to the server, including the address
+/// lookup. With a VPN such as Tailscale still up while the device is offline,
+/// connection attempts fail only at this limit, so it is kept short. Once
+/// connected, the request and response limits apply as before.
+const archiveConnectTimeout = Duration(seconds: 10);
+
 /// The Mail-Archiver implementation of [ArchiveBackend], using its read-only
 /// REST API under `/api/v1/`.
-class ArchiveApi implements ArchiveBackend {
+///
+/// It also owns the shared HTTPS transport: one pooled client, disabled
+/// redirects, response size and time limits, and per-call cancellation.
+/// Another backend on the same transport extends it and overrides
+/// [authorize], [isMailRequest] and the backend methods; see
+/// `OpenArchiverApi`.
+class ArchiveApi implements ArchiveBackend, CancellableMessageBackend {
   ArchiveApi(
     this.server,
     this.key, {
@@ -78,6 +101,10 @@ class ArchiveApi implements ArchiveBackend {
   final Uri server;
   @override
   final String key;
+
+  @override
+  ArchiveCapabilities get capabilities => ArchiveCapabilities.full;
+
   // One client per connection lets API calls reuse TLS connections.
   // Attachment downloads keep their own client in [_clients].
   HttpClient? _apiClient;
@@ -109,13 +136,39 @@ class ArchiveApi implements ArchiveBackend {
     }
   }
 
-  Future<dynamic> get(String path, [Map<String, String>? query]) async {
+  /// Adds this server's credential to [request].
+  void authorize(HttpClientRequest request) =>
+      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $key');
+
+  /// Whether a request to [path] is a mail list or search, which
+  /// [cancelEmailRequests] stops.
+  bool isMailRequest(String path) => path == 'emails';
+
+  Future<dynamic> get(String path, [Map<String, String>? query]) => send(
+    path,
+    query,
+    (body, contentLength) =>
+        decodeArchiveJson(body, contentLength: contentLength),
+  );
+
+  /// Sends a GET to [path] on the shared transport and hands the response
+  /// body to [read], which owns its size limits. [timeout] bounds reading
+  /// the body after the headers arrive; it defaults to [responseTimeout].
+  Future<T> send<T>(
+    String path,
+    Map<String, String>? query,
+    Future<T> Function(Stream<List<int>> body, int contentLength) read, {
+    Duration? timeout,
+  }) async {
     if (_closed) throw StateError('Archive connection closed');
+    final load = MessageLoad.current;
+    load?.throwIfCancelled();
     validateServer(server.toString());
     final client = _apiClient ??= HttpClient()
-      ..connectionTimeout = const Duration(seconds: 15);
-    final call = _ApiCall(isMail: path == 'emails');
+      ..connectionTimeout = archiveConnectTimeout;
+    final call = _ApiCall(isMail: isMailRequest(path));
     _calls.add(call);
+    load?.addCancelListener(call.cancel);
     var finished = false;
     try {
       final url = server.replace(
@@ -129,10 +182,10 @@ class ArchiveApi implements ArchiveBackend {
       }
 
       final request = await call.guard(
-        open().timeout(const Duration(seconds: 20)),
+        open().timeout(archiveConnectTimeout),
       );
       request.followRedirects = false;
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $key');
+      authorize(request);
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
       final response = await call.guard(
         request.close().timeout(const Duration(seconds: 20)),
@@ -142,14 +195,12 @@ class ArchiveApi implements ArchiveBackend {
       final body = call.trackBody(response);
       if (response.statusCode != 200) throw ArchiveFailure(response.statusCode);
       final result = await call.guard(
-        decodeArchiveJson(
-          body,
-          contentLength: response.contentLength,
-        ).timeout(responseTimeout),
+        read(body, response.contentLength).timeout(timeout ?? responseTimeout),
       );
       finished = true;
       return result;
     } finally {
+      load?.removeCancelListener(call.cancel);
       _calls.remove(call);
       // A failed, timed-out or cancelled call stops reading its response and
       // drops that connection instead of returning it to the pool half-read.
@@ -158,45 +209,94 @@ class ArchiveApi implements ArchiveBackend {
   }
 
   @override
-  Future<List<dynamic>> accounts() async =>
-      await get('accounts') as List<dynamic>;
+  Future<MailMessage> messageWithCancellation(String id, MessageLoad load) =>
+      load.run(() => message(id));
+
   @override
-  Future<Map<String, dynamic>> stats() async =>
-      await get('stats') as Map<String, dynamic>;
+  Future<List<ArchiveAccount>> accounts() async {
+    final result = await get('accounts');
+    if (result is! List<dynamic>) {
+      throw const FormatException('Invalid account response');
+    }
+    return [for (final item in result) ArchiveAccount.fromJson(item)];
+  }
+
   @override
-  Future<List<ArchiveFolder>> folders(int id) async =>
-      flattenFolders(await get('accounts/$id/folders') as List<dynamic>);
+  Future<ArchiveStats> stats() async => ArchiveStats.fromJson(await get('stats'));
   @override
-  Future<Map<String, dynamic>> emails(
-    int id,
+  Future<List<ArchiveFolder>> folders(String id) async => flattenFolders(
+    await get('accounts/${_mailArchiverId(id)}/folders') as List<dynamic>,
+  );
+  @override
+  Future<MailPage> emails(
+    String id,
     String query,
     int page, {
     String? folder,
     SearchFilters filters = const SearchFilters(),
-  }) async =>
-      await get('emails', {
-            'accountId': '$id',
-            'q': query,
-            'page': '$page',
-            'pageSize': '25',
-            ...filters.parameters,
-            'folder': ?folder,
-          })
-          as Map<String, dynamic>;
+  }) async => MailPage.fromJson(
+    await get('emails', {
+      'accountId': _mailArchiverId(id),
+      'q': query,
+      'page': '$page',
+      'pageSize': '25',
+      ...filters.parameters,
+      'folder': ?folder,
+    }),
+  );
   @override
-  Future<Map<String, dynamic>> message(int id) async =>
-      await get('emails/$id') as Map<String, dynamic>;
+  Future<MailMessage> message(String id) async =>
+      MailMessage.fromJson(await get('emails/${_mailArchiverId(id)}'));
 
   @override
   Future<void> downloadAttachment(
-    int emailId,
-    int attachmentId,
+    String emailId,
+    String attachmentId,
     File destination, {
     AttachmentDownload? transfer,
     void Function(int receivedBytes)? onProgress,
   }) async {
     if (_closed) throw StateError('Archive connection closed');
+    _mailArchiverId(emailId);
+    _mailArchiverId(attachmentId);
+    await downloadTo(
+      server.replace(
+        path: '${server.path}/api/v1/emails/$emailId/attachments/$attachmentId',
+      ),
+      destination,
+      transfer: transfer,
+      onProgress: onProgress,
+    );
+  }
+
+  /// Streams [url] into [destination] on a client of its own, within the
+  /// attachment size, deadline and idle limits, deleting a partial file on
+  /// any failure or cancellation. [expectedBytes], when the server states an
+  /// attachment's size, is enforced as an exact length. The URL must use
+  /// the configured server's HTTPS origin without user information or a fragment.
+  Future<void> downloadTo(
+    Uri url,
+    File destination, {
+    AttachmentDownload? transfer,
+    void Function(int receivedBytes)? onProgress,
+    int? expectedBytes,
+  }) async {
+    if (_closed) throw StateError('Archive connection closed');
     validateServer(server.toString());
+    if (url.scheme != server.scheme ||
+        url.host != server.host ||
+        url.port != server.port ||
+        url.userInfo.isNotEmpty ||
+        url.hasFragment) {
+      throw const FormatException('Invalid attachment URL');
+    }
+
+    if (expectedBytes != null && expectedBytes < 0) {
+      throw ArgumentError.value(expectedBytes, 'expectedBytes');
+    }
+    if (expectedBytes != null && expectedBytes > attachmentByteLimit) {
+      throw const AttachmentTooLarge();
+    }
     if (attachmentByteLimit < 1 ||
         attachmentDeadline <= Duration.zero ||
         attachmentIdleTimeout <= Duration.zero) {
@@ -205,7 +305,7 @@ class ArchiveApi implements ArchiveBackend {
     final active = transfer ?? AttachmentDownload();
     active.throwIfStopped();
     final client = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 15);
+      ..connectionTimeout = archiveConnectTimeout;
     _clients.add(client);
     void stopClient() => client.close(force: true);
     active.addStopListener(stopClient);
@@ -215,23 +315,21 @@ class ArchiveApi implements ArchiveBackend {
     var opened = false, completed = false;
     try {
       final request = await active.wait(
-        client
-            .getUrl(
-              server.replace(
-                path:
-                    '${server.path}/api/v1/emails/$emailId/attachments/$attachmentId',
-              ),
-            )
-            .timeout(const Duration(seconds: 20)),
+        client.getUrl(url).timeout(archiveConnectTimeout),
       );
       request.followRedirects = false;
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $key');
+      authorize(request);
       final response = await active.wait(
         request.close().timeout(const Duration(seconds: 30)),
       );
       if (response.statusCode != 200) throw ArchiveFailure(response.statusCode);
       if (response.contentLength > attachmentByteLimit) {
         throw const AttachmentTooLarge();
+      }
+      if (expectedBytes != null &&
+          response.contentLength >= 0 &&
+          response.contentLength != expectedBytes) {
+        throw const FormatException('Attachment size does not match');
       }
       active.throwIfStopped();
       output = await destination.open(mode: FileMode.write);
@@ -244,6 +342,9 @@ class ArchiveApi implements ArchiveBackend {
         if (chunk.length > attachmentByteLimit - received) {
           throw const AttachmentTooLarge();
         }
+        if (expectedBytes != null && chunk.length > expectedBytes - received) {
+          throw const FormatException('Attachment size does not match');
+        }
         // Serialize file writes: never close/delete while a write is pending.
         await output.writeFrom(chunk);
         active.throwIfStopped();
@@ -251,6 +352,9 @@ class ArchiveApi implements ArchiveBackend {
         onProgress?.call(received);
       }
       active.throwIfStopped();
+      if (expectedBytes != null && received != expectedBytes) {
+        throw const FormatException('Attachment size does not match');
+      }
       await output.flush();
       await output.close();
       output = null;

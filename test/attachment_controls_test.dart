@@ -89,8 +89,8 @@ void main() {
                     appBar: AppBar(title: const Text('Reader')),
                     body: MessageAttachments(
                       api: api,
-                      emailId: 1,
-                      attachments: [MailAttachment(2, 'sample.txt', size)],
+                      emailId: '1',
+                      attachments: [MailAttachment('2', 'sample.txt', size)],
                     ),
                   ),
                 ),
@@ -492,8 +492,8 @@ class ControlledDownloadApi extends FakeArchiveBackend {
   int attempts = 0, cancelled = 0;
   @override
   Future<void> downloadAttachment(
-    int emailId,
-    int attachmentId,
+    String emailId,
+    String attachmentId,
     File destination, {
     AttachmentDownload? transfer,
     void Function(int)? onProgress,
