@@ -63,6 +63,18 @@ The reader needs a custom role with two rules, one on its source and one on that
 
 A successful export only proves the files match the demo data. Whether the server ingested every message and attachment, how it stores and returns them, and whether a restricted key is isolated from other sources are separate checks, run against the live test server. Record them with the server's exact version.
 
+## Bichon lab check
+
+For the planned Bichon backend (Phase 0 feasibility), [bichon_lab_check.py](../../tools/bichon_lab_check.py) checks a test Bichon server holding only the demo mail: Alex Rivera and Maple Street Bakery imported into two NoSync accounts, and a reader user with the `member` global role and `account_viewer` on the Alex account only.
+
+```
+python tools/bichon_lab_check.py https://<test-server>:9443 [--write-denial]
+```
+
+It asks for an admin token (a control; never used by the app), the reader token and, optionally, a revoked token and an expired token, without echoing them; every token must be different, and the expired one must have passed its expiry date without being revoked. It sends GET requests plus POST to the read-only search endpoint, always verifies certificates and never follows redirects. With `--write-denial` it also sends one tag change with the reader token, expects a refusal, confirms with the admin token that nothing changed, and removes the probe tag if the server wrongly accepted it.
+
+It checks token refusal, the reader's permissions and account list, that the reader sees Alex only (listing, search, unscoped search, text search, mailboxes, messages, envelopes and attachments), attachment sizes, raw EML refusal, path-like IDs, unusual search text, and redirects. The app never calls `/accounts`; the check only reports whether it would expose an IMAP password to the reader. The summary holds only statuses, counts, sizes, permission names and allowlisted field names. [test_bichon_lab_check.py](../../tools/test_bichon_lab_check.py) runs it against an in-process fake server with leaks and wrongly allowed writes injected.
+
 ## Phone memory check with stress mail
 
 [generate_stress_mail.py](../../tools/generate_stress_mail.py) writes `stress-mail.zip`: ten fictional messages for the 0.4.0 release check of memory on the phone. They include long bodies, quoted-printable and base64 encodings, Latin-1 plain text and Windows-1252 HTML as the selected body alternatives, six explicitly inline CID images, 30 levels of nesting, 400 parts, about 190 KiB of headers, one message just under the app's 10 MiB message limit and one just over it. Output is deterministic and uses only `stress.example` addresses.
