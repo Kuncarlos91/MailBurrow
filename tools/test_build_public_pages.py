@@ -95,8 +95,8 @@ class PublicPackageTests(unittest.TestCase):
     def test_current_copy_preserves_platform_and_service_boundaries(self):
         support, privacy = self.files["index.html"], self.files["privacy.html"]
         self.assertIn("early preview for Android and iOS", support)
-        self.assertIn("signed Android prerelease for 64-bit ARM phones", support)
-        self.assertIn("releases/tag/v0.3.0-rc.9", support)
+        self.assertIn("signed Android release for 64-bit ARM phones", support)
+        self.assertIn("releases/tag/v0.4.0", support)
         self.assertIn("MailBurrow limits attachment downloads", support)
         self.assertIn("This recovery action is Android-only", support)
         self.assertIn("Issues are public", support)

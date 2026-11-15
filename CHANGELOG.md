@@ -2,7 +2,9 @@
 
 All notable changes to MailBurrow are recorded here. Versions follow the app version shown in Settings.
 
-## 0.4.0 (build27) - unreleased
+## 0.4.0 (build27) - 2026-11-14
+
+Published as the latest [GitHub release](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.4.0) from tag `v0.4.0`. APK SHA-256 `3cc4c7c1e1f4840b45d9608b2741de37117bcac17e70f68629aca70d4c3fd6e5`.
 
 Release preparation is not artifact or device sign-off. Candidate plan and gates: [Android 0.4.0 candidate](docs/releasing/android-0.4.0.md).
 
