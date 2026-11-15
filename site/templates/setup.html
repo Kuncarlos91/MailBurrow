@@ -200,7 +200,7 @@
         <tr><td>Your API key was not accepted.</td><td>Key mistyped, expired or revoked, or its user is inactive</td><td>Create a new key and enter it again; for a saved archive, use <strong>Enter a new key</strong></td></tr>
         <tr><td>This source keeps full original messages&hellip;</td><td>The Open Archiver source has Preserve Original File turned on</td><td>Read it on Open Archiver's website; MailBurrow doesn't open those messages</td></tr>
         <tr><td>Archive API or message unavailable.</td><td>Mail-Archiver's API isn't enabled or it's older than 2607.3, the wrong server type is chosen, the address points at the wrong service, or the message is outside the key's accounts or sources</td><td>Check the server type, <code>Api__Enabled=true</code> and the version, then the address</td></tr>
-        <tr><td>The server returned an unexpected response…</td><td>The address points at a different service, the wrong server type is chosen, or the response differs from the tested contract</td><td>Check the server type, address and version; retry without loosening validation</td></tr>
+        <tr><td>The server returned an unexpected response…</td><td>The address points at a different service, the wrong server type is chosen, or the server runs a version MailBurrow doesn't support</td><td>Check the server type and address, then the server's version against this guide</td></tr>
         <tr><td>Too many requests. Wait and retry.</td><td>More than the rate limit (120 a minute by default for Mail-Archiver, about 100 for Open Archiver)</td><td>Wait a minute</td></tr>
         <tr><td>The server took too long to respond.</td><td>Slow connection or busy server</td><td>Retry; check the server is running</td></tr>
       </tbody>
