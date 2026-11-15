@@ -10,7 +10,8 @@ Usage (PowerShell):
 
 It asks for up to four API keys without echoing them (on Windows, paste with
 a right-click): the admin key, the reader key (custom read-only role on the
-Alex Rivera demo source) and, optionally, a deleted key and an expired key.
+Alex Rivera demo source) and, optionally, a revoked key and an expired key
+(one whose expiry date has passed; a revoked key there proves nothing about expiry).
 
 Version 3 adds the Phase 3 contract checks: list items, search hits and the
 opened-message response must have the fields and types MailBurrow's Open
@@ -382,14 +383,14 @@ def run_checks(lab, admin, reader, deleted, rate_limit=False, samples=None, expi
     if deleted:
         for path, params in (("/ingestion-sources", None), ("/search", {"keywords": "a"})):
             r = lab.get(path, deleted, params)
-            lab.check("Deleted key refused on " + path, r.status == 401, "%s, %s" % (st(r), kind(r)),
+            lab.check("Revoked key refused on " + path, r.status == 401, "%s, %s" % (st(r), kind(r)),
                       required=False)
     else:
-        lab.skip("Deleted key refused", "no deleted key given", required=False)
+        lab.skip("Revoked key refused", "no revoked key given", required=False)
     if expired:
         for path, params in (("/ingestion-sources", None), ("/search", {"keywords": "a"})):
             r = lab.get(path, expired, params)
-            lab.check("Expired key refused on " + path, r.status == 401, "%s, %s" % (st(r), kind(r)),
+            lab.check("Expired key refused on " + path, r.status == 401, "%s, %s; expiry state supplied by operator" % (st(r), kind(r)),
                       required=False)
     else:
         lab.skip("Expired key refused", "no expired key given", required=False)
@@ -752,11 +753,15 @@ def main(argv=None, keys=None, transport=None, out=None):
         return 2
     if keys is None:
         keys = (ask_key("Admin API key: "), ask_key("Reader API key: "),
-                ask_key("Deleted key (Enter to skip): ", optional=True),
-                ask_key("Expired key (Enter to skip): ", optional=True))
+                ask_key("Revoked key (Enter to skip): ", optional=True),
+                ask_key("Expired key, past its expiry date, not revoked (Enter to skip): ", optional=True))
     admin, reader, deleted = keys[:3]
     expired = keys[3] if len(keys) > 3 else ""
     if not admin or not reader:
+        return 2
+    if expired and expired in (admin, reader, deleted):
+        print("The expired-key fixture must be distinct from the admin, reader and revoked keys. "
+              "Use a non-revoked key past its expiry date, or leave that prompt empty to skip.", file=out)
         return 2
     samples = Path(args.samples) if args.samples else None
     if samples is not None:

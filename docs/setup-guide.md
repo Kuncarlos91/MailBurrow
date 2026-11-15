@@ -107,7 +107,7 @@ Open Archiver's API needs no setting to turn on. What matters is which user owns
 2. Open **Settings → API Keys** and choose **Generate API Key**. Give it a clear name such as "MailBurrow phone" and choose an expiry.
 3. Copy the key straight away. It's shown only once.
 
-Keep the key private, as for Mail-Archiver. If your phone is lost, delete the key on the same page. When a key expires or is deleted, MailBurrow offers **Enter a new key** for that archive.
+Keep the key private, as for Mail-Archiver. If your phone is lost, revoke the key on the same page. When a key expires or is revoked, MailBurrow offers **Enter a new key** for that archive.
 
 **What the app shows from Open Archiver:**
 

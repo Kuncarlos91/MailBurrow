@@ -240,7 +240,7 @@ class CheckerTests(unittest.TestCase):
         code, out = run(FakeOpenArchiver())
         self.assertEqual(code, 0, out)
         self.assertIn("RESULT: all required checks passed", out)
-        self.assertIn("[SKIP] (optional) Deleted key refused", out)
+        self.assertIn("[SKIP] (optional) Revoked key refused", out)
         self.assertIn("[SKIP] (optional) Preserve-original source", out)
         self.assertIn("[SKIP] (optional) Rate limit answers 429", out)
         self.assertNotIn("[FAIL]", out)
@@ -251,7 +251,7 @@ class CheckerTests(unittest.TestCase):
         self.assertEqual(code, 0, out)
         self.assertIn("[PASS] (optional) Preserve-original source keeps attachments inside raw", out)
         self.assertIn("[PASS] (optional) Rate limit answers 429", out)
-        self.assertIn("[PASS] (optional) Deleted key refused on /search", out)
+        self.assertIn("[PASS] (optional) Revoked key refused on /search", out)
 
     def test_missing_required_fixture_is_skipped_and_fails_the_run(self):
         code, out = run(FakeOpenArchiver(b_no_attachments=True))
@@ -343,6 +343,21 @@ class CheckerTests(unittest.TestCase):
         out = io.StringIO()
         self.assertEqual(lab.main(["http://lab.example"], keys=("a", "b", ""), transport=FakeOpenArchiver(),
                                   out=out), 2)
+
+
+class KeyFixtureIdentityTests(unittest.TestCase):
+    def test_expiry_fixture_cannot_reuse_any_other_key(self):
+        for expired in ("admin-key", "reader-key", "revoked-key"):
+            out = io.StringIO()
+            def transport(*args):
+                self.fail("invalid fixtures must be refused before requests")
+            code = lab.main(["https://lab.example:8443"],
+                            keys=("admin-key", "reader-key", "revoked-key", expired),
+                            transport=transport, out=out)
+            self.assertEqual(code, 2)
+            self.assertIn("must be distinct", out.getvalue())
+            for key in ("admin-key", "reader-key", "revoked-key"):
+                self.assertNotIn(key, out.getvalue())
 
 
 class Phase3ContractTests(unittest.TestCase):

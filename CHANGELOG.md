@@ -33,6 +33,7 @@ Support for a second archive server type, Open Archiver 0.6.2. Mail-Archiver use
 - Harden imported stress-case verification against false passes, malformed responses and server text leaking through MIME diagnostics.
 
 - Leaving a loading reader now cancels its own HTTP request immediately; other archive requests stay active, and late responses cannot prepare or register content for the closed reader.
+- Correct Open Archiver revocation terminology and prevent known key reuse from producing misleading expiry-test evidence.
 
 ## 0.3.0-rc.9 (build23) - 2026-11-10
 
