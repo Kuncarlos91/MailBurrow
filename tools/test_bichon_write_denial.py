@@ -74,8 +74,9 @@ class FakeBichon:
 
 def run(fake, argv=("https://lab.example:9443",), keys=(ADMIN, READER)):
     out = io.StringIO()
-    wd.time.sleep = lambda s: None
-    code = wd.main(list(argv), keys=keys, transport=fake, out=out)
+    from unittest.mock import patch
+    with patch.object(wd.time, "sleep", lambda s: None):
+        code = wd.main(list(argv), keys=keys, transport=fake, out=out)
     return code, out.getvalue()
 
 
@@ -116,7 +117,7 @@ class WriteDenialTests(unittest.TestCase):
     def test_unproven_tag_shape_cannot_pass(self):
         code, out = run(FakeBichon(admin_tags_work=False))
         self.assertEqual(code, 1)
-        self.assertIn("request shape unproven", out)
+        self.assertIn("[FAIL] Tag request is well formed", out)
 
     def test_failed_cleanup_fails(self):
         code, out = run(FakeBichon(admin_delete_works=False))
@@ -143,7 +144,70 @@ class WriteDenialTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             p.send("reader", "GET", "/accounts")
         with self.assertRaises(ValueError):
-            p.send("admin", "POST", "/repair-message")
+            p.send("reader", "POST", "/restore-messages")
+
+    def test_invalid_reader_token_cannot_prove_permission_denial(self):
+        fake = FakeBichon()
+        code, out = run(fake, keys=(ADMIN, "invalid-reader"))
+        self.assertEqual(code, 1)
+        self.assertIn("[FAIL] Reader token can read", out)
+        self.assertFalse(any(c[2] in ("/update-tags", "/delete-messages") for c in fake.calls))
+
+    def test_partial_probe_identity_is_not_selected(self):
+        for field, value in (("from", "prefix-" + wd.PROBE_SENDER),
+                             ("message_id", "mailburrow-write-denial-probe@other.example")):
+            fake = FakeBichon()
+            fake.envs[PROBE][field] = value
+            code, out = run(fake)
+            self.assertEqual(code, 1)
+            self.assertFalse(any(c[2] in ("/update-tags", "/delete-messages") for c in fake.calls))
+
+    def test_truncated_search_cannot_prove_unique_probe(self):
+        fake = FakeBichon()
+        def transport(method, url, headers, body):
+            status, response_headers, data = fake(method, url, headers, body)
+            if url.endswith("/search-messages"):
+                obj = json.loads(data)
+                obj["total_items"] = 11
+                return status, response_headers, json.dumps(obj).encode()
+            return status, response_headers, data
+        code, out = run(transport)
+        self.assertEqual(code, 1)
+        self.assertFalse(any(c[2] in ("/update-tags", "/delete-messages") for c in fake.calls))
+
+    def test_failed_search_after_cleanup_is_not_absence(self):
+        fake = FakeBichon()
+        def transport(method, url, headers, body):
+            if PROBE not in fake.envs and url.endswith("/search-messages"):
+                return 500, {}, b"{}"
+            return fake(method, url, headers, body)
+        code, out = run(transport)
+        self.assertEqual(code, 1)
+        self.assertIn("[FAIL] Delete request is well formed", out)
+
+    def test_repair_requires_successful_admin_control(self):
+        fake = FakeBichon()
+        def transport(method, url, headers, body):
+            if "/repair-message/" in url and headers["Authorization"] == "Bearer " + ADMIN:
+                return 400, {}, b"{}"
+            return fake(method, url, headers, body)
+        code, out = run(transport)
+        self.assertEqual(code, 1)
+        self.assertIn("[FAIL] Repair request is well formed", out)
+        self.assertNotIn(PROBE, fake.envs)
+        self.assertFalse(any(c[0] == "reader" and c[1] == "POST" for c in fake.calls))
+
+    def test_403_with_changed_metadata_fails_and_cleans_up(self):
+        fake = FakeBichon()
+        def transport(method, url, headers, body):
+            if url.endswith("/update-tags") and headers["Authorization"] == "Bearer " + READER:
+                fake.envs[PROBE]["preview"] = "changed"
+                return 403, {}, b"{}"
+            return fake(method, url, headers, body)
+        code, out = run(transport)
+        self.assertEqual(code, 1)
+        self.assertIn("[FAIL] Reader tag change refused", out)
+        self.assertNotIn(PROBE, fake.envs)
 
     def test_probe_eml_is_fictional(self):
         with tempfile.TemporaryDirectory() as d:

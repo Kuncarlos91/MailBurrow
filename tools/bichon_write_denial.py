@@ -1,7 +1,7 @@
 """Bichon write-denial check for MailBurrow (Phase 0, task B02).
 
-Proves that the reader token (member global role, account_viewer on the
-Alex Rivera account) cannot change mail, using ONE sacrificial fictional
+Checks that the reader token (member global role, account_viewer on the
+Alex Rivera account) is denied the tested changes, using ONE sacrificial fictional
 message instead of the demo mail. This is the separate procedure that the
 routine, read-only tools/bichon_lab_check.py deliberately leaves out.
 
@@ -18,10 +18,10 @@ change. It then:
 - with the ADMIN token, adds and removes a tag on the probe, to prove the
   tag request is well formed (a refusal is only evidence if the same request
   works for someone allowed to make it);
-- with the READER token, tries to add a tag, repair the probe and delete it,
-  expecting 401 or 403 each time, and checks with the admin token after each
-  attempt that the probe still exists and its tags did not change (removing
-  the reader's tag again if the server wrongly accepted it);
+- proves repair request shape with an ADMIN repair on the sacrificial probe;
+- with the READER token, tries tag, repair and delete, expecting 403 each
+  time; 401 is not permission evidence. The admin compares validated envelope
+  snapshots after each attempt; any uncertainty stops further reader probes;
 - finally deletes the probe with the ADMIN token, which proves the delete
   request is well formed and returns the Alex account to its 40 demo
   messages.
@@ -71,6 +71,8 @@ class Prober:
         ("admin", "GET", "/envelope"),
         ("admin", "POST", "/update-tags"),
         ("admin", "POST", "/delete-messages"),
+        ("admin", "POST", "/repair-message"),
+        ("reader", "GET", "/envelope"),
         ("reader", "POST", "/update-tags"),
         ("reader", "POST", "/repair-message"),
         ("reader", "POST", "/delete-messages"),
@@ -106,10 +108,16 @@ class Prober:
         self.results.append(("PASS" if ok else "FAIL", name, detail))
         return ok
 
-    def envelope(self, account_id, env):
-        resp = self.send("admin", "GET", "/envelope", suffix="/%d/%s" % (account_id, urllib.parse.quote(env, safe="")))
-        tags = resp.obj().get("tags")
-        return resp.status, (sorted(t for t in tags if isinstance(t, str)) if isinstance(tags, list) else None)
+    def snapshot(self, account_id, env, role="admin"):
+        resp = self.send(role, "GET", "/envelope", suffix="/%d/%s" % (account_id, urllib.parse.quote(env, safe="")))
+        obj = resp.obj()
+        tags = obj.get("tags")
+        valid = (resp.status == 200 and obj.get("id") == env and obj.get("account_id") == account_id
+                 and obj.get("subject") == PROBE_SUBJECT and obj.get("from") == PROBE_SENDER
+                 and isinstance(obj.get("message_id"), str)
+                 and obj["message_id"].strip("<>") == PROBE_MESSAGE_ID.strip("<>")
+                 and isinstance(tags, list) and all(isinstance(t, str) for t in tags))
+        return resp.status, obj if valid else None
 
     def tags(self, role, account_id, env, tag, action):
         return self.send(role, "POST", "/update-tags", {
@@ -123,8 +131,9 @@ def st(resp):
 def find_probe(p):
     resp = p.send("admin", "GET", "/minimal-account-list")
     accounts = resp.json if isinstance(resp.json, list) else []
-    alex = next((a.get("id") for a in accounts if isinstance(a, dict)
-                 and a.get("email") == EXPECT["reader_email"] and is_int(a.get("id"))), None)
+    matches = [a.get("id") for a in accounts if isinstance(a, dict)
+               and a.get("email") == EXPECT["reader_email"] and is_int(a.get("id"))]
+    alex = matches[0] if resp.status == 200 and len(matches) == 1 else None
     if alex is None:
         return None, None, "Alex Rivera account not found"
     found = p.send("admin", "POST", "/search-messages", {
@@ -133,8 +142,12 @@ def find_probe(p):
     items = items_of(found)
     if found.status != 200 or items is None:
         return alex, None, "probe search failed (%s)" % st(found)
-    exact = [i for i in items if i.get("subject") == PROBE_SUBJECT and PROBE_SENDER in str(i.get("from", ""))
-             and "mailburrow-write-denial-probe@" in str(i.get("message_id", ""))
+    total = found.obj().get("total_items")
+    if not is_int(total) or total != len(items) or len(items) > 10:
+        return alex, None, "probe search incomplete or invalid; no writes allowed"
+    exact = [i for i in items if i.get("subject") == PROBE_SUBJECT and i.get("from") == PROBE_SENDER
+             and isinstance(i.get("message_id"), str)
+             and i["message_id"].strip("<>") == PROBE_MESSAGE_ID.strip("<>")
              and i.get("account_id") == alex and isinstance(i.get("id"), str)]
     if len(exact) != 1:
         return alex, None, "%d probe messages found; import exactly one" % len(exact)
@@ -145,49 +158,78 @@ def run(p):
     alex, env, problem = find_probe(p)
     if not p.check("Exactly one probe message in the Alex account", env is not None, problem or "found"):
         return
-    status, before = p.envelope(alex, env)
+    status, before = p.snapshot(alex, env)
     if not p.check("Admin reads the probe envelope", status == 200 and before is not None, "status %s" % status):
         return
+    if not p.check("Probe tags do not collide with control tags",
+                   SHAPE_TAG not in before["tags"] and READER_TAG not in before["tags"]):
+        return
+    status, reader_before = p.snapshot(alex, env, role="reader")
+    if not p.check("Reader token can read the probe before write tests", status == 200 and reader_before == before,
+                   "status %s" % status):
+        return
 
-    add = p.tags("admin", alex, env, SHAPE_TAG, "Add")
-    _, with_tag = p.envelope(alex, env)
-    remove = p.tags("admin", alex, env, SHAPE_TAG, "Remove")
-    _, restored = p.envelope(alex, env)
-    shape_ok = p.check("Tag request is well formed (admin add and remove work)",
-                       add.status == 200 and remove.status == 200 and SHAPE_TAG in (with_tag or [])
-                       and restored == before, "add %s, remove %s" % (st(add), st(remove)))
+    # Once a verified sacrificial probe is selected, attempt cleanup even if
+    # a malformed response interrupts the experiment. Never broaden its ID.
+    try:
+        add = p.tags("admin", alex, env, SHAPE_TAG, "Add")
+        added_status, with_tag = p.snapshot(alex, env)
+        remove = p.tags("admin", alex, env, SHAPE_TAG, "Remove")
+        restored_status, restored = p.snapshot(alex, env)
+        shape_ok = p.check("Tag request is well formed (admin add and remove work)",
+                           add.status == 200 and remove.status == 200 and added_status == 200
+                           and with_tag is not None and SHAPE_TAG in with_tag["tags"]
+                           and restored_status == 200 and restored == before,
+                           "add %s, remove %s" % (st(add), st(remove)))
+        if not shape_ok:
+            return
 
-    attempt = p.tags("reader", alex, env, READER_TAG, "Add")
-    status, after = p.envelope(alex, env)
-    changed = READER_TAG in (after or [])
-    if changed:
-        p.tags("admin", alex, env, READER_TAG, "Remove")
-    p.check("Reader tag change refused and nothing changed",
-            shape_ok and attempt.status in REFUSED and not changed and after == before,
-            "%s; tags changed %s%s" % (st(attempt), changed, "" if shape_ok else "; request shape unproven"))
+        suffix = "/%d/%s" % (alex, urllib.parse.quote(env, safe=""))
+        repair_control = p.send("admin", "POST", "/repair-message", suffix=suffix)
+        status, before = p.snapshot(alex, env)
+        if not p.check("Repair request is well formed (admin control)",
+                       repair_control.status == 200 and status == 200 and before is not None,
+                       st(repair_control)):
+            return
 
-    repair = p.send("reader", "POST", "/repair-message", suffix="/%d/%s" % (alex, urllib.parse.quote(env, safe="")))
-    status, after = p.envelope(alex, env)
-    p.check("Reader repair refused and the probe is unchanged", repair.status in REFUSED and status == 200
-            and after == before, "%s; probe status %s" % (st(repair), status))
+        attempt = p.tags("reader", alex, env, READER_TAG, "Add")
+        status, after = p.snapshot(alex, env)
+        p.check("Reader tag change refused and nothing changed",
+                attempt.status == 403 and status == 200 and after == before,
+                "%s; envelope unchanged %s" % (st(attempt), after == before))
+        # Stop further reader probes after any accepted or uncertain change.
+        if attempt.status != 403 or status != 200 or after != before:
+            return
 
-    delete = p.send("reader", "POST", "/delete-messages", {str(alex): [env]})
-    status, _ = p.envelope(alex, env)
-    p.check("Reader delete refused and the probe still exists", delete.status in REFUSED and status == 200,
-            "%s; probe status %s" % (st(delete), status))
+        repair = p.send("reader", "POST", "/repair-message", suffix=suffix)
+        status, after = p.snapshot(alex, env)
+        p.check("Reader repair refused and the probe is unchanged",
+                repair.status == 403 and status == 200 and after == before,
+                "%s; probe status %s" % (st(repair), status))
+        if repair.status != 403 or status != 200 or after != before:
+            return
 
-    cleanup = p.send("admin", "POST", "/delete-messages", {str(alex): [env]})
-    gone = None
-    for _ in range(5):
-        _, gone_env, _ = find_probe(p)
-        gone = gone_env is None
-        if gone:
-            break
-        time.sleep(1)
-    p.check("Delete request is well formed (admin deletes the probe)", cleanup.status == 200 and gone,
-            "%s; probe removed %s" % (st(cleanup), gone))
-    p.check("No redirects", p.redirects == 0, "%d" % p.redirects)
-    p.check("No connection errors", p.errors == 0, "%d" % p.errors)
+        delete = p.send("reader", "POST", "/delete-messages", {str(alex): [env]})
+        status, after = p.snapshot(alex, env)
+        p.check("Reader delete refused and the probe still exists",
+                delete.status == 403 and status == 200 and after == before,
+                "%s; probe status %s" % (st(delete), status))
+    finally:
+        cleanup = p.send("admin", "POST", "/delete-messages", {str(alex): [env]})
+        gone = False
+        for _ in range(5):
+            status, _ = p.snapshot(alex, env)
+            account, found_env, problem = find_probe(p)
+            # A failed/ambiguous search is never proof of absence.
+            gone = (status == 404 and account == alex and found_env is None
+                    and problem == "0 probe messages found; import exactly one")
+            if gone:
+                break
+            time.sleep(1)
+        p.check("Delete request is well formed (admin deletes the probe)", cleanup.status == 200 and gone,
+                "%s; probe removed %s" % (st(cleanup), gone))
+        p.check("No redirects", p.redirects == 0, "%d" % p.redirects)
+        p.check("No connection errors", p.errors == 0, "%d" % p.errors)
 
 
 def report(p, out):
