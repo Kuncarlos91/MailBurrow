@@ -67,7 +67,7 @@ try {
             if ($null -eq $start) { $start = $rss }
             if ($rss -gt $peak) {
                 $peak = $rss
-                Write-Host ("  new peak {0,8:N1} MB" -f ($peak / 1024))
+                Write-Host ("  new peak {0,8:N1} MiB" -f ($peak / 1024))
             }
         }
     }
@@ -78,8 +78,8 @@ finally {
     if ($null -ne $start) {
         Write-Host ""
         Write-Host ("Case: {0}" -f $Label)
-        Write-Host ("  start RSS   {0,8:N1} MB" -f ($start / 1024))
-        Write-Host ("  peak RSS    {0,8:N1} MB  (growth {1:N1} MB)" -f ($peak / 1024), (($peak - $start) / 1024))
-        Write-Host ("  VmHWM       {0,8:N1} MB  (highest since the app started)" -f ($hwm / 1024))
+        Write-Host ("  start RSS   {0,8:N1} MiB" -f ($start / 1024))
+        Write-Host ("  peak RSS    {0,8:N1} MiB  (growth {1:N1} MiB)" -f ($peak / 1024), (($peak - $start) / 1024))
+        Write-Host ("  VmHWM       {0,8:N1} MiB  (highest since the app started)" -f ($hwm / 1024))
     }
 }

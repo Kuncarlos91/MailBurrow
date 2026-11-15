@@ -32,6 +32,8 @@ Support for a second archive server type, Open Archiver 0.6.2. Mail-Archiver use
 
 - Harden imported stress-case verification against false passes, malformed responses and server text leaking through MIME diagnostics.
 
+- Correct Open Archiver revocation terminology and prevent known key reuse from producing misleading expiry-test evidence.
+
 ## 0.3.0-rc.9 (build23) - 2026-11-10
 
 First public Android APK, published as a [GitHub prerelease](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.3.0-rc.9) from tag `v0.3.0-rc.9`. APK SHA-256 `8cf7b33f3a7a11ba5de8541f2e111d475224ecac591e2bebb8743ee572ed078b`. See the [candidate guide](docs/releasing/android-rc9.md) for the gates it passed.
