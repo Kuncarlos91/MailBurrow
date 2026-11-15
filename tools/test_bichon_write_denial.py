@@ -17,16 +17,17 @@ class FakeBichon:
     """Bichon stand-in: admin may write; the reader is refused unless a flaw is switched on."""
 
     def __init__(self, probes=1, reader_can=(), admin_tags_work=True, admin_delete_works=True, omit_empty_tags=False,
-                 remove_failures=0):
+                 overwrite_works=True):
         self.envs = {"env-%d" % i: {"id": "env-%d" % i, "account_id": ALEX, "subject": "Demo %d" % i,
                                     "from": "someone@example.com", "message_id": "<d%d@example.com>" % i,
                                     "tags": []} for i in range(3)}
         for n in range(probes):
             env = PROBE if n == 0 else "%s-%d" % (PROBE, n)
             self.envs[env] = {"id": env, "account_id": ALEX, "subject": wd.PROBE_SUBJECT, "from": wd.PROBE_SENDER,
-                              "message_id": wd.PROBE_MESSAGE_ID.strip("<>"), "tags": ["/existing"]}
+                              "message_id": wd.PROBE_MESSAGE_ID.strip("<>"), "tags": []}
         self.reader_can, self.admin_tags_work, self.admin_delete_works = set(reader_can), admin_tags_work, admin_delete_works
-        self.calls, self.omit_empty_tags, self.remove_failures = [], omit_empty_tags, remove_failures
+        self.bodies = []
+        self.calls, self.omit_empty_tags, self.overwrite_works = [], omit_empty_tags, overwrite_works
         if omit_empty_tags:
             for e in self.envs.values():
                 e["tags"] = []
@@ -36,6 +37,7 @@ class FakeBichon:
         path = parts.path.replace("/api/v1", "", 1)
         role = {ADMIN: "admin", READER: "reader"}.get(headers.get("Authorization", "").removeprefix("Bearer "))
         self.calls.append((role, method, path))
+        self.bodies.append(body)
         ok = lambda obj=None: (200, {}, json.dumps(obj if obj is not None else {}).encode())
         deny = (403, {}, b'{"message":"forbidden","code":403}')
         req = json.loads(body) if body else None
@@ -65,15 +67,21 @@ class FakeBichon:
         if path == "/update-tags":
             if role == "admin" and not self.admin_tags_work:
                 return 400, {}, b"{}"
-            if req["action"] == "Remove" and self.remove_failures:
-                self.remove_failures -= 1
-                return 500, {}, b'{"message":"internal","code":500}'
+            for env in req["updates"][str(ALEX)]:
+                tags = self.envs[env]["tags"]
+                if req["action"] in ("Add", "Remove") and tags:
+                    # Bichon 2.4.2: Add/Remove re-adds stored tags in encoded form and panics.
+                    return 500, {}, b"internal server error"
+                if req["action"] == "Overwrite" and not self.overwrite_works:
+                    return 500, {}, b"internal server error"
             for env in req["updates"][str(ALEX)]:
                 tags = self.envs[env]["tags"]
                 if req["action"] == "Add":
                     tags.extend(t for t in req["tags"] if t not in tags)
                 elif req["action"] == "Remove":
                     tags[:] = [t for t in tags if t not in req["tags"]]
+                else:
+                    tags[:] = list(req["tags"])
             return ok()
         if path.startswith("/repair-message/"):
             return ok({"repaired": True})
@@ -106,21 +114,20 @@ class WriteDenialTests(unittest.TestCase):
             self.assertIn((role, method, path.split("/")[1] and "/" + path.split("/")[1]),
                           wd.Prober.ALLOWED)
 
-    def test_transient_remove_error_is_retried(self):
-        fake = FakeBichon(remove_failures=1)
+    def test_tagged_message_bug_is_avoided_with_overwrite(self):
+        fake = FakeBichon()
         code, out = run(fake)
         self.assertEqual(code, 0, out)
-        self.assertIn("[INFO] Admin tag removal", out)
-        self.assertIn("status 200 after 2 attempt(s); control tag gone True", out)
-        self.assertNotIn(PROBE, fake.envs)
+        self.assertIn("[PASS] Admin restores the probe's tags (Overwrite)", out)
+        actions = [json.loads(b)["action"] for b in fake.bodies if b and "action" in json.loads(b)]
+        self.assertNotIn("Remove", actions)
 
-    def test_persistent_remove_error_does_not_block_reader_checks(self):
-        fake = FakeBichon(remove_failures=99)
+    def test_failed_restore_stops_before_reader_writes_and_cleans_up(self):
+        fake = FakeBichon(overwrite_works=False)
         code, out = run(fake)
-        self.assertEqual(code, 0, out)
-        self.assertIn("status 500 after 3 attempt(s); control tag gone False", out)
-        for name in ("Reader tag change refused", "Reader repair refused", "Reader delete refused"):
-            self.assertIn("[PASS] " + name, out)
+        self.assertEqual(code, 1)
+        self.assertIn("[FAIL] Admin restores the probe's tags", out)
+        self.assertFalse([c for c in fake.calls if c[0] == "reader" and not c[2].startswith("/envelope/")])
         self.assertNotIn(PROBE, fake.envs)
 
     def test_invisible_admin_add_fails_shape_control(self):
@@ -138,20 +145,6 @@ class WriteDenialTests(unittest.TestCase):
         self.assertFalse([c for c in fake.calls if c[0] == "reader" and c[2] != "/envelope/%d/%s" % (ALEX, PROBE)
                           and not c[2].startswith("/envelope/")])
         self.assertNotIn(PROBE, fake.envs)
-
-    def test_removal_retries_only_429_and_server_errors(self):
-        for failure, expected in ((429, 3), (500, 3), (503, 3), (430, 1), (451, 1), (403, 1)):
-            fake = FakeBichon()
-            attempts = []
-            def transport(method, url, headers, body):
-                if url.endswith("/update-tags") and body and json.loads(body).get("action") == "Remove":
-                    attempts.append(1)
-                    return failure, {}, b"{}"
-                return fake(method, url, headers, body)
-            code, out = run(transport)
-            self.assertEqual(code, 0, out)
-            self.assertEqual(len(attempts), expected)
-            self.assertNotIn(PROBE, fake.envs)
 
     def test_every_required_check_must_pass_despite_informational_results(self):
         for missing in wd.REQUIRED:

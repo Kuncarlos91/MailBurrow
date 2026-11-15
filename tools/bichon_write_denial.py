@@ -191,6 +191,7 @@ def run(p):
     # Once a verified sacrificial probe is selected, attempt cleanup even if
     # a malformed response interrupts the experiment. Never broaden its ID.
     try:
+        with_tag_before = sorted(before["tags"])
         add = p.tags("admin", alex, env, SHAPE_TAG, "Add")
         added_status, with_tag, _ = p.snapshot(alex, env)
         # The add alone proves the request shape the reader will send: same
@@ -200,19 +201,18 @@ def run(p):
                            and with_tag is not None and SHAPE_TAG in with_tag["tags"],
                            "add %s" % st(add))
         if shape_ok:
-            # Removing the control tag only tidies the probe, which cleanup
-            # deletes anyway. Bichon 2.4.2 returned 500 for an immediate
-            # remove once, so retry server errors and report the outcome
-            # without letting it decide the result.
-            for attempt in range(3):
-                remove = p.tags("admin", alex, env, SHAPE_TAG, "Remove")
-                if remove.status != 429 and not (remove.status is not None and 500 <= remove.status <= 599):
-                    break
-                time.sleep(2)
-            _, restored, _ = p.snapshot(alex, env)
-            p.note("Admin tag removal (informational; the probe is deleted at the end)",
-                   "%s after %d attempt(s); control tag gone %s"
-                   % (st(remove), attempt + 1, restored is not None and SHAPE_TAG not in restored["tags"]))
+            # Restore the probe's original tags with Overwrite, not Remove.
+            # Bichon 2.4.2's update-tags rebuilds the document from the stored
+            # tags in tantivy's encoded form (no leading "/") for Add and
+            # Remove, which panics (HTTP 500) whenever the message already has
+            # a tag; Overwrite does not read the stored tags.
+            restore = p.send("admin", "POST", "/update-tags", {
+                "updates": {str(alex): [env]}, "tags": list(with_tag_before), "action": "Overwrite"})
+            restored_status, restored, _ = p.snapshot(alex, env)
+            shape_ok = p.check("Admin restores the probe's tags (Overwrite)",
+                               restore.status == 200 and restored_status == 200 and restored is not None
+                               and sorted(restored["tags"]) == with_tag_before,
+                               st(restore))
         if not shape_ok:
             return
 
@@ -269,6 +269,7 @@ REQUIRED = {
     "Admin reads the probe envelope",
     "Reader token can read the probe before write tests",
     "Tag request is well formed (admin add works and is visible)",
+    "Admin restores the probe's tags (Overwrite)",
     "Repair request is well formed (admin control)",
     "Reader tag change refused and nothing changed",
     "Reader repair refused and the probe is unchanged",
