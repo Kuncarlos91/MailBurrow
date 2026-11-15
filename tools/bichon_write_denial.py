@@ -15,9 +15,9 @@ routine, read-only tools/bichon_lab_check.py deliberately leaves out.
 The run touches only the message whose subject and sender are exactly the
 probe's; if it does not find exactly one, it stops before sending any
 change. It then:
-- with the ADMIN token, adds and removes a tag on the probe, to prove the
-  tag request is well formed (a refusal is only evidence if the same request
-  works for someone allowed to make it);
+- with the ADMIN token, adds a visible tag to prove the reader Add request
+  shape; restores the original tags using a required Overwrite control
+  (avoids the Bichon 2.4.2 Add/Remove bug on already-tagged messages);
 - proves repair request shape with an ADMIN repair on the sacrificial probe;
 - with the READER token, tries tag, repair and delete, expecting 403 each
   time; 401 is not permission evidence. The admin compares validated envelope
@@ -50,7 +50,6 @@ PROBE_MESSAGE_ID = "<mailburrow-write-denial-probe@write-denial.example>"
 # (crates/server/src/rest/api/message.rs, Bichon 2.4.2).
 SHAPE_TAG = "/mailburrow-shape-check"
 READER_TAG = "/mailburrow-reader-probe"
-REFUSED = (401, 403)
 
 
 def probe_eml():
@@ -106,6 +105,9 @@ class Prober:
         if 300 <= status < 400:
             self.redirects += 1
         return Response(status, resp_headers, data)
+
+    def note(self, name, detail=""):
+        self.results.append(("INFO", name, detail))
 
     def check(self, name, ok, detail=""):
         self.results.append(("PASS" if ok else "FAIL", name, detail))
@@ -189,15 +191,28 @@ def run(p):
     # Once a verified sacrificial probe is selected, attempt cleanup even if
     # a malformed response interrupts the experiment. Never broaden its ID.
     try:
+        with_tag_before = sorted(before["tags"])
         add = p.tags("admin", alex, env, SHAPE_TAG, "Add")
         added_status, with_tag, _ = p.snapshot(alex, env)
-        remove = p.tags("admin", alex, env, SHAPE_TAG, "Remove")
-        restored_status, restored, _ = p.snapshot(alex, env)
-        shape_ok = p.check("Tag request is well formed (admin add and remove work)",
-                           add.status == 200 and remove.status == 200 and added_status == 200
-                           and with_tag is not None and SHAPE_TAG in with_tag["tags"]
-                           and restored_status == 200 and restored == before,
-                           "add %s, remove %s" % (st(add), st(remove)))
+        # The add alone proves the request shape the reader will send: same
+        # endpoint, body and action, accepted and visible on the envelope.
+        shape_ok = p.check("Tag request is well formed (admin add works and is visible)",
+                           add.status == 200 and added_status == 200
+                           and with_tag is not None and SHAPE_TAG in with_tag["tags"],
+                           "add %s" % st(add))
+        if shape_ok:
+            # Restore the probe's original tags with Overwrite, not Remove.
+            # Bichon 2.4.2's update-tags rebuilds the document from the stored
+            # tags in tantivy's encoded form (no leading "/") for Add and
+            # Remove, which panics (HTTP 500) whenever the message already has
+            # a tag; Overwrite does not read the stored tags.
+            restore = p.send("admin", "POST", "/update-tags", {
+                "updates": {str(alex): [env]}, "tags": list(with_tag_before), "action": "Overwrite"})
+            restored_status, restored, _ = p.snapshot(alex, env)
+            shape_ok = p.check("Admin restores the probe's tags (Overwrite)",
+                               restore.status == 200 and restored_status == 200 and restored is not None
+                               and sorted(restored["tags"]) == with_tag_before,
+                               st(restore))
         if not shape_ok:
             return
 
@@ -249,13 +264,30 @@ def run(p):
         p.check("No connection errors", p.errors == 0, "%d" % p.errors)
 
 
+REQUIRED = {
+    "Exactly one probe message in the Alex account",
+    "Admin reads the probe envelope",
+    "Reader token can read the probe before write tests",
+    "Tag request is well formed (admin add works and is visible)",
+    "Admin restores the probe's tags (Overwrite)",
+    "Repair request is well formed (admin control)",
+    "Reader tag change refused and nothing changed",
+    "Reader repair refused and the probe is unchanged",
+    "Reader delete refused and the probe still exists",
+    "Delete request is well formed (admin deletes the probe)",
+    "No redirects",
+    "No connection errors",
+}
+
+
 def report(p, out):
     print("\nBichon write-denial check v1 (paste this summary; it holds no keys, addresses or server text)", file=out)
     print("Python %s, %s" % (sys.version.split()[0], time.strftime("%Y-%m-%d %H:%M")), file=out)
     for status, name, detail in p.results:
         print("[%s] %s%s" % (status, name, (": " + detail) if detail else ""), file=out)
     failed = sum(1 for r in p.results if r[0] == "FAIL")
-    ok = failed == 0 and len(p.results) >= 9
+    passed = {name for status, name, _ in p.results if status == "PASS"}
+    ok = failed == 0 and REQUIRED <= passed
     print("%d checks, %d failed; %d requests" % (len(p.results), failed, p.calls), file=out)
     print("RESULT: %s" % ("reader writes refused" if ok else
                           "NOT PROVEN: a check failed or the run stopped early"), file=out)
