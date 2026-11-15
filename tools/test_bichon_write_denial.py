@@ -106,6 +106,52 @@ class WriteDenialTests(unittest.TestCase):
         self.assertEqual(code, 0, out)
         self.assertNotIn(PROBE, fake.envs)
 
+    def test_null_tags_normalize_like_missing_tags(self):
+        fake = FakeBichon(omit_empty_tags=True)
+        def transport(method, url, headers, body):
+            status, response_headers, data = fake(method, url, headers, body)
+            if "/envelope/" in url and status == 200:
+                obj = json.loads(data)
+                if "tags" not in obj:
+                    obj["tags"] = None
+                data = json.dumps(obj).encode()
+            return status, response_headers, data
+        code, out = run(transport)
+        self.assertEqual(code, 0, out)
+        self.assertNotIn(PROBE, fake.envs)
+
+    def test_invalid_tag_shapes_fail_before_writes_without_values(self):
+        for tags in ("private-tag-value", {"private-tag-value": True}, ["ok", 42]):
+            fake = FakeBichon()
+            def transport(method, url, headers, body):
+                status, response_headers, data = fake(method, url, headers, body)
+                if "/envelope/" in url and status == 200:
+                    obj = json.loads(data)
+                    obj["tags"] = tags
+                    data = json.dumps(obj).encode()
+                return status, response_headers, data
+            code, out = run(transport)
+            self.assertEqual(code, 1)
+            self.assertIn("unexpected fields tags", out)
+            self.assertNotIn("private-tag-value", out)
+            self.assertIn(PROBE, fake.envs)
+            self.assertFalse(any(c[2] == "/update-tags" for c in fake.calls))
+
+    def test_post_write_validation_failure_still_attempts_cleanup(self):
+        fake = FakeBichon()
+        def transport(method, url, headers, body):
+            status, response_headers, data = fake(method, url, headers, body)
+            if "/envelope/" in url and status == 200 and any(c[2] == "/update-tags" for c in fake.calls):
+                obj = json.loads(data)
+                obj["tags"] = "invalid-private-value"
+                data = json.dumps(obj).encode()
+            return status, response_headers, data
+        code, out = run(transport)
+        self.assertEqual(code, 1)
+        self.assertNotIn("invalid-private-value", out)
+        self.assertNotIn(PROBE, fake.envs)
+        self.assertTrue(any(c[0] == "admin" and c[2] == "/delete-messages" for c in fake.calls))
+
     def test_envelope_mismatch_names_only_the_field(self):
         fake = FakeBichon()
         real = fake.__call__
