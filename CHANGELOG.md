@@ -2,7 +2,7 @@
 
 All notable changes to MailBurrow are recorded here. Versions follow the app version shown in Settings.
 
-## 0.4.0 (build26) - unreleased
+## 0.4.0 (build27) - unreleased
 
 Release preparation is not artifact or device sign-off. Candidate plan and gates: [Android 0.4.0 candidate](docs/releasing/android-0.4.0.md).
 

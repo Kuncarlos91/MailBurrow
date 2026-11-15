@@ -8,19 +8,19 @@
 
 | Item | Intended value |
 | --- | --- |
-| Android version / code | `0.4.0` / `26` |
-| Settings stamp | `0.4.0 (build 26)` |
+| Android version / code | `0.4.0` / `27` |
+| Settings stamp | `0.4.0 (build 27)` |
 | Release application ID | `com.kuncarlos91.mailburrow` (unchanged) |
 | Launcher name | MailBurrow |
 | Proposed tag | `v0.4.0`, created only after exact-source/artifact approval |
 | Signing | Existing maintainer release key; do not generate a replacement |
 | ABI | arm64-v8a only, as for 0.3.0-rc.9 |
 
-Build numbers 24 and 25 were private test builds (`0.4.0-dev.1` and `0.4.0-dev.2`) on the maintainer's phone, so this release uses 26. It is intended to install as an update over 0.3.0-rc.9 and those test builds; the exact APK must pass the upgrade checks below before that claim is published. This allocates an Android build number only; no iOS build is included (see the rc.9 record for iOS version rules).
+Build numbers 24 and 25 were private test builds (`0.4.0-dev.1` and `0.4.0-dev.2`) on the maintainer's phone, and build 26 was a 0.4.0 candidate tested on it before the reader cancellation fix, so this release uses 27. It is intended to install as an update over 0.3.0-rc.9 and those builds; the exact APK must pass the upgrade checks below before that claim is published. This allocates an Android build number only; no iOS build is included (see the rc.9 record for iOS version rules).
 
 ## Reader cancellation follow-up
 
-Build 26 predates scoped reader-request cancellation: Back could hide a loading message while its network response continued. The identity and commands below describe that frozen candidate. Before building a candidate containing the reader fix, allocate a higher build number and update the native flags, Settings stamp and identity checklist together. Retest the fixed APK and record its own hash; keep build-26 evidence as historical rather than transferring its pass to changed bytes.
+Build 26 predates scoped reader-request cancellation (MailBurrow #38): Back could hide a loading message while its network response continued. It stays frozen as historical evidence; its passes don't transfer to build 27. The identity, commands and checks on this page are for **build 27**, which contains the fix. Build 27 needs its own artifact checks, hash and device check below, including the reader-cancellation regression.
 
 ## What is in 0.4.0
 
@@ -51,7 +51,7 @@ Full list: [CHANGELOG](../../CHANGELOG.md).
 Build from a clean checkout outside your user profile (for example `C:\build\mailburrow`), with your existing local signing configuration:
 
 ```sh
-flutter build apk --release --target-platform android-arm64 --build-name=0.4.0 --build-number=26 --dart-define=MAILSHELF_BUILD_VERSION=0.4.0 --dart-define=MAILSHELF_BUILD_NUMBER=26
+flutter build apk --release --target-platform android-arm64 --build-name=0.4.0 --build-number=27 --dart-define=MAILSHELF_BUILD_VERSION=0.4.0 --dart-define=MAILSHELF_BUILD_NUMBER=27
 ```
 
 Expected output: `build/app/outputs/flutter-apk/app-release.apk`. Freeze that exact file; any rebuild needs a new hash and the affected checks repeated.
@@ -60,7 +60,7 @@ Expected output: `build/app/outputs/flutter-apk/app-release.apk`. Freeze that ex
 
 - [ ] `python tools/check_apk_abis.py build/app/outputs/flutter-apk/app-release.apk` passes (arm64-v8a only).
 - [ ] `python tools/privacy_check.py --artifact build/app/outputs/flutter-apk/app-release.apk` reports **0 findings**, including no personal path in `lib/arm64-v8a/libapp.so`. Do not weaken the classifier.
-- [ ] Package, version `0.4.0`, code `26`, not debuggable, no broad storage or media permissions (`aapt2 dump badging`).
+- [ ] Package, version `0.4.0`, code `27`, not debuggable, no broad storage or media permissions (`aapt2 dump badging`).
 - [ ] `apksigner verify --print-certs build/app/outputs/flutter-apk/app-release.apk` succeeds and shows the established certificate; review its DN privately before upload.
 - [ ] Notices present (`NOTICES.Z`, Guava asset checksum as recorded for rc.9).
 - [ ] SHA-256 and file size recorded.
@@ -69,19 +69,20 @@ Expected output: `build/app/outputs/flutter-apk/app-release.apk`. Freeze that ex
 
 Install as an update over the current install on the reference phone (do not uninstall). Retain the earlier private-build results as historical evidence; they do not replace checks on this frozen APK. Verify the current v3-to-v3 upgrade. The direct RC9-to-v3 path is explicitly not device-tested under the decision above; retain automated migration coverage and do not present it as a passed phone check. Do not uninstall the working baseline to recreate RC9. Then:
 
-1. Settings shows `0.4.0 (build 26)`; both saved archives and their selected accounts or sources come back without keys.
+1. Settings shows `0.4.0 (build 27)`, installed as an update over build 26; both saved archives and their selected accounts or sources come back without keys.
 2. Mail-Archiver: browse, search with filters, folders, read a long message, save and open an attachment.
 3. Open Archiver: browse, attachment-text search, read, save an attachment; a Preserve Original File source's message is refused.
 4. Switch archives both ways; rename one in **Settings → Archives**.
 5. Airplane mode with Tailscale on: the account list and an archive switch should hit the roughly 10-second address-lookup/connection limit; response-header/body limits remain separate, so do not claim every failure takes 10 seconds. Before persistence starts, **Cancel** on Connecting/Opening returns to setup at once, and late results do not save or activate the abandoned archive. Cancel is disabled during secure persistence and after opening. Retry after the network returns.
 6. Demo entry and exit leave both archives saved; force-close and reopen restores the last archive.
-7. Settings > Open source licenses offline; largest text and landscape on the archive picker and Opening screen.
+7. **Reader cancellation (build 27 regression):** on the Open Archiver stress source, open **near-limit** and press Back while it loads; with `tools/sample_app_memory.ps1` running, memory should stop rising and settle, and no message opens late. Repeat three times, then open near-limit normally and confirm it shows. Do the same Back test once on a long Mail-Archiver message.
+8. Settings > Open source licenses offline; largest text and landscape on the archive picker and Opening screen.
 
 ## Draft release notes
 
 Use the tested-version and upgrade claims below only after the exact APK passes the relevant gates; replace `<sha256>` with its verified hash.
 
-**MailBurrow 0.4.0 - Android (build 26)**
+**MailBurrow 0.4.0 - Android (build 27)**
 
 A read-only mobile viewer for your own Mail-Archiver or Open Archiver server. This release adds Open Archiver and lets you save several archives and switch between them.
 
