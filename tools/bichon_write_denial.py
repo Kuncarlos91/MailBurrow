@@ -15,9 +15,9 @@ routine, read-only tools/bichon_lab_check.py deliberately leaves out.
 The run touches only the message whose subject and sender are exactly the
 probe's; if it does not find exactly one, it stops before sending any
 change. It then:
-- with the ADMIN token, adds and removes a tag on the probe, to prove the
-  tag request is well formed (a refusal is only evidence if the same request
-  works for someone allowed to make it);
+- with the ADMIN token, adds a visible tag to prove the reader Add request
+  shape; tag removal is retried on 429/5xx and reported as informational
+  because final cleanup deletes this sacrificial probe;
 - proves repair request shape with an ADMIN repair on the sacrificial probe;
 - with the READER token, tries tag, repair and delete, expecting 403 each
   time; 401 is not permission evidence. The admin compares validated envelope
@@ -206,7 +206,7 @@ def run(p):
             # without letting it decide the result.
             for attempt in range(3):
                 remove = p.tags("admin", alex, env, SHAPE_TAG, "Remove")
-                if remove.status == 200 or remove.status is None or remove.status < 429:
+                if remove.status != 429 and not (remove.status is not None and 500 <= remove.status <= 599):
                     break
                 time.sleep(2)
             _, restored, _ = p.snapshot(alex, env)

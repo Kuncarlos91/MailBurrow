@@ -139,6 +139,31 @@ class WriteDenialTests(unittest.TestCase):
                           and not c[2].startswith("/envelope/")])
         self.assertNotIn(PROBE, fake.envs)
 
+    def test_removal_retries_only_429_and_server_errors(self):
+        for failure, expected in ((429, 3), (500, 3), (503, 3), (430, 1), (451, 1), (403, 1)):
+            fake = FakeBichon()
+            attempts = []
+            def transport(method, url, headers, body):
+                if url.endswith("/update-tags") and body and json.loads(body).get("action") == "Remove":
+                    attempts.append(1)
+                    return failure, {}, b"{}"
+                return fake(method, url, headers, body)
+            code, out = run(transport)
+            self.assertEqual(code, 0, out)
+            self.assertEqual(len(attempts), expected)
+            self.assertNotIn(PROBE, fake.envs)
+
+    def test_every_required_check_must_pass_despite_informational_results(self):
+        for missing in wd.REQUIRED:
+            p = wd.Prober("https://lab.example", FakeBichon(), {"admin": ADMIN, "reader": READER})
+            for name in wd.REQUIRED - {missing}:
+                p.check(name, True)
+            for _ in range(20):
+                p.note("Informational result")
+            self.assertFalse(wd.report(p, io.StringIO()), missing)
+        p.check(missing, True)
+        self.assertTrue(wd.report(p, io.StringIO()))
+
     def test_control_tags_are_facet_paths(self):
         self.assertTrue(wd.SHAPE_TAG.startswith("/") and wd.READER_TAG.startswith("/"))
 
