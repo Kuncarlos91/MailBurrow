@@ -4,7 +4,7 @@
 
 ## Status and identity
 
-**Built and checked; not yet published.** The maintainer reports that build 27 from `da4a5375d151aefe30947472d7655e102563af90` (SHA-256 `3cc4c7c1e1f4840b45d9608b2741de37117bcac17e70f68629aca70d4c3fd6e5`, 20,205,590 bytes) passed the artifact and device checks, and approved the memory and cancellation gates with the limitation below. App inputs match that commit on the release branch; recheck the final merge commit before tagging. This page is the plan and checklist for the 0.4.0 release. Keep detailed gate results, device measurements and build records in the maintainer’s private release records. This public page describes required checks; public release notes may include the final source commit, artifact hash, size and tested-version summary. Never record keys, certificate fields, private hosts, server addresses or raw logs here.
+**Published 2026-11-14** as the latest GitHub release, tag `v0.4.0` on `ed34d16`; the uploaded APK was downloaded again and its SHA-256 matched. Previously: **built and checked.** The maintainer reports that build 27 from `da4a5375d151aefe30947472d7655e102563af90` (SHA-256 `3cc4c7c1e1f4840b45d9608b2741de37117bcac17e70f68629aca70d4c3fd6e5`, 20,205,590 bytes) passed the artifact and device checks, and approved the memory and cancellation gates with the limitation below. App inputs match that commit on the release branch; recheck the final merge commit before tagging. This page is the plan and checklist for the 0.4.0 release. Keep detailed gate results, device measurements and build records in the maintainer’s private release records. This public page describes required checks; public release notes may include the final source commit, artifact hash, size and tested-version summary. Never record keys, certificate fields, private hosts, server addresses or raw logs here.
 
 | Item | Intended value |
 | --- | --- |
@@ -89,6 +89,7 @@ A read-only mobile viewer for your own Mail-Archiver or Open Archiver server. Th
 
 - **Open Archiver 0.6.2:** choose the server type in setup. Sources appear as accounts. Browse, search (including text inside attachments), read messages and save attachments. Messages from sources that keep full original files are listed but not opened. No folders or server-wide totals for Open Archiver; search counts are estimates.
 - **Several archives:** add up to 20 archives and switch from the archive name above the account, without entering keys again. **Settings → Archives** renames, changes the address or key of, or forgets an archive. If a saved key stops working, the app offers **Enter a new key** for that archive.
+- **Leaving a loading message** now stops its download.
 - **Faster offline errors:** address lookup and connection have a 10-second limit; response-header/body limits are separate. **Cancel** stops waiting before secure saving begins; it is disabled during the commit and once the archive is open.
 - **Setup guide:** includes a read-only Open Archiver role and serving two servers on one machine with Tailscale.
 

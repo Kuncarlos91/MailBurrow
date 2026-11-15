@@ -8,7 +8,7 @@ MailBurrow is a phone app for reading the mail you already archive with [Mail-Ar
 - **Open Archiver:** follow [Open Archiver steps 1 and 2](#open-archiver-step-1-create-a-read-only-role), then steps 3 and 4.
 - **Both:** set up one, then add the other in the app. See [several archives](#several-archives).
 
-**App version:** Open Archiver, the server-type choice and several saved archives require a 0.4.0 build. The linked 0.3.0-rc.9 download supports Mail-Archiver and one saved archive.
+**App version:** Open Archiver, the server-type choice and several saved archives need MailBurrow 0.4.0 or later.
 
 The same guide is on the [MailBurrow website](https://mailburrow.pages.dev/setup.html).
 
