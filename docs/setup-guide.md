@@ -202,6 +202,7 @@ Only one archive is open at a time. There's no combined inbox or search across a
 | Archive API or message unavailable. | Mail-Archiver's API isn't enabled or it's older than 2607.3, the wrong server type is chosen, the address points at the wrong service, or the message is outside the key's accounts or sources | Check the server type, `Api__Enabled=true` and the version, then the address |
 | Too many requests. Wait and retry. | More than the rate limit (120 a minute by default for Mail-Archiver, about 100 for Open Archiver) | Wait a minute |
 | The server took too long to respond. | Slow connection or busy server | Retry; check the server is running |
+| The server returned an unexpected response… | The address points at a different service, the wrong server type is chosen, or the server runs a version MailBurrow doesn't support | Check the server type and address, then the server's version against this guide |
 
 More detail is in [troubleshooting](troubleshooting/README.md). When asking for help, never include your API key, server address or messages.
 

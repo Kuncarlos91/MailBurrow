@@ -12,6 +12,10 @@ const bichonPageSize = 25;
 /// Time to read a message's parsed content after its headers.
 const bichonMessageReadTimeout = Duration(seconds: 60);
 
+/// The Bichon version MailBurrow is tested with, named in the message shown
+/// when a response does not match the tested contract (plan decision D08).
+const bichonTestedVersion = '2.4.2';
+
 /// Longest search text, in Unicode code points, counted before escaping.
 const bichonMaxSearchLength = 256;
 
@@ -150,6 +154,19 @@ class BichonApi extends ArchiveApi {
   // messages, so a saved file must match its stated size.
   final _attachmentSizes = <String, int>{};
 
+  /// Runs [body], reporting a response that does not match the tested
+  /// contract as [ArchiveUnsupportedResponse]. Arguments are validated
+  /// before it, so their errors keep their own types.
+  Future<T> _contract<T>(Future<T> Function() body) async {
+    try {
+      return await body();
+    } on FormatException {
+      throw const ArchiveUnsupportedResponse('Bichon', bichonTestedVersion);
+    } on TypeError {
+      throw const ArchiveUnsupportedResponse('Bichon', bichonTestedVersion);
+    }
+  }
+
   @override
   bool isMailRequest(String path) => path == 'search-messages';
 
@@ -157,7 +174,7 @@ class BichonApi extends ArchiveApi {
   bool allowsPost(String path) => path == 'search-messages';
 
   @override
-  Future<List<ArchiveAccount>> accounts() async {
+  Future<List<ArchiveAccount>> accounts() => _contract(() async {
     final result = await get('minimal-account-list');
     if (result is! List<dynamic>) {
       throw const FormatException('Invalid Bichon account response');
@@ -175,44 +192,49 @@ class BichonApi extends ArchiveApi {
           );
         }(),
     ];
-  }
+  });
 
   @override
   Future<List<ArchiveFolder>> folders(String id) async {
     final account = _accountId(id);
-    final json = _object(await get('list-mailboxes/$account'), 'mailbox list');
-    final status = json['status'];
-    final mailboxes = json['mailboxes'];
-    if (status != 'ready' || mailboxes is! List) {
-      throw const FormatException('Invalid Bichon mailbox list');
-    }
-    final ids = <String, int>{};
-    final folders = <ArchiveFolder>[];
-    for (final item in mailboxes) {
-      final mailbox = _object(item, 'mailbox');
-      final id = _positive(mailbox['id'], 'mailbox');
-      final path = _text(mailbox, 'name');
-      final delimiter = _text(mailbox, 'delimiter') ?? '';
-      if (mailbox['account_id'] != account ||
-          path == null ||
-          path.isEmpty ||
-          ids.containsKey(path)) {
-        throw const FormatException('Invalid Bichon mailbox');
-      }
-      ids[path] = id;
-      final parts = delimiter.isEmpty ? [path] : path.split(delimiter);
-      folders.add(
-        ArchiveFolder(
-          parts.last.isEmpty ? path : parts.last,
-          path,
-          _count(mailbox['exists'], 'mailbox count'),
-          parts.length - 1,
-        ),
+    return _contract(() async {
+      final json = _object(
+        await get('list-mailboxes/$account'),
+        'mailbox list',
       );
-    }
-    folders.sort((a, b) => a.path.compareTo(b.path));
-    _mailboxes[id] = ids;
-    return folders;
+      final status = json['status'];
+      final mailboxes = json['mailboxes'];
+      if (status != 'ready' || mailboxes is! List) {
+        throw const FormatException('Invalid Bichon mailbox list');
+      }
+      final ids = <String, int>{};
+      final folders = <ArchiveFolder>[];
+      for (final item in mailboxes) {
+        final mailbox = _object(item, 'mailbox');
+        final id = _positive(mailbox['id'], 'mailbox');
+        final path = _text(mailbox, 'name');
+        final delimiter = _text(mailbox, 'delimiter') ?? '';
+        if (mailbox['account_id'] != account ||
+            path == null ||
+            path.isEmpty ||
+            ids.containsKey(path)) {
+          throw const FormatException('Invalid Bichon mailbox');
+        }
+        ids[path] = id;
+        final parts = delimiter.isEmpty ? [path] : path.split(delimiter);
+        folders.add(
+          ArchiveFolder(
+            parts.last.isEmpty ? path : parts.last,
+            path,
+            _count(mailbox['exists'], 'mailbox count'),
+            parts.length - 1,
+          ),
+        );
+      }
+      folders.sort((a, b) => a.path.compareTo(b.path));
+      _mailboxes[id] = ids;
+      return folders;
+    });
   }
 
   @override
@@ -246,52 +268,54 @@ class BichonApi extends ArchiveApi {
       }
     }
     final from = filters.from, to = filters.to;
-    final result = _object(
-      await postJson('search-messages', {
-        'filter': {
-          'account_ids': [account],
-          'mailbox_ids': ?(mailbox == null ? null : [mailbox]),
-          'text': ?(text.isEmpty ? null : bichonLiteralSearch(text)),
-          'since': ?(from == null
-              ? null
-              : DateTime.utc(
-                  from.year,
-                  from.month,
-                  from.day,
-                ).millisecondsSinceEpoch),
-          'before': ?(to == null
-              ? null
-              : DateTime.utc(
-                      to.year,
-                      to.month,
-                      to.day + 1,
-                    ).millisecondsSinceEpoch -
-                    1),
-        },
-        'page': page,
-        'page_size': bichonPageSize,
-        'sort_by': 'DATE',
-        'desc': filters.sortOrder != 'asc',
-      }),
-      'search',
-    );
-    final items = result['items'];
-    final total = _count(result['total_items'], 'total');
-    final pages = result['total_pages'];
-    if (items is! List || items.length > bichonPageSize) {
-      throw const FormatException('Invalid Bichon search response');
-    }
-    if (pages != null && (pages is! int || pages < 0)) {
-      throw const FormatException('Invalid Bichon page count');
-    }
-    return MailPage(
-      items: [for (final item in items) _summary(item, account, mailbox)],
-      page: page,
-      totalPages:
-          pages as int? ?? (total + bichonPageSize - 1) ~/ bichonPageSize,
-      totalItems: total,
-      totalIsEstimate: false,
-    );
+    return _contract(() async {
+      final result = _object(
+        await postJson('search-messages', {
+          'filter': {
+            'account_ids': [account],
+            'mailbox_ids': ?(mailbox == null ? null : [mailbox]),
+            'text': ?(text.isEmpty ? null : bichonLiteralSearch(text)),
+            'since': ?(from == null
+                ? null
+                : DateTime.utc(
+                    from.year,
+                    from.month,
+                    from.day,
+                  ).millisecondsSinceEpoch),
+            'before': ?(to == null
+                ? null
+                : DateTime.utc(
+                        to.year,
+                        to.month,
+                        to.day + 1,
+                      ).millisecondsSinceEpoch -
+                      1),
+          },
+          'page': page,
+          'page_size': bichonPageSize,
+          'sort_by': 'DATE',
+          'desc': filters.sortOrder != 'asc',
+        }),
+        'search',
+      );
+      final items = result['items'];
+      final total = _count(result['total_items'], 'total');
+      final pages = result['total_pages'];
+      if (items is! List || items.length > bichonPageSize) {
+        throw const FormatException('Invalid Bichon search response');
+      }
+      if (pages != null && (pages is! int || pages < 0)) {
+        throw const FormatException('Invalid Bichon page count');
+      }
+      return MailPage(
+        items: [for (final item in items) _summary(item, account, mailbox)],
+        page: page,
+        totalPages:
+            pages as int? ?? (total + bichonPageSize - 1) ~/ bichonPageSize,
+        totalItems: total,
+        totalIsEstimate: false,
+      );
+    });
   }
 
   MailSummary _summary(Object? value, int account, int? mailbox) {
@@ -317,67 +341,70 @@ class BichonApi extends ArchiveApi {
   @override
   Future<MailMessage> message(String id) async {
     final message = _messageId(id);
-    final path = '${message.account}/${Uri.encodeComponent(message.envelope)}';
-    final envelope = _object(await get('envelope/$path'), 'message');
-    MessageLoad.current?.throwIfCancelled();
-    if (envelope['id'] != message.envelope ||
-        envelope['account_id'] != message.account) {
-      throw const FormatException('Invalid Bichon message');
-    }
-    final content = _object(
-      await send(
-        'message-content/$path',
-        {'block_remote_content': 'true'},
-        (body, length) => decodeArchiveJson(body, contentLength: length),
-        timeout: bichonMessageReadTimeout,
-      ),
-      'message content',
-    );
-    MessageLoad.current?.throwIfCancelled();
-    final attachments = content['attachments'];
-    if (attachments != null && attachments is! List) {
-      throw const FormatException('Invalid Bichon attachments');
-    }
-    final files = <MailAttachment>[];
-    for (final item in attachments as List? ?? const []) {
-      final file = _object(item, 'attachment');
-      final inline = file['inline'];
-      if (inline is! bool) throw const FormatException('Invalid attachment');
-      // Inline parts are rendered through cid: references, which the app
-      // does not display; they are neither listed nor downloaded.
-      if (inline) continue;
-      final hash = file['content_hash'];
-      if (hash is! String) throw const FormatException('Invalid attachment');
-      final size = _count(file['size'], 'attachment size');
-      final name = _text(file, 'filename')?.trim() ?? '';
-      _hash(hash);
-      files.add(
-        MailAttachment(
-          hash,
-          name.isEmpty ? 'attachment' : name,
-          size,
-          _text(file, 'file_type') ?? 'application/octet-stream',
+    return _contract(() async {
+      final path =
+          '${message.account}/${Uri.encodeComponent(message.envelope)}';
+      final envelope = _object(await get('envelope/$path'), 'message');
+      MessageLoad.current?.throwIfCancelled();
+      if (envelope['id'] != message.envelope ||
+          envelope['account_id'] != message.account) {
+        throw const FormatException('Invalid Bichon message');
+      }
+      final content = _object(
+        await send(
+          'message-content/$path',
+          {'block_remote_content': 'true'},
+          (body, length) => decodeArchiveJson(body, contentLength: length),
+          timeout: bichonMessageReadTimeout,
         ),
+        'message content',
       );
-    }
-    final result = MailMessage(
-      subject: _text(envelope, 'subject'),
-      from: _sender(_text(envelope, 'from_name'), _text(envelope, 'from')),
-      sentDate: _date(envelope['date']),
-      folderName: _text(envelope, 'mailbox_name'),
-      htmlBody: _text(content, 'html') ?? '',
-      textBody: _text(content, 'text') ?? '',
-      attachments: files,
-    );
-    // Publish handles only after all message fields validate and the reader
-    // remains active. Reopening replaces this message's previous handles.
-    MessageLoad.current?.throwIfCancelled();
-    _attachmentSizes.removeWhere((key, _) => key.startsWith('$id/'));
-    if (_attachmentSizes.length > 2000) _attachmentSizes.clear();
-    for (final file in files) {
-      _attachmentSizes['$id/${file.id}'] = file.size;
-    }
-    return result;
+      MessageLoad.current?.throwIfCancelled();
+      final attachments = content['attachments'];
+      if (attachments != null && attachments is! List) {
+        throw const FormatException('Invalid Bichon attachments');
+      }
+      final files = <MailAttachment>[];
+      for (final item in attachments as List? ?? const []) {
+        final file = _object(item, 'attachment');
+        final inline = file['inline'];
+        if (inline is! bool) throw const FormatException('Invalid attachment');
+        // Inline parts are rendered through cid: references, which the app
+        // does not display; they are neither listed nor downloaded.
+        if (inline) continue;
+        final hash = file['content_hash'];
+        if (hash is! String) throw const FormatException('Invalid attachment');
+        final size = _count(file['size'], 'attachment size');
+        final name = _text(file, 'filename')?.trim() ?? '';
+        _hash(hash);
+        files.add(
+          MailAttachment(
+            hash,
+            name.isEmpty ? 'attachment' : name,
+            size,
+            _text(file, 'file_type') ?? 'application/octet-stream',
+          ),
+        );
+      }
+      final result = MailMessage(
+        subject: _text(envelope, 'subject'),
+        from: _sender(_text(envelope, 'from_name'), _text(envelope, 'from')),
+        sentDate: _date(envelope['date']),
+        folderName: _text(envelope, 'mailbox_name'),
+        htmlBody: _text(content, 'html') ?? '',
+        textBody: _text(content, 'text') ?? '',
+        attachments: files,
+      );
+      // Publish handles only after all message fields validate and the reader
+      // remains active. Reopening replaces this message's previous handles.
+      MessageLoad.current?.throwIfCancelled();
+      _attachmentSizes.removeWhere((key, _) => key.startsWith('$id/'));
+      if (_attachmentSizes.length > 2000) _attachmentSizes.clear();
+      for (final file in files) {
+        _attachmentSizes['$id/${file.id}'] = file.size;
+      }
+      return result;
+    });
   }
 
   @override

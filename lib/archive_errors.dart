@@ -17,6 +17,14 @@ class ArchiveSearchRefused implements Exception {
   final String reason;
 }
 
+/// A response that does not match the contract a backend was tested
+/// against, such as a newer server version. [server] names the server type
+/// and [testedVersion] the version MailBurrow is tested with.
+class ArchiveUnsupportedResponse implements Exception {
+  const ArchiveUnsupportedResponse(this.server, this.testedVersion);
+  final String server, testedVersion;
+}
+
 class ArchiveFailure implements Exception {
   const ArchiveFailure(this.status);
   final int status;
@@ -28,6 +36,9 @@ String readableError(Object error) {
   }
   if (error is ArchiveMessageRefused) return error.reason;
   if (error is ArchiveSearchRefused) return error.reason;
+  if (error is ArchiveUnsupportedResponse) {
+    return "This ${error.server} version isn't supported yet. MailBurrow is tested with ${error.server} ${error.testedVersion}.";
+  }
   if (error is ArchiveFailure) {
     return switch (error.status) {
       401 => 'Your API key was not accepted.',
@@ -44,7 +55,7 @@ String readableError(Object error) {
     return 'The server took too long to respond. Check your connection and retry.';
   }
   if (error is FormatException || error is TypeError) {
-    return 'The server returned an unexpected response. Check that it supports the Mail-Archiver API.';
+    return 'The server returned an unexpected response. Check that it runs a supported version of its archive software.';
   }
   return 'Unable to connect. Check your HTTPS address and private network.';
 }

@@ -5,8 +5,8 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mailburrow/archive_api.dart';
 import 'package:mailburrow/bichon_api.dart';
-import 'package:mailburrow/search_filters.dart';
 import 'package:mailburrow/message_load.dart';
+import 'package:mailburrow/search_filters.dart';
 
 // Fictional fixtures shaped like Bichon 2.4.2 Community responses.
 const alex = 579812555935764;
@@ -56,6 +56,9 @@ class FakeBichonClient implements HttpClient {
   FakeBichonClient(this.routes);
   final Map<String, Handler> routes;
   final sent = <Sent>[];
+
+  /// Paths whose responses wait until the test completes their gate.
+  final holds = <String, Completer<void>>{};
   @override
   Duration? connectionTimeout;
 
@@ -127,6 +130,8 @@ class FakeRequest implements HttpClientRequest {
         'content-type': fakeHeaders.contentType.toString(),
     }, List.of(body));
     client.sent.add(sent);
+    final gate = client.holds[uri.path.replaceFirst('/api/v1/', '')];
+    if (gate != null) await gate.future;
     final (status, bytes) = client.respond(sent);
     return FakeResponse(status, bytes);
   }
@@ -159,6 +164,8 @@ class FakeResponse extends Stream<List<int>> implements HttpClientResponse {
 }
 
 final server = Uri.parse('https://bichon.example:9443');
+
+final throwsUnsupported = throwsA(isA<ArchiveUnsupportedResponse>());
 
 Future<T> withClient<T>(
   FakeBichonClient client,
@@ -248,7 +255,7 @@ void main() {
         expect(client.sent, isEmpty);
         // A valid attachment followed by an invalid body must publish nothing.
         content['text'] = 42;
-        await expectLater(api.message('$alex:$envA'), throwsFormatException);
+        await expectLater(api.message('$alex:$envA'), throwsUnsupported);
         final count = client.sent.length;
         await expectLater(
           api.downloadAttachment('$alex:$envA', hash, file),
@@ -309,7 +316,7 @@ void main() {
         });
         await expectLater(
           withClient(client, (api) => api.emails('$alex', '', 1)),
-          throwsFormatException,
+          throwsUnsupported,
         );
       }
     },
@@ -322,7 +329,7 @@ void main() {
       });
       await expectLater(
         withClient(client, (api) => api.folders('$alex')),
-        throwsFormatException,
+        throwsUnsupported,
       );
     }
   });
@@ -381,7 +388,7 @@ void main() {
     });
     await expectLater(
       withClient(client, (api) => api.accounts()),
-      throwsFormatException,
+      throwsUnsupported,
     );
   });
 
@@ -416,7 +423,7 @@ void main() {
       final client = FakeBichonClient({'list-mailboxes/*': (_) => json(body)});
       await expectLater(
         withClient(client, (api) => api.folders('$alex')),
-        throwsFormatException,
+        throwsUnsupported,
       );
     }
   });
@@ -532,7 +539,7 @@ void main() {
         });
         await expectLater(
           withClient(client, (api) => api.emails('$alex', '', 1)),
-          throwsFormatException,
+          throwsUnsupported,
         );
       }
       final client = FakeBichonClient({
@@ -547,7 +554,7 @@ void main() {
           await api.folders('$alex');
           return api.emails('$alex', '', 1, folder: 'INBOX');
         }),
-        throwsFormatException,
+        throwsUnsupported,
       );
     },
   );
@@ -671,7 +678,7 @@ void main() {
     });
     await expectLater(
       withClient(client, (api) => api.message('$alex:$envA')),
-      throwsFormatException,
+      throwsUnsupported,
     );
     expect(client.sent, hasLength(1));
   });
@@ -803,4 +810,74 @@ void main() {
       );
     }
   });
+
+  test(
+    'names Bichon and the tested version for a non-conforming response',
+    () async {
+      final client = FakeBichonClient({
+        'minimal-account-list': (_) => json({'unexpected': 'shape'}),
+      });
+      final error = await withClient(
+        client,
+        (api) => api.accounts(),
+      ).then<Object?>((_) => null, onError: (Object e) => e);
+      expect(error, isA<ArchiveUnsupportedResponse>());
+      expect(
+        readableError(error!),
+        "This Bichon version isn't supported yet. MailBurrow is tested with Bichon 2.4.2.",
+      );
+      expect(
+        readableError(const FormatException('x')),
+        isNot(contains('Mail-Archiver')),
+      );
+    },
+  );
+
+  test(
+    'cancelling mail stops an in-flight search POST but not a folder list',
+    () async {
+      final client = FakeBichonClient({
+        'list-mailboxes/*': (_) => json(mailboxes),
+        'search-messages': (_) => json({'items': [], 'total_items': 0}),
+      });
+      client.holds['search-messages'] = Completer<void>();
+      client.holds['list-mailboxes/$alex'] = Completer<void>();
+      await withClient(client, (api) async {
+        final search = api.emails('$alex', 'garden', 1);
+        final searchDone = expectLater(search, throwsA(isA<HttpException>()));
+        final folders = api.folders('$alex');
+        await Future<void>.delayed(Duration.zero);
+        api.cancelEmailRequests();
+        await searchDone;
+        client.holds['list-mailboxes/$alex']!.complete();
+        expect((await folders).map((f) => f.path), ['INBOX', 'INBOX/Family']);
+        client.holds['search-messages']!.complete();
+        await Future<void>.delayed(Duration.zero);
+      });
+    },
+  );
+
+  test(
+    'a reader cancelled during the envelope request never fetches content',
+    () async {
+      final client = FakeBichonClient({
+        'envelope/*': (_) => json(envelope(envA)),
+        'message-content/*': (_) => json({'has_remote_content': false}),
+      });
+      client.holds['envelope/$alex/$envA'] = Completer<void>();
+      await withClient(client, (api) async {
+        final load = MessageLoad();
+        final opening = api.messageWithCancellation('$alex:$envA', load);
+        final done = expectLater(opening, throwsA(anything));
+        await Future<void>.delayed(Duration.zero);
+        load.cancel();
+        await done;
+        client.holds['envelope/$alex/$envA']!.complete();
+        await Future<void>.delayed(Duration.zero);
+      });
+      expect(client.sent.map((r) => r.url.path), [
+        '/api/v1/envelope/$alex/$envA',
+      ]);
+    },
+  );
 }

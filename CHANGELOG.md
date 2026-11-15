@@ -6,6 +6,7 @@ All notable changes to MailBurrow are recorded here. Versions follow the app ver
 
 - **Testing tools:** `tools/bichon_lab_check.py` checks a test Bichon server for the planned third backend (read-only enforcement, account isolation, message and attachment contracts), with tests against a fake server. `tools/bichon_write_denial.py` checks that the reader token cannot tag, repair or delete mail, using one sacrificial fictional message.
 - **Bichon backend (in progress, not in setup yet):** a read-only `BichonApi` adapter for Bichon 2.4.2 Community, with literal search text, a transport limited to Bichon's read-only search POST, and host tests.
+- **Fixed:** an unexpected server response no longer says to check the Mail-Archiver API when the archive is an Open Archiver server; the message now applies to every server type.
 
 ## 0.4.0 (build27) - 2026-11-14
 
