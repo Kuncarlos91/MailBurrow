@@ -75,6 +75,10 @@ Future<dynamic> _decodeArchiveBytes(Uint8List bytes) =>
 /// connected, the request and response limits apply as before.
 const archiveConnectTimeout = Duration(seconds: 10);
 
+/// The largest request body the transport sends. Only a backend's
+/// allowlisted read-only POST routes send a body (see [ArchiveApi.allowsPost]).
+const maxRequestBodyBytes = 4 * 1024;
+
 /// The Mail-Archiver implementation of [ArchiveBackend], using its read-only
 /// REST API under `/api/v1/`.
 ///
@@ -144,6 +148,20 @@ class ArchiveApi implements ArchiveBackend, CancellableMessageBackend {
   /// [cancelEmailRequests] stops.
   bool isMailRequest(String path) => path == 'emails';
 
+  /// Whether [path] is a read-only route this backend may POST to. No
+  /// Mail-Archiver or Open Archiver route is; Bichon allows only its search.
+  bool allowsPost(String path) => false;
+
+  /// POSTs [body] as JSON to an allowlisted read-only route and decodes the
+  /// JSON response within the API response limits.
+  Future<dynamic> postJson(String path, Object body) => send(
+    path,
+    null,
+    (response, contentLength) =>
+        decodeArchiveJson(response, contentLength: contentLength),
+    requestBody: utf8.encode(jsonEncode(body)),
+  );
+
   Future<dynamic> get(String path, [Map<String, String>? query]) => send(
     path,
     query,
@@ -159,8 +177,15 @@ class ArchiveApi implements ArchiveBackend, CancellableMessageBackend {
     Map<String, String>? query,
     Future<T> Function(Stream<List<int>> body, int contentLength) read, {
     Duration? timeout,
+    List<int>? requestBody,
   }) async {
     if (_closed) throw StateError('Archive connection closed');
+    if (requestBody != null) {
+      if (!allowsPost(path)) throw StateError('POST not allowed for $path');
+      if (requestBody.length > maxRequestBodyBytes) {
+        throw ArgumentError('Request body too large');
+      }
+    }
     final load = MessageLoad.current;
     load?.throwIfCancelled();
     validateServer(server.toString());
@@ -176,7 +201,9 @@ class ArchiveApi implements ArchiveBackend, CancellableMessageBackend {
         queryParameters: query,
       );
       Future<HttpClientRequest> open() async {
-        final request = await client.getUrl(url);
+        final request = requestBody == null
+            ? await client.getUrl(url)
+            : await client.postUrl(url);
         call.attach(request);
         return request;
       }
@@ -187,6 +214,11 @@ class ArchiveApi implements ArchiveBackend, CancellableMessageBackend {
       request.followRedirects = false;
       authorize(request);
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      if (requestBody != null) {
+        request.headers.contentType = ContentType.json;
+        request.contentLength = requestBody.length;
+        request.add(requestBody);
+      }
       final response = await call.guard(
         request.close().timeout(const Duration(seconds: 20)),
       );
