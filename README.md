@@ -1,14 +1,42 @@
-# MailBurrow
+<h1 align="center">MailBurrow</h1>
+
+<p align="center">Read your self-hosted mail archives on your phone.</p>
+
+<p align="center">
+  <a href="https://github.com/Kuncarlos91/MailBurrow/releases/latest"><img src="https://img.shields.io/github/v/release/Kuncarlos91/MailBurrow?color=7950b3&amp;label=Release" alt="Latest stable GitHub release"></a>
+  <a href="https://github.com/Kuncarlos91/MailBurrow/actions/workflows/flutter-checks.yml?query=branch%3Amain"><img src="https://img.shields.io/github/actions/workflow/status/Kuncarlos91/MailBurrow/flutter-checks.yml?branch=main&amp;label=Build%20checks" alt="Build checks on main"></a>
+  <a href="#install"><img src="https://img.shields.io/badge/Android-arm64-3d7a46" alt="Android download: arm64 only"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-555555" alt="License: MIT"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/Kuncarlos91/MailBurrow/releases/latest"><strong>Download Android</strong></a> ·
+  <a href="#try-it-without-a-server">Try the demo</a> ·
+  <a href="docs/setup-guide.md">Setup guide</a> ·
+  <a href="https://github.com/Kuncarlos91/MailBurrow/issues/new/choose">Feedback / report a problem</a>
+</p>
 
 A read-only Android and iOS app for browsing your own [Mail-Archiver](https://github.com/s1t5/mail-archiver) or [Open Archiver](https://github.com/LogicLabs-OU/OpenArchiver) server. Browse and search archived mail, filter by date and supported folder options, read messages in a simplified view, and save attachments when you choose to.
 
-MailBurrow is an early preview. A signed Android release, [0.4.0](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.4.0), is available for 64-bit ARM phones; it is not in the app stores, and iPhone/iPad builds are source-only. See [project status](docs/testing/status.md).
+MailBurrow is an early preview. A signed Android release, [0.4.0](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.4.0), is available for 64-bit ARM phones; iPhone/iPad builds are source-only. See [project status](docs/testing/status.md).
 
-<img src="docs/images/setup-screen.jpg" alt="MailBurrow setup in dark mode: a Mail-Archiver or Open Archiver server-type choice, empty server address and API key fields, Connect to archive, Try the demo, Support and Privacy notice" width="270">
+**New here?** Install the Android APK and tap **Try the demo** for fictional mail with no server or network needed. The demo is inside the app. To connect your own archive, follow the [setup guide](docs/setup-guide.md).
 
-> **Just want to look around first?** Tap **Try the demo** on the setup screen. It opens fictional sample mail built into the app, with no server, account or network needed. See [Try it without a server](#try-it-without-a-server).
+## Why MailBurrow?
 
-> **New here? Start with the [setup guide](docs/setup-guide.md).** It shows how MailBurrow, your archive server and your HTTPS address fit together, with step-by-step settings for Mail-Archiver's API, an Open Archiver read-only role, TrueNAS and Tailscale, and fixes for common connection errors.
+- Browse and search without sending, changing or deleting mail.
+- Save up to 20 archive connections and switch between them.
+- Fetch mail on demand, with no offline mail cache, analytics or crash-report upload.
+- Read with remote content blocked; save attachments only when you choose.
+
+## Tested servers
+
+<p>
+  <a href="docs/testing/status.md#tested-servers"><img src="https://img.shields.io/badge/Mail--Archiver-2611.2-555555" alt="Tested with Mail-Archiver 2611.2"></a>
+  <a href="docs/testing/status.md#tested-servers"><img src="https://img.shields.io/badge/Open%20Archiver-0.6.2-555555" alt="Tested with Open Archiver 0.6.2"></a>
+</p>
+
+Android 0.4.0 was tested with Mail-Archiver 2611.2 and Open Archiver 0.6.2; other server versions are unverified. See [tested servers and known limits](docs/testing/status.md#tested-servers).
 
 ## What you need before connecting
 
@@ -28,7 +56,7 @@ The setup screen has a **Try the demo** button. It opens a small archive of made
 - The demo connects to no server, sends nothing over the network and never saves or changes a connection, so a real connection you saved earlier is kept.
 - Saving a demo attachment still uses the normal save dialog, and confirmed links still open in your browser, just as with a real archive.
 
-Screenshots from the Android app in dark mode, using fictional demo mail:
+Android in dark mode, using fictional demo mail: **browse mail** (first), then **read a message** (second).
 
 <img src="docs/images/demo-mail-list.jpg" alt="Demo mail list in dark mode showing the Demo · sample mail banner, fictional account, message dates and attachment indicators" width="270"> <img src="docs/images/demo-message.jpg" alt="Open fictional welcome message in dark mode, with the Demo · sample mail banner, sender, sent date and readable message text" width="270">
 
@@ -42,6 +70,12 @@ MailBurrow is not in the app stores. To try it:
 
 Signed releases are published on the [Releases page](https://github.com/Kuncarlos91/MailBurrow/releases) and install over each other without losing your saved connection.
 
+## Feedback
+
+[Report a problem or ask for setup help](https://github.com/Kuncarlos91/MailBurrow/issues/new/choose). Include your app/build, server type/version, device/OS, expected and actual behavior, and steps using fictional data. Never include API keys, passwords, signing details, private server addresses, real messages or unredacted screenshots. Report security issues privately through [Security reporting](SECURITY.md).
+
+If MailBurrow is useful to you, you can [star the project](https://github.com/Kuncarlos91/MailBurrow).
+
 ## Connect
 
 1. Connect Tailscale first, if your server needs it.
@@ -50,6 +84,10 @@ Signed releases are published on the [Releases page](https://github.com/Kuncarlo
 4. Enter your API key and tap **Connect to archive**.
 5. If your key can see more than one mail account or source, switch between them from the account row or Settings.
 6. To add another archive, tap the archive name above the account, then **Add archive**. **Settings → Archives** renames, changes or forgets saved archives.
+
+The setup screen in dark mode: choose the server type, then enter the server address and API key.
+
+<img src="docs/images/setup-screen.jpg" alt="MailBurrow setup in dark mode: a Mail-Archiver or Open Archiver server-type choice, empty server address and API key fields, Connect to archive, Try the demo, Support and Privacy notice" width="270">
 
 Your server address and key are saved in the device's secure storage. Never send them to app support. If the connection fails, see the [setup guide's checks](docs/setup-guide.md#if-something-goes-wrong) and [troubleshooting](docs/troubleshooting/README.md).
 

@@ -12,7 +12,7 @@ body:
     id: app-version
     attributes:
       label: App version and build
-      description: Shown in Settings, for example 0.3.0 (22).
+      description: Shown in Settings, for example 0.4.0 (build 27).
     validations:
       required: true
   - type: input
@@ -25,8 +25,8 @@ body:
   - type: input
     id: server-version
     attributes:
-      label: Mail-Archiver version
-      description: If you know it.
+      label: Archive server type and version
+      description: "For example: Mail-Archiver 2611.2 or Open Archiver 0.6.2. If unknown, say so."
   - type: dropdown
     id: area
     attributes:
@@ -37,7 +37,7 @@ body:
         - Search, filters or paging
         - Message reader
         - Attachment save or open
-        - Account switching
+        - Archive or account switching
         - Large text or landscape layout
         - Settings
         - Other

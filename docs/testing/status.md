@@ -12,4 +12,15 @@ MailBurrow is an early preview. The signed Android release [0.4.0](https://githu
 | iOS / iPadOS | Builds from source on macOS. **Device regression of the new demo and other newest changes is pending.** No public TestFlight or App Store build. |
 | Downloads | Android: [`MailBurrow-0.4.0-build27.apk`](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.4.0) (64-bit ARM only), SHA-256 `3cc4c7c1e1f4840b45d9608b2741de37117bcac17e70f68629aca70d4c3fd6e5`. Releases are listed on the [Releases page](https://github.com/Kuncarlos91/MailBurrow/releases). |
 
+## Tested servers
+
+These are reviewed release facts recorded for the November 14, 2026 release, not live backend monitoring. Other server versions are unverified.
+
+| Android app | Server tested | Scope and limits |
+| --- | --- | --- |
+| [0.4.0 (build 27)](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.4.0) | Mail-Archiver 2611.2 | Browse, search, filters, folders, reader and attachment save/open on Android 16. |
+| [0.4.0 (build 27)](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.4.0) | Open Archiver 0.6.2 | Source browsing, search, reader and attachment saving on Android 16. No folders or archive totals; search counts are estimates. Messages from Preserve Original File sources cannot be opened. Expired-key handling is untested. |
+
+iPhone/iPad builds are source-only, with 0.4.0 device behavior unverified. See [release decisions and limitations](../releasing/android-0.4.0.md#release-decisions).
+
 Automated tests do not replace device testing. Before any binary release, run the [device testing checklist](device-checklist.md) on the exact build being published.

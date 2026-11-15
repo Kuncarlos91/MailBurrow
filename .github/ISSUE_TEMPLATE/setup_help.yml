@@ -18,13 +18,13 @@ body:
   - type: input
     id: server-version
     attributes:
-      label: Mail-Archiver version
+      label: Archive server type and version
     validations:
       required: true
   - type: dropdown
     id: hosting
     attributes:
-      label: How is Mail-Archiver hosted?
+      label: How is your archive server hosted?
       options:
         - TrueNAS app
         - Docker / Docker Compose
