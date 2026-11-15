@@ -6,6 +6,7 @@ import 'archive_api.dart';
 import 'archive_capabilities.dart';
 import 'attachment_download.dart';
 import 'mime_bodies.dart';
+import 'message_load.dart';
 import 'open_archiver_detail.dart';
 import 'search_filters.dart';
 
@@ -222,6 +223,7 @@ class OpenArchiverApi extends ArchiveApi {
       timeout: openArchiverMessageReadTimeout,
     );
     final fields = detail.fields;
+    MessageLoad.current?.throwIfCancelled();
     final listed = fields['ingestionSourceId'];
     if (listed != null && listed != source) {
       throw const FormatException('Message source does not match');
@@ -230,6 +232,7 @@ class OpenArchiverApi extends ArchiveApi {
       detail.raw,
     ).timeout(openArchiverMimeTimeout);
     final attachments = openArchiverAttachments(fields['attachments']);
+    MessageLoad.current?.throwIfCancelled();
     final result = MailMessage(
       subject: _text(fields, 'subject'),
       from: _sender(_text(fields, 'senderName'), _text(fields, 'senderEmail')),

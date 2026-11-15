@@ -111,3 +111,5 @@ A direct Gradle release after tests can fail on missing IntegrationTestPlugin be
 A local diagnostic build can add `--dart-define=MAILSHELF_FILE_DIAGNOSTICS=true`. Default builds do not enable this tracing. Native events use only fixed MailShelfFiles categories for grant retention, saved-reference registration, release and the Open outcome; never add URIs, file names, provider exception messages, attachment bytes, server settings or keys. This is local logcat output, not an analytics upload. Read only the MailShelfFiles tag and do not share broad device logs.
 
 While an archive is opening, Cancel is unavailable during the secure-storage commit and once the archive is open. Before that commit, cancelling returns to setup without activating the abandoned attempt; Retry starts another attempt.
+
+Reader cancellation fix: Back during a message load cancels that reader’s network calls rather than only hiding the result. Build 26 predates this fix; its successful navigation checks do not establish that its transport stopped. Validate a newer fixed APK separately, with its own source/hash and cancellation evidence.

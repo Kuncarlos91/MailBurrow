@@ -9,6 +9,7 @@ import 'archive_models.dart';
 import 'archive_errors.dart';
 import 'search_filters.dart';
 import 'attachment_download.dart';
+import 'message_load.dart';
 
 // Preserve existing imports while consumers migrate to the shared contract.
 export 'archive_models.dart';
@@ -82,7 +83,7 @@ const archiveConnectTimeout = Duration(seconds: 10);
 /// Another backend on the same transport extends it and overrides
 /// [authorize], [isMailRequest] and the backend methods; see
 /// `OpenArchiverApi`.
-class ArchiveApi implements ArchiveBackend {
+class ArchiveApi implements ArchiveBackend, CancellableMessageBackend {
   ArchiveApi(
     this.server,
     this.key, {
@@ -160,11 +161,14 @@ class ArchiveApi implements ArchiveBackend {
     Duration? timeout,
   }) async {
     if (_closed) throw StateError('Archive connection closed');
+    final load = MessageLoad.current;
+    load?.throwIfCancelled();
     validateServer(server.toString());
     final client = _apiClient ??= HttpClient()
       ..connectionTimeout = archiveConnectTimeout;
     final call = _ApiCall(isMail: isMailRequest(path));
     _calls.add(call);
+    load?.addCancelListener(call.cancel);
     var finished = false;
     try {
       final url = server.replace(
@@ -196,12 +200,17 @@ class ArchiveApi implements ArchiveBackend {
       finished = true;
       return result;
     } finally {
+      load?.removeCancelListener(call.cancel);
       _calls.remove(call);
       // A failed, timed-out or cancelled call stops reading its response and
       // drops that connection instead of returning it to the pool half-read.
       if (!finished) call.cancel();
     }
   }
+
+  @override
+  Future<MailMessage> messageWithCancellation(String id, MessageLoad load) =>
+      load.run(() => message(id));
 
   @override
   Future<List<ArchiveAccount>> accounts() async {

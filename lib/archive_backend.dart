@@ -3,12 +3,13 @@ import 'dart:io';
 import 'archive_capabilities.dart';
 import 'archive_models.dart';
 import 'attachment_download.dart';
+import 'message_load.dart';
 import 'search_filters.dart';
 
 /// A read-only connection to a self-hosted mail archive.
 ///
 /// The app talks to its server only through this interface. `ArchiveApi`
-/// implements it for Mail-Archiver, currently the only supported backend.
+/// implements it for Mail-Archiver and `OpenArchiverApi` for Open Archiver.
 ///
 /// Results are the typed models in `archive_models.dart`. Each backend
 /// converts its own responses into them and rejects malformed responses with
@@ -70,4 +71,9 @@ abstract interface class ArchiveBackend {
 
   /// Stops every request and releases the connection.
   void close();
+}
+
+/// Network backends support cancelling an individual reader's work.
+abstract interface class CancellableMessageBackend {
+  Future<MailMessage> messageWithCancellation(String id, MessageLoad load);
 }

@@ -114,6 +114,8 @@ No guessed received-date fallback is used. Attachment indication uses hasAttachm
 
 Local JSON limit: 8 MiB received bytes before decoding, including streamed/declared-size checks, with decoding off the UI isolate. Downloads stream separately. Request generations prevent late results replacing newer searches or forgotten connections. Backend availability/compatibility remain external dependencies.
 
+Reader loads have per-reader cancellation (`MessageLoad` and `CancellableMessageBackend`): Back cancels as soon as the route pops, before its transition finishes, and disposal is a fallback. Shared HTTP requests made by that load are stopped without closing the archive or cancelling another reader, even with an equal message ID. Late Open Archiver results cannot start MIME/body preparation or register attachment handles after cancellation. Already-running bounded preparation may finish, but its result is discarded.
+
 ## Failure and recovery decisions
 
 Preserve useful messages and scroll position on failed refresh. Show Mail/Search errors visibly with Retry, retain the inline error, and preserve current page/query/filter context. Never echo response bodies, keys or private hosts.
