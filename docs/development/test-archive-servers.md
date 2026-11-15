@@ -75,6 +75,17 @@ It asks for an admin token (a control; never used by the app), the reader token 
 
 It checks token refusal, the reader's permissions and account list, that the reader sees Alex only (listing, search, unscoped search, text search, mailboxes, messages, envelopes and attachments), attachment sizes, raw EML refusal, path-like IDs, unusual search text, and redirects. The app never calls `/accounts`; the check only reports whether it would expose an IMAP password to the reader. The summary holds only statuses, counts, sizes, permission names and allowlisted field names. [test_bichon_lab_check.py](../../tools/test_bichon_lab_check.py) runs it against an in-process fake server with leaks, malformed responses, oversized bodies and forbidden method/path combinations injected. Cross-account attachment refusal uses an existing attachment with a successful admin control, not an invented hash. Host responses above 41 MiB fail rather than being silently truncated.
 
+### Bichon write-denial check
+
+[bichon_write_denial.py](../../tools/bichon_write_denial.py) is that separate procedure. It uses one sacrificial fictional message, never the demo mail:
+
+```
+python tools/bichon_write_denial.py --write-probe-eml build/probe.eml
+python tools/bichon_write_denial.py https://<test-server>:9443
+```
+
+The first command writes the probe message without touching the network; import it into the Alex Rivera account's INBOX on Bichon's Import page. The second asks for the admin and reader tokens. It stops before sending any change unless it finds exactly one message with the probe's subject, sender and Message-ID. The admin token adds and removes a tag on the probe, proving the request is well formed. The reader token then tries to add a tag, repair the probe and delete it, each expected to return 401 or 403, and after each attempt the admin token confirms the probe still exists with unchanged tags (a wrongly accepted reader tag is removed again). Finally the admin token deletes the probe, which proves the delete request is well formed and returns the account to its 40 demo messages. A refusal only counts when the matching admin control succeeded. The summary holds only statuses and booleans. [test_bichon_write_denial.py](../../tools/test_bichon_write_denial.py) runs it against a fake server with each reader write wrongly allowed, broken admin controls, and zero or two probes.
+
 ## Phone memory check with stress mail
 
 [generate_stress_mail.py](../../tools/generate_stress_mail.py) writes `stress-mail.zip`: ten fictional messages for the 0.4.0 release check of memory on the phone. They include long bodies, quoted-printable and base64 encodings, Latin-1 plain text and Windows-1252 HTML as the selected body alternatives, six explicitly inline CID images, 30 levels of nesting, 400 parts, about 190 KiB of headers, one message just under the app's 10 MiB message limit and one just over it. Output is deterministic and uses only `stress.example` addresses.

@@ -4,7 +4,7 @@ All notable changes to MailBurrow are recorded here. Versions follow the app ver
 
 ## Unreleased
 
-- **Testing tools:** `tools/bichon_lab_check.py` checks a test Bichon server for the planned third backend (read-only enforcement, account isolation, message and attachment contracts), with tests against a fake server.
+- **Testing tools:** `tools/bichon_lab_check.py` checks a test Bichon server for the planned third backend (read-only enforcement, account isolation, message and attachment contracts), with tests against a fake server. `tools/bichon_write_denial.py` checks that the reader token cannot tag, repair or delete mail, using one sacrificial fictional message.
 
 ## 0.4.0 (build27) - 2026-11-14
 
