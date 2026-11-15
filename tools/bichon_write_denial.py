@@ -45,8 +45,11 @@ from bichon_lab_check import (EXPECT, MAX_BODY, Response, ask_key, is_int, items
 PROBE_SUBJECT = "MailBurrow write-denial probe"
 PROBE_SENDER = "probe@write-denial.example"
 PROBE_MESSAGE_ID = "<mailburrow-write-denial-probe@write-denial.example>"
-SHAPE_TAG = "mailburrow-shape-check"
-READER_TAG = "mailburrow-reader-probe"
+# Bichon tags are Tantivy facets: update-tags validates each with
+# Facet::from_text (a leading "/" is required) before checking permissions
+# (crates/server/src/rest/api/message.rs, Bichon 2.4.2).
+SHAPE_TAG = "/mailburrow-shape-check"
+READER_TAG = "/mailburrow-reader-probe"
 REFUSED = (401, 403)
 
 
