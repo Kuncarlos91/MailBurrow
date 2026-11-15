@@ -11,6 +11,12 @@ class ArchiveMessageRefused implements Exception {
   final String reason;
 }
 
+/// A search the app declines to send; [reason] is shown to the user.
+class ArchiveSearchRefused implements Exception {
+  const ArchiveSearchRefused(this.reason);
+  final String reason;
+}
+
 class ArchiveFailure implements Exception {
   const ArchiveFailure(this.status);
   final int status;
@@ -21,6 +27,7 @@ String readableError(Object error) {
     return 'This server response is too large for the app preview. Open your archive website to view it.';
   }
   if (error is ArchiveMessageRefused) return error.reason;
+  if (error is ArchiveSearchRefused) return error.reason;
   if (error is ArchiveFailure) {
     return switch (error.status) {
       401 => 'Your API key was not accepted.',

@@ -37,6 +37,7 @@ class ReloadableOpenArchiver extends FakeOpenArchiver {
     Map<String, String>? query,
     Future<T> Function(Stream<List<int>>, int) read, {
     Duration? timeout,
+  List<int>? requestBody,
   }) {
     final data = nextDetail ?? detail;
     return read(Stream.value(data), data.length);
