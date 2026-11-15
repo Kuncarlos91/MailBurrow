@@ -16,7 +16,8 @@ PROBE = "probe-env-uuid"
 class FakeBichon:
     """Bichon stand-in: admin may write; the reader is refused unless a flaw is switched on."""
 
-    def __init__(self, probes=1, reader_can=(), admin_tags_work=True, admin_delete_works=True, omit_empty_tags=False):
+    def __init__(self, probes=1, reader_can=(), admin_tags_work=True, admin_delete_works=True, omit_empty_tags=False,
+                 remove_failures=0):
         self.envs = {"env-%d" % i: {"id": "env-%d" % i, "account_id": ALEX, "subject": "Demo %d" % i,
                                     "from": "someone@example.com", "message_id": "<d%d@example.com>" % i,
                                     "tags": []} for i in range(3)}
@@ -25,7 +26,7 @@ class FakeBichon:
             self.envs[env] = {"id": env, "account_id": ALEX, "subject": wd.PROBE_SUBJECT, "from": wd.PROBE_SENDER,
                               "message_id": wd.PROBE_MESSAGE_ID.strip("<>"), "tags": ["/existing"]}
         self.reader_can, self.admin_tags_work, self.admin_delete_works = set(reader_can), admin_tags_work, admin_delete_works
-        self.calls, self.omit_empty_tags = [], omit_empty_tags
+        self.calls, self.omit_empty_tags, self.remove_failures = [], omit_empty_tags, remove_failures
         if omit_empty_tags:
             for e in self.envs.values():
                 e["tags"] = []
@@ -64,6 +65,9 @@ class FakeBichon:
         if path == "/update-tags":
             if role == "admin" and not self.admin_tags_work:
                 return 400, {}, b"{}"
+            if req["action"] == "Remove" and self.remove_failures:
+                self.remove_failures -= 1
+                return 500, {}, b'{"message":"internal","code":500}'
             for env in req["updates"][str(ALEX)]:
                 tags = self.envs[env]["tags"]
                 if req["action"] == "Add":
@@ -101,6 +105,39 @@ class WriteDenialTests(unittest.TestCase):
         for role, method, path in fake.calls:
             self.assertIn((role, method, path.split("/")[1] and "/" + path.split("/")[1]),
                           wd.Prober.ALLOWED)
+
+    def test_transient_remove_error_is_retried(self):
+        fake = FakeBichon(remove_failures=1)
+        code, out = run(fake)
+        self.assertEqual(code, 0, out)
+        self.assertIn("[INFO] Admin tag removal", out)
+        self.assertIn("status 200 after 2 attempt(s); control tag gone True", out)
+        self.assertNotIn(PROBE, fake.envs)
+
+    def test_persistent_remove_error_does_not_block_reader_checks(self):
+        fake = FakeBichon(remove_failures=99)
+        code, out = run(fake)
+        self.assertEqual(code, 0, out)
+        self.assertIn("status 500 after 3 attempt(s); control tag gone False", out)
+        for name in ("Reader tag change refused", "Reader repair refused", "Reader delete refused"):
+            self.assertIn("[PASS] " + name, out)
+        self.assertNotIn(PROBE, fake.envs)
+
+    def test_invisible_admin_add_fails_shape_control(self):
+        fake = FakeBichon()
+        def transport(method, url, headers, body):
+            status, h, data = fake(method, url, headers, body)
+            if "/envelope/" in url and status == 200:
+                obj = json.loads(data)
+                obj["tags"] = [t for t in obj.get("tags", []) if t != wd.SHAPE_TAG]
+                data = json.dumps(obj).encode()
+            return status, h, data
+        code, out = run(transport)
+        self.assertEqual(code, 1)
+        self.assertIn("[FAIL] Tag request is well formed", out)
+        self.assertFalse([c for c in fake.calls if c[0] == "reader" and c[2] != "/envelope/%d/%s" % (ALEX, PROBE)
+                          and not c[2].startswith("/envelope/")])
+        self.assertNotIn(PROBE, fake.envs)
 
     def test_control_tags_are_facet_paths(self):
         self.assertTrue(wd.SHAPE_TAG.startswith("/") and wd.READER_TAG.startswith("/"))

@@ -50,7 +50,6 @@ PROBE_MESSAGE_ID = "<mailburrow-write-denial-probe@write-denial.example>"
 # (crates/server/src/rest/api/message.rs, Bichon 2.4.2).
 SHAPE_TAG = "/mailburrow-shape-check"
 READER_TAG = "/mailburrow-reader-probe"
-REFUSED = (401, 403)
 
 
 def probe_eml():
@@ -106,6 +105,9 @@ class Prober:
         if 300 <= status < 400:
             self.redirects += 1
         return Response(status, resp_headers, data)
+
+    def note(self, name, detail=""):
+        self.results.append(("INFO", name, detail))
 
     def check(self, name, ok, detail=""):
         self.results.append(("PASS" if ok else "FAIL", name, detail))
@@ -191,13 +193,26 @@ def run(p):
     try:
         add = p.tags("admin", alex, env, SHAPE_TAG, "Add")
         added_status, with_tag, _ = p.snapshot(alex, env)
-        remove = p.tags("admin", alex, env, SHAPE_TAG, "Remove")
-        restored_status, restored, _ = p.snapshot(alex, env)
-        shape_ok = p.check("Tag request is well formed (admin add and remove work)",
-                           add.status == 200 and remove.status == 200 and added_status == 200
-                           and with_tag is not None and SHAPE_TAG in with_tag["tags"]
-                           and restored_status == 200 and restored == before,
-                           "add %s, remove %s" % (st(add), st(remove)))
+        # The add alone proves the request shape the reader will send: same
+        # endpoint, body and action, accepted and visible on the envelope.
+        shape_ok = p.check("Tag request is well formed (admin add works and is visible)",
+                           add.status == 200 and added_status == 200
+                           and with_tag is not None and SHAPE_TAG in with_tag["tags"],
+                           "add %s" % st(add))
+        if shape_ok:
+            # Removing the control tag only tidies the probe, which cleanup
+            # deletes anyway. Bichon 2.4.2 returned 500 for an immediate
+            # remove once, so retry server errors and report the outcome
+            # without letting it decide the result.
+            for attempt in range(3):
+                remove = p.tags("admin", alex, env, SHAPE_TAG, "Remove")
+                if remove.status == 200 or remove.status is None or remove.status < 429:
+                    break
+                time.sleep(2)
+            _, restored, _ = p.snapshot(alex, env)
+            p.note("Admin tag removal (informational; the probe is deleted at the end)",
+                   "%s after %d attempt(s); control tag gone %s"
+                   % (st(remove), attempt + 1, restored is not None and SHAPE_TAG not in restored["tags"]))
         if not shape_ok:
             return
 
@@ -249,13 +264,29 @@ def run(p):
         p.check("No connection errors", p.errors == 0, "%d" % p.errors)
 
 
+REQUIRED = {
+    "Exactly one probe message in the Alex account",
+    "Admin reads the probe envelope",
+    "Reader token can read the probe before write tests",
+    "Tag request is well formed (admin add works and is visible)",
+    "Repair request is well formed (admin control)",
+    "Reader tag change refused and nothing changed",
+    "Reader repair refused and the probe is unchanged",
+    "Reader delete refused and the probe still exists",
+    "Delete request is well formed (admin deletes the probe)",
+    "No redirects",
+    "No connection errors",
+}
+
+
 def report(p, out):
     print("\nBichon write-denial check v1 (paste this summary; it holds no keys, addresses or server text)", file=out)
     print("Python %s, %s" % (sys.version.split()[0], time.strftime("%Y-%m-%d %H:%M")), file=out)
     for status, name, detail in p.results:
         print("[%s] %s%s" % (status, name, (": " + detail) if detail else ""), file=out)
     failed = sum(1 for r in p.results if r[0] == "FAIL")
-    ok = failed == 0 and len(p.results) >= 9
+    passed = {name for status, name, _ in p.results if status == "PASS"}
+    ok = failed == 0 and REQUIRED <= passed
     print("%d checks, %d failed; %d requests" % (len(p.results), failed, p.calls), file=out)
     print("RESULT: %s" % ("reader writes refused" if ok else
                           "NOT PROVEN: a check failed or the run stopped early"), file=out)
