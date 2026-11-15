@@ -6,6 +6,10 @@ Start with [README.md](README.md), the sole main documentation index, and [the p
 
 MailBurrow is a read-only client. Users configure their own Mail-Archiver, HTTPS endpoint, API keys and Tailscale/private-network access. The project does not provide customer TrueNAS/server hosting, mailbox provisioning, mail relay, managed tailnets or remote server administration. TrueNAS is an optional host, not a client runtime requirement. Keep setup/help/policies and tester guidance consistent with this boundary; do not request customer credentials or treat the owner's production log/backup audit as a release prerequisite. Any synthetic review/test environment is separate, fictional and explicitly scoped; it does not establish customer hosting.
 
+## Planning location
+
+All feature plans, roadmaps, automation designs, scope decisions and living task trackers belong in the owner’s private planning repository. This public repository holds reviewed implementation, workflows, user documentation and verified compatibility facts. Do not create public planning PRs or copy/link private plans or evidence here. This location rule does not require extra approval for implementation already authorized in the session.
+
 ## Rolling documentation
 
 For every meaningful feature/fix, API/native integration, configuration or failure-recovery change, review the playbook and update affected behavior, architecture/source references, limitations and validation/release status when needed. Update the setup guide and troubleshooting in the same change when they are affected. If documentation is unaffected, say why in the work summary. Record user-visible changes in CHANGELOG; avoid contradictory current instructions.
