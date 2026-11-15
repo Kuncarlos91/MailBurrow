@@ -75,6 +75,17 @@ It asks for an admin token (a control; never used by the app), the reader token 
 
 It checks token refusal, the reader's permissions and account list, that the reader sees Alex only (listing, search, unscoped search, text search, mailboxes, messages, envelopes and attachments), attachment sizes, raw EML refusal, path-like IDs, unusual search text, and redirects. The app never calls `/accounts`; the check only reports whether it would expose an IMAP password to the reader. The summary holds only statuses, counts, sizes, permission names and allowlisted field names. [test_bichon_lab_check.py](../../tools/test_bichon_lab_check.py) runs it against an in-process fake server with leaks, malformed responses, oversized bodies and forbidden method/path combinations injected. Cross-account attachment refusal uses an existing attachment with a successful admin control, not an invented hash. Host responses above 41 MiB fail rather than being silently truncated.
 
+### Bichon write-denial check
+
+[bichon_write_denial.py](../../tools/bichon_write_denial.py) is that separate procedure. It uses one sacrificial fictional message, never the demo mail:
+
+```
+python tools/bichon_write_denial.py --write-probe-eml build/probe.eml
+python tools/bichon_write_denial.py https://<test-server>:9443
+```
+
+The first command writes the probe message without touching the network; import it into the Alex Rivera account's INBOX on Bichon's Import page. The second asks for distinct admin and reader tokens. It stops before mutation unless a complete search finds exactly one probe with exact subject, sender and Message-ID, the admin can read its validated envelope, and the reader can read that same envelope. The admin adds/removes a tag and repairs this sacrificial probe as positive controls. The reader then tries tag, repair and delete, expecting **403**; 401 cannot prove authorization denial because it may mean an invalid/expired token. After each attempt the admin compares the validated envelope snapshot. An uncertain or accepted change stops further reader probes. Once mutation testing starts, admin deletion cleanup is attempted even on a contract failure. Cleanup requires both a direct 404 and a successful, complete empty probe search; an error is not absence. A failed admin control cannot establish the matching request shape. Results apply only to the tested operations, not every possible Bichon mutation. The summary holds only statuses and booleans. [test_bichon_write_denial.py](../../tools/test_bichon_write_denial.py) covers wrongly allowed writes, invalid reader credentials, incomplete/ambiguous probe searches, broken controls, metadata changes and cleanup lookup failures. No live write is performed by running these unit tests.
+
 ## Phone memory check with stress mail
 
 [generate_stress_mail.py](../../tools/generate_stress_mail.py) writes `stress-mail.zip`: ten fictional messages for the 0.4.0 release check of memory on the phone. They include long bodies, quoted-printable and base64 encodings, Latin-1 plain text and Windows-1252 HTML as the selected body alternatives, six explicitly inline CID images, 30 levels of nesting, 400 parts, about 190 KiB of headers, one message just under the app's 10 MiB message limit and one just over it. Output is deterministic and uses only `stress.example` addresses.
