@@ -23,7 +23,7 @@ class FakeBichon:
         for n in range(probes):
             env = PROBE if n == 0 else "%s-%d" % (PROBE, n)
             self.envs[env] = {"id": env, "account_id": ALEX, "subject": wd.PROBE_SUBJECT, "from": wd.PROBE_SENDER,
-                              "message_id": wd.PROBE_MESSAGE_ID.strip("<>"), "tags": ["existing"]}
+                              "message_id": wd.PROBE_MESSAGE_ID.strip("<>"), "tags": ["/existing"]}
         self.reader_can, self.admin_tags_work, self.admin_delete_works = set(reader_can), admin_tags_work, admin_delete_works
         self.calls, self.omit_empty_tags = [], omit_empty_tags
         if omit_empty_tags:
@@ -41,6 +41,8 @@ class FakeBichon:
         allowed = role == "admin" or any(path.startswith("/" + w) for w in self.reader_can)
         if role is None:
             return 401, {}, b"{}"
+        if path == "/update-tags" and not all(t.startswith("/") for t in req["tags"]):
+            return 400, {}, b'{"message":"invalid facet","code":400}'  # before the permission check, as upstream
         if path == "/minimal-account-list":
             return ok([{"id": ALEX, "email": "alex.rivera@example.com"},
                        {"id": BAKERY, "email": "hello@maple-street-bakery.example"}])
@@ -99,6 +101,9 @@ class WriteDenialTests(unittest.TestCase):
         for role, method, path in fake.calls:
             self.assertIn((role, method, path.split("/")[1] and "/" + path.split("/")[1]),
                           wd.Prober.ALLOWED)
+
+    def test_control_tags_are_facet_paths(self):
+        self.assertTrue(wd.SHAPE_TAG.startswith("/") and wd.READER_TAG.startswith("/"))
 
     def test_untagged_probe_without_tags_field_passes(self):
         fake = FakeBichon(omit_empty_tags=True)
