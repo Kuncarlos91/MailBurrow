@@ -109,15 +109,28 @@ class Prober:
         return ok
 
     def snapshot(self, account_id, env, role="admin"):
+        """Return (status, normalized envelope or None, names of fields that failed validation).
+
+        Bichon's Envelope schema makes `tags` optional, so an untagged message
+        may omit it or send null; both are treated as no tags."""
         resp = self.send(role, "GET", "/envelope", suffix="/%d/%s" % (account_id, urllib.parse.quote(env, safe="")))
-        obj = resp.obj()
+        obj = dict(resp.obj())
         tags = obj.get("tags")
-        valid = (resp.status == 200 and obj.get("id") == env and obj.get("account_id") == account_id
-                 and obj.get("subject") == PROBE_SUBJECT and obj.get("from") == PROBE_SENDER
-                 and isinstance(obj.get("message_id"), str)
-                 and obj["message_id"].strip("<>") == PROBE_MESSAGE_ID.strip("<>")
-                 and isinstance(tags, list) and all(isinstance(t, str) for t in tags))
-        return resp.status, obj if valid else None
+        if tags is None:
+            tags = []
+        obj["tags"] = tags
+        message_id = obj.get("message_id")
+        checks = {
+            "id": obj.get("id") == env,
+            "account_id": obj.get("account_id") == account_id,
+            "subject": obj.get("subject") == PROBE_SUBJECT,
+            "from": obj.get("from") == PROBE_SENDER,
+            "message_id": isinstance(message_id, str) and message_id.strip("<>") == PROBE_MESSAGE_ID.strip("<>"),
+            "tags": isinstance(tags, list) and all(isinstance(t, str) for t in tags),
+        }
+        bad = [name for name, ok in checks.items() if not ok] if resp.status == 200 else []
+        valid = resp.status == 200 and not bad
+        return resp.status, (obj if valid else None), bad
 
     def tags(self, role, account_id, env, tag, action):
         return self.send(role, "POST", "/update-tags", {
@@ -158,24 +171,25 @@ def run(p):
     alex, env, problem = find_probe(p)
     if not p.check("Exactly one probe message in the Alex account", env is not None, problem or "found"):
         return
-    status, before = p.snapshot(alex, env)
-    if not p.check("Admin reads the probe envelope", status == 200 and before is not None, "status %s" % status):
+    status, before, bad = p.snapshot(alex, env)
+    if not p.check("Admin reads the probe envelope", status == 200 and before is not None,
+                   "status %s%s" % (status, "; unexpected fields " + ", ".join(bad) if bad else "")):
         return
     if not p.check("Probe tags do not collide with control tags",
                    SHAPE_TAG not in before["tags"] and READER_TAG not in before["tags"]):
         return
-    status, reader_before = p.snapshot(alex, env, role="reader")
+    status, reader_before, bad = p.snapshot(alex, env, role="reader")
     if not p.check("Reader token can read the probe before write tests", status == 200 and reader_before == before,
-                   "status %s" % status):
+                   "status %s%s" % (status, "; unexpected fields " + ", ".join(bad) if bad else "")):
         return
 
     # Once a verified sacrificial probe is selected, attempt cleanup even if
     # a malformed response interrupts the experiment. Never broaden its ID.
     try:
         add = p.tags("admin", alex, env, SHAPE_TAG, "Add")
-        added_status, with_tag = p.snapshot(alex, env)
+        added_status, with_tag, _ = p.snapshot(alex, env)
         remove = p.tags("admin", alex, env, SHAPE_TAG, "Remove")
-        restored_status, restored = p.snapshot(alex, env)
+        restored_status, restored, _ = p.snapshot(alex, env)
         shape_ok = p.check("Tag request is well formed (admin add and remove work)",
                            add.status == 200 and remove.status == 200 and added_status == 200
                            and with_tag is not None and SHAPE_TAG in with_tag["tags"]
@@ -186,14 +200,14 @@ def run(p):
 
         suffix = "/%d/%s" % (alex, urllib.parse.quote(env, safe=""))
         repair_control = p.send("admin", "POST", "/repair-message", suffix=suffix)
-        status, before = p.snapshot(alex, env)
+        status, before, _ = p.snapshot(alex, env)
         if not p.check("Repair request is well formed (admin control)",
                        repair_control.status == 200 and status == 200 and before is not None,
                        st(repair_control)):
             return
 
         attempt = p.tags("reader", alex, env, READER_TAG, "Add")
-        status, after = p.snapshot(alex, env)
+        status, after, _ = p.snapshot(alex, env)
         p.check("Reader tag change refused and nothing changed",
                 attempt.status == 403 and status == 200 and after == before,
                 "%s; envelope unchanged %s" % (st(attempt), after == before))
@@ -202,7 +216,7 @@ def run(p):
             return
 
         repair = p.send("reader", "POST", "/repair-message", suffix=suffix)
-        status, after = p.snapshot(alex, env)
+        status, after, _ = p.snapshot(alex, env)
         p.check("Reader repair refused and the probe is unchanged",
                 repair.status == 403 and status == 200 and after == before,
                 "%s; probe status %s" % (st(repair), status))
@@ -210,7 +224,7 @@ def run(p):
             return
 
         delete = p.send("reader", "POST", "/delete-messages", {str(alex): [env]})
-        status, after = p.snapshot(alex, env)
+        status, after, _ = p.snapshot(alex, env)
         p.check("Reader delete refused and the probe still exists",
                 delete.status == 403 and status == 200 and after == before,
                 "%s; probe status %s" % (st(delete), status))
@@ -218,7 +232,7 @@ def run(p):
         cleanup = p.send("admin", "POST", "/delete-messages", {str(alex): [env]})
         gone = False
         for _ in range(5):
-            status, _ = p.snapshot(alex, env)
+            status, _, _ = p.snapshot(alex, env)
             account, found_env, problem = find_probe(p)
             # A failed/ambiguous search is never proof of absence.
             gone = (status == 404 and account == alex and found_env is None

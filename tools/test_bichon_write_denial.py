@@ -16,7 +16,7 @@ PROBE = "probe-env-uuid"
 class FakeBichon:
     """Bichon stand-in: admin may write; the reader is refused unless a flaw is switched on."""
 
-    def __init__(self, probes=1, reader_can=(), admin_tags_work=True, admin_delete_works=True):
+    def __init__(self, probes=1, reader_can=(), admin_tags_work=True, admin_delete_works=True, omit_empty_tags=False):
         self.envs = {"env-%d" % i: {"id": "env-%d" % i, "account_id": ALEX, "subject": "Demo %d" % i,
                                     "from": "someone@example.com", "message_id": "<d%d@example.com>" % i,
                                     "tags": []} for i in range(3)}
@@ -25,7 +25,10 @@ class FakeBichon:
             self.envs[env] = {"id": env, "account_id": ALEX, "subject": wd.PROBE_SUBJECT, "from": wd.PROBE_SENDER,
                               "message_id": wd.PROBE_MESSAGE_ID.strip("<>"), "tags": ["existing"]}
         self.reader_can, self.admin_tags_work, self.admin_delete_works = set(reader_can), admin_tags_work, admin_delete_works
-        self.calls = []
+        self.calls, self.omit_empty_tags = [], omit_empty_tags
+        if omit_empty_tags:
+            for e in self.envs.values():
+                e["tags"] = []
 
     def __call__(self, method, url, headers, body):
         parts = urllib.parse.urlsplit(url)
@@ -48,7 +51,12 @@ class FakeBichon:
             return ok({"items": items, "total_items": len(items), "total_pages": 1})
         if path.startswith("/envelope/"):
             env = urllib.parse.unquote(path.rsplit("/", 1)[1])
-            return ok(self.envs[env]) if env in self.envs else (404, {}, b"{}")
+            if env not in self.envs:
+                return 404, {}, b"{}"
+            e = dict(self.envs[env])
+            if self.omit_empty_tags and not e["tags"]:
+                del e["tags"]  # Bichon's Envelope schema does not require tags
+            return ok(e)
         if not allowed:
             return deny
         if path == "/update-tags":
@@ -91,6 +99,28 @@ class WriteDenialTests(unittest.TestCase):
         for role, method, path in fake.calls:
             self.assertIn((role, method, path.split("/")[1] and "/" + path.split("/")[1]),
                           wd.Prober.ALLOWED)
+
+    def test_untagged_probe_without_tags_field_passes(self):
+        fake = FakeBichon(omit_empty_tags=True)
+        code, out = run(fake)
+        self.assertEqual(code, 0, out)
+        self.assertNotIn(PROBE, fake.envs)
+
+    def test_envelope_mismatch_names_only_the_field(self):
+        fake = FakeBichon()
+        real = fake.__call__
+        def wrong_sender(method, url, headers, body):
+            status, h, data = real(method, url, headers, body)
+            if "/envelope/" in url and status == 200:
+                obj = json.loads(data)
+                obj["from"] = "someone-else@example.com"
+                data = json.dumps(obj).encode()
+            return status, h, data
+        code, out = run(wrong_sender)
+        self.assertEqual(code, 1)
+        self.assertIn("unexpected fields from", out)
+        self.assertNotIn("someone-else", out)
+        self.assertFalse([c for c in fake.calls if c[2] == "/update-tags" or c[2].startswith("/repair-message")])
 
     def test_summary_holds_no_secrets_or_identifiers(self):
         code, out = run(FakeBichon())
