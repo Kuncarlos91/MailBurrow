@@ -6,12 +6,11 @@ imported into two NoSync accounts), and prints a summary that is safe to
 share. It always verifies certificates and never follows redirects.
 
 Requests are read-only: GET, plus POST to the search endpoint, which reads.
-With --write-denial it also sends ONE tag-update request with the READER
-token, expecting a refusal, and checks with the admin token that nothing
-changed (removing the probe tag again if the server wrongly accepted it).
+Write-denial testing belongs in a separate disposable-lab procedure, not this
+routine checker. This script never sends a mutation request.
 
 Usage (PowerShell):
-    python tools\\bichon_lab_check.py https://<test-server>:9443 [--write-denial]
+    python tools\bichon_lab_check.py https://<test-server>:9443
 
 It asks for up to four tokens without echoing them (on Windows, paste with
 a right-click): an admin token (control only, never used by the app), the
@@ -29,7 +28,6 @@ message text, addresses or other values sent by the server.
 import argparse
 import getpass
 import json
-import re
 import ssl
 import sys
 import time
@@ -53,7 +51,7 @@ EXPECT = {
 
 READER_GLOBAL_ALLOWED = {"system:access"}
 READER_ACCOUNT_ALLOWED = {"data:read", "account:read_details"}
-PERMISSION = re.compile(r"^[a-z_]{1,40}:[a-z_]{1,40}$")
+KNOWN_PERMISSIONS = READER_GLOBAL_ALLOWED | READER_ACCOUNT_ALLOWED
 
 KNOWN_FIELDS = {
     "id", "email", "name", "account_type", "auth_type", "kind", "items", "total_items",
@@ -89,9 +87,16 @@ def urllib_transport(method, url, headers, body):
     req = urllib.request.Request(url, data=body, method=method, headers=headers)
     try:
         resp = opener.open(req, timeout=TIMEOUT)
-        return resp.status, {k.lower(): v for k, v in resp.headers.items()}, resp.read(MAX_BODY)
+        return resp.status, {k.lower(): v for k, v in resp.headers.items()}, read_bounded(resp)
     except urllib.error.HTTPError as err:
-        return err.code, {k.lower(): v for k, v in err.headers.items()}, err.read(MAX_BODY)
+        return err.code, {k.lower(): v for k, v in err.headers.items()}, read_bounded(err)
+
+
+def read_bounded(response):
+    data = response.read(MAX_BODY + 1)
+    if len(data) > MAX_BODY:
+        raise ValueError("response exceeds host budget")
+    return data
 
 
 class Response:
@@ -106,8 +111,8 @@ class Response:
         return self.json if isinstance(self.json, dict) else {}
 
 
-# The only POST paths this script may send, and with which token role.
-POST_ALLOWED = {"/search-messages", "/update-tags"}
+# The only POST path this routine checker may send.
+POST_ALLOWED = {"/search-messages"}
 
 
 class Lab:
@@ -120,6 +125,10 @@ class Lab:
         self.calls = 0
 
     def request(self, method, path, token=None, params=None, payload=None, auth="bearer"):
+        if method not in ("GET", "POST"):
+            raise ValueError("method not allowed")
+        if not path.startswith("/") or "?" in path or "#" in path:
+            raise ValueError("invalid request path")
         if method == "POST" and path not in POST_ALLOWED:
             raise ValueError("POST path not allowlisted")
         url = self.base + self.prefix + path
@@ -136,6 +145,9 @@ class Lab:
         try:
             status, resp_headers, data = self.transport(method, url, headers, body)
         except Exception:  # connection, TLS or timeout: report the category only
+            self.connection_errors += 1
+            return Response(None, {}, b"")
+        if not is_int(status) or not 100 <= status <= 599 or len(data) > MAX_BODY:
             self.connection_errors += 1
             return Response(None, {}, b"")
         if 300 <= status < 400:
@@ -178,7 +190,7 @@ def names(keys):
 
 def perms(values):
     values = sorted(set(str(v) for v in values if isinstance(v, str)))
-    shown = [v for v in values if PERMISSION.match(v)]
+    shown = [v for v in values if v in KNOWN_PERMISSIONS]
     other = len(values) - len(shown)
     return (", ".join(shown) or "none") + (" (+%d other)" % other if other else "")
 
@@ -190,7 +202,7 @@ def is_int(value):
 def items_of(resp):
     data = resp.obj()
     items = data.get("items")
-    return [i for i in items if isinstance(i, dict)] if isinstance(items, list) else None
+    return items if isinstance(items, list) and all(isinstance(i, dict) for i in items) else None
 
 
 def refused(resp):
@@ -229,18 +241,21 @@ def all_pages(lab, token, account_id, page_size=10, limit=20):
         items = items_of(resp)
         if resp.status != 200 or items is None:
             return False, ids, totals, foreign
-        totals.add(resp.obj().get("total_items"))
+        total = resp.obj().get("total_items")
+        if not is_int(total) or total < 0 or len(items) > page_size:
+            return False, ids, totals, foreign
+        totals.add(total)
         for item in items:
             if item.get("account_id") != account_id:
                 foreign += 1
             if isinstance(item.get("id"), str):
                 ids.append(item["id"])
         if len(items) < page_size:
-            break
-    return ok, ids, totals, foreign
+            return ok, ids, totals, foreign
+    return False, ids, totals, foreign
 
 
-def run_checks(lab, admin, reader, revoked, expired, write_denial):
+def run_checks(lab, admin, reader, revoked, expired):
     # Authentication
     r = lab.get("/current-user", admin)
     if not lab.check("API reachable with admin token (Bearer)", r.status == 200, "%s, json %s" % (
@@ -275,14 +290,16 @@ def run_checks(lab, admin, reader, revoked, expired, write_denial):
     lab.check("Reader minimal account list shows only Alex", rd.status == 200 and rd_ids == [own_id],
               "%s, %d accounts, Alex %s, Bakery %s" % (st(rd), len(rd_ids), own_id in rd_ids, other_id in rd_ids))
 
-    me = lab.get("/current-user", reader).obj()
+    me_resp = lab.get("/current-user", reader)
+    me = me_resp.obj()
     global_perms = me.get("global_permissions") if isinstance(me.get("global_permissions"), list) else []
     acct_perms = me.get("account_permissions") if isinstance(me.get("account_permissions"), dict) else {}
     own_perms = acct_perms.get(str(own_id)) or []
-    lab.check("Reader global permissions are login only", set(global_perms) <= READER_GLOBAL_ALLOWED,
+    lab.check("Reader global permissions are login only", me_resp.status == 200 and isinstance(me.get("global_permissions"), list)
+              and set(global_perms) == READER_GLOBAL_ALLOWED,
               perms(global_perms))
     lab.check("Reader account permissions are read only, Alex only",
-              set(acct_perms.keys()) <= {str(own_id)} and set(own_perms) <= READER_ACCOUNT_ALLOWED and bool(own_perms),
+              set(acct_perms.keys()) <= {str(own_id)} and set(own_perms) == READER_ACCOUNT_ALLOWED,
               "%d accounts with permissions; Alex: %s" % (len(acct_perms), perms(own_perms)))
     lab.check("Reader current-user password field (reported)", True, secret_state(me.get("password")),
               required=False)
@@ -300,13 +317,13 @@ def run_checks(lab, admin, reader, revoked, expired, write_denial):
               "%s, %s mailboxes, status field %s" % (st(mb), len(boxes) if isinstance(boxes, list) else "no",
                                                      "present" if "status" in mb.obj() else "missing"))
     mo = lab.get("/list-mailboxes/%d" % other_id, reader)
-    lab.check("Reader refused Bakery mailboxes", refused_or_empty(mo) or (mo.status == 200 and not mo.obj().get("mailboxes")),
+    lab.check("Reader refused Bakery mailboxes", refused(mo) or (mo.status == 200 and mo.obj().get("mailboxes") == []),
               st(mo))
 
     # Listing and search
     ok, ids, totals, foreign = all_pages(lab, reader, own_id)
     lab.check("Reader browses Alex completely", ok and len(set(ids)) == EXPECT["reader_total"] and foreign == 0
-              and totals == {EXPECT["reader_total"]},
+              and len(ids) == len(set(ids)) and totals == {EXPECT["reader_total"]},
               "%d distinct of %d expected, totals %s, %d from other accounts" % (
                   len(set(ids)), EXPECT["reader_total"], sorted(t for t in totals if is_int(t)), foreign))
     first = lab.search(reader, {"account_ids": [own_id]}, page_size=5)
@@ -315,9 +332,12 @@ def run_checks(lab, admin, reader, revoked, expired, write_denial):
     unscoped = lab.search(reader, {}, page_size=50)
     u_items = items_of(unscoped)
     lab.check("Reader search without an account filter stays in Alex",
-              unscoped.status == 200 and u_items is not None and all(i.get("account_id") == own_id for i in u_items),
+              unscoped.status == 200 and u_items is not None
+              and len(u_items) == EXPECT["reader_total"]
+              and unscoped.obj().get("total_items") == EXPECT["reader_total"]
+              and all(i.get("account_id") == own_id for i in u_items),
               "%s, %s items, total %s" % (st(unscoped), len(u_items) if u_items is not None else "no",
-                                          unscoped.obj().get("total_items")))
+                                          (unscoped.obj().get("total_items") if is_int(unscoped.obj().get("total_items")) else "invalid")))
     cross = lab.search(reader, {"account_ids": [other_id]}, page_size=5)
     lab.check("Reader search on Bakery account returns nothing", refused_or_empty(cross), "%s, %s items" % (
         st(cross), len(items_of(cross) or [])))
@@ -331,7 +351,7 @@ def run_checks(lab, admin, reader, revoked, expired, write_denial):
     for query in ODD_QUERIES:
         resp = lab.search(reader, {"account_ids": [own_id], "text": query}, page_size=5)
         lab.check("Unusual search text handled (%d chars)" % len(query),
-                  resp.status is not None and resp.status < 500,
+                  resp.status in (200, 400, 422),
                   "%s, %s" % (st(resp), "items" if items_of(resp) is not None else
                               ("error {%s}" % names(resp.obj().keys()) if resp.obj() else "no json")),
                   required=False)
@@ -362,6 +382,8 @@ def run_checks(lab, admin, reader, revoked, expired, write_denial):
         detail = lab.get("/message-content/%d/%s" % (own_id, urllib.parse.quote(env, safe="")), reader,
                          {"block_remote_content": "true"}).obj()
         for a in detail.get("attachments") or []:
+            if downloaded >= 12:
+                break
             if not isinstance(a, dict) or a.get("inline") or not a.get("content_hash"):
                 continue
             if a.get("extracted_text"):
@@ -383,9 +405,29 @@ def run_checks(lab, admin, reader, revoked, expired, write_denial):
     lab.check("Reader refused a Bakery message under the Alex account ID", refused(swap) or swap.status == 400, st(swap))
     oe = lab.get("/envelope/%d/%s" % (other_id, urllib.parse.quote(other_env, safe="")), reader)
     lab.check("Reader refused a Bakery envelope", refused(oe), st(oe))
-    oa = lab.get("/download-attachment/%d/%s" % (other_id, urllib.parse.quote(other_env, safe="")), reader,
-                 {"content_hash": "0" * 64})
-    lab.check("Reader refused a Bakery attachment download", oa.status in REFUSED + (400,), st(oa))
+    # A real attachment plus a successful admin control is essential: an
+    # invented hash could return 404 even without any authorization checks.
+    other_atts = lab.search(admin, {"account_ids": [other_id], "has_attachment": True}, page_size=1)
+    candidates = items_of(other_atts) or []
+    foreign_files = []
+    if candidates:
+        foreign_env = candidates[0].get("id")
+        if isinstance(foreign_env, str):
+            detail = lab.get("/message-content/%d/%s" % (other_id, urllib.parse.quote(foreign_env, safe="")),
+                             admin, {"block_remote_content": "true"})
+            foreign_files = detail.obj().get("attachments") or []
+    real = next((a for a in foreign_files if isinstance(a, dict) and not a.get("inline")
+                 and isinstance(a.get("content_hash"), str) and is_int(a.get("size"))), None)
+    if real is None:
+        lab.skip("Reader refused a Bakery attachment download", "no verified foreign attachment fixture")
+    else:
+        path = "/download-attachment/%d/%s" % (other_id, urllib.parse.quote(foreign_env, safe=""))
+        params = {"content_hash": real["content_hash"]}
+        control = lab.get(path, admin, params)
+        oa = lab.get(path, reader, params)
+        lab.check("Reader refused a Bakery attachment download",
+                  control.status == 200 and len(control.body) == real["size"] and refused(oa),
+                  "admin %s; reader %s" % (st(control), st(oa)))
     trav = lab.get("/message-content/%d/%s" % (own_id, urllib.parse.quote("../../accounts", safe="")), reader)
     lab.check("Path-like message ID refused", trav.status is not None and 400 <= trav.status < 500, st(trav))
     badhash = lab.get("/download-attachment/%d/%s" % (own_id, urllib.parse.quote(own_env, safe="")), reader,
@@ -394,22 +436,7 @@ def run_checks(lab, admin, reader, revoked, expired, write_denial):
     remote = lab.get("/list-mailboxes/%d" % own_id, reader)
     lab.check("Mailbox listing works without remote=true", remote.status == 200, st(remote), required=False)
 
-    # Optional write denial with the reader token
-    if write_denial:
-        probe = "mailburrow-lab-probe"
-        before = lab.get("/envelope/%d/%s" % (own_id, urllib.parse.quote(own_env, safe="")), admin).obj()
-        attempt = lab.request("POST", "/update-tags", reader, payload={
-            "updates": {str(own_id): [own_env]}, "tags": [probe], "action": "Add"})
-        after = lab.get("/envelope/%d/%s" % (own_id, urllib.parse.quote(own_env, safe="")), admin).obj()
-        changed = probe in (after.get("tags") or [])
-        if changed:  # undo with the admin token so the lab stays clean
-            lab.request("POST", "/update-tags", admin, payload={
-                "updates": {str(own_id): [own_env]}, "tags": [probe], "action": "Remove"})
-        lab.check("Reader tag change refused and nothing changed",
-                  refused(attempt) and not changed and isinstance(before.get("tags"), list),
-                  "%s; tags changed %s" % (st(attempt), changed), required=False)
-    else:
-        lab.skip("Reader tag change refused and nothing changed", "not requested (--write-denial)", required=False)
+    lab.skip("Write-denial enforcement", "separate sacrificial-fixture procedure required", required=False)
 
     lab.check("No redirects on any API call", lab.redirects == 0, "%d redirects" % lab.redirects)
     lab.check("No connection errors", lab.connection_errors == 0, "%d errors" % lab.connection_errors)
@@ -448,15 +475,21 @@ def ask_key(prompt, optional=False):
 
 def main(argv=None, keys=None, transport=None, out=None):
     out = out or sys.stdout
-    parser = argparse.ArgumentParser(description="Bichon lab check (read-only unless --write-denial).")
+    parser = argparse.ArgumentParser(description="Bichon lab check (read-only).")
     parser.add_argument("url", help="Test server base URL, e.g. https://<host>:9443")
     parser.add_argument("--api-prefix", default="/api/v1")
-    parser.add_argument("--write-denial", action="store_true",
-                        help="Also send one tag change with the reader token, expecting a refusal")
     args = parser.parse_args(argv)
-    parsed = urllib.parse.urlsplit(args.url)
-    if parsed.scheme != "https" or not parsed.hostname or parsed.path not in ("", "/") or parsed.query:
+    try:
+        parsed = urllib.parse.urlsplit(args.url)
+        port = parsed.port
+    except ValueError:
+        print("Invalid HTTPS base address", file=out)
+        return 2
+    if parsed.scheme != "https" or not parsed.hostname or parsed.path not in ("", "/") or parsed.query or parsed.fragment or parsed.username is not None or parsed.password is not None or (port is not None and not 1 <= port <= 65535):
         print("Use the HTTPS base address, for example https://<host>:9443", file=out)
+        return 2
+    if args.api_prefix != "/api/v1":
+        print("Only the reviewed /api/v1 prefix is allowed", file=out)
         return 2
     if keys is None:
         keys = (ask_key("Admin token: "), ask_key("Reader token: "),
@@ -473,7 +506,10 @@ def main(argv=None, keys=None, transport=None, out=None):
               "or leave those prompts empty.", file=out)
         return 2
     lab = Lab(args.url, args.api_prefix, transport or urllib_transport)
-    run_checks(lab, admin, reader, revoked, expired, args.write_denial)
+    try:
+        run_checks(lab, admin, reader, revoked, expired)
+    except (TypeError, ValueError, KeyError, AttributeError, IndexError, OverflowError):
+        lab.check("Response contracts valid", False, "malformed response; no server values displayed")
     return 0 if report(lab, out) else 1
 
 

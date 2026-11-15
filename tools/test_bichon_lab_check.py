@@ -137,7 +137,7 @@ class BichonLabCheckTest(unittest.TestCase):
 
     def test_correct_server_passes_without_leaking(self):
         server = FakeBichon()
-        code, text = run(server, ["--write-denial"])
+        code, text = run(server)
         self.assertEqual(code, 0, text)
         self.assertIn("RESULT: all required checks passed", text)
         for secret in TOKENS.values():
@@ -146,14 +146,14 @@ class BichonLabCheckTest(unittest.TestCase):
             self.assertNotIn(private, text)
         self.assertEqual({m for m, _ in server.methods}, {"GET", "POST"})
         posts = {p for m, p in server.methods if m == "POST"}
-        self.assertEqual(posts, {"/api/v1/search-messages", "/api/v1/update-tags"})
+        self.assertEqual(posts, {"/api/v1/search-messages"})
 
     def test_without_write_denial_only_search_is_posted(self):
         server = FakeBichon()
         code, text = run(server)
         self.assertEqual(code, 0, text)
         self.assertEqual({p for m, p in server.methods if m == "POST"}, {"/api/v1/search-messages"})
-        self.assertIn("[SKIP] (optional) Reader tag change refused", text)
+        self.assertIn("[SKIP] (optional) Write-denial enforcement", text)
 
     def test_cross_account_leak_fails(self):
         code, text = run(FakeBichon(leak=True))
@@ -166,11 +166,13 @@ class BichonLabCheckTest(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertTrue(line(text, "Reader refused raw EML download").startswith("[FAIL]"))
 
-    def test_accepted_tag_write_fails_and_is_undone(self):
+    def test_mutation_path_rejected_even_with_reader_or_admin(self):
         server = FakeBichon(allow_tags=True)
-        code, text = run(server, ["--write-denial"])
-        self.assertTrue(line(text, "Reader tag change refused").startswith("[FAIL]"))
-        self.assertFalse(any("mailburrow-lab-probe" in m["tags"] for m in server.messages))
+        l = lab.Lab("https://lab.example", "/api/v1", server)
+        for role in ("admin", "reader"):
+            with self.assertRaises(ValueError):
+                l.request("POST", "/update-tags", TOKENS[role], payload={})
+        self.assertEqual(server.methods, [])
 
     def test_server_error_on_odd_search_is_reported(self):
         code, text = run(FakeBichon(five_hundred_on_odd=True))
@@ -191,6 +193,63 @@ class BichonLabCheckTest(unittest.TestCase):
         for url in ("http://lab.example", "https://lab.example/api", "https://lab.example?x=1"):
             out = io.StringIO()
             self.assertEqual(lab.main([url], keys=("a", "b"), transport=lambda *a: self.fail(), out=out), 2)
+
+    def test_hostile_server_values_are_not_reported(self):
+        server = FakeBichon()
+        marker = "private-server-value-DO-NOT-PRINT"
+        def transport(method, url, headers, body):
+            status, response_headers, data = server(method, url, headers, body)
+            path = urllib.parse.urlsplit(url).path
+            if path.endswith("/search-messages"):
+                obj = json.loads(data)
+                if "items" in obj:
+                    obj["total_items"] = marker
+                    data = json.dumps(obj).encode()
+            return status, response_headers, data
+        code, text = run(transport)
+        self.assertEqual(code, 1)
+        self.assertNotIn(marker, text)
+        self.assertNotIn("private:secret", lab.perms(["private:secret", "data:read"]))
+
+    def test_malformed_items_cannot_prove_empty_refusal(self):
+        r = lab.Response(200, {}, b'{"items":["invalid"]}')
+        self.assertIsNone(lab.items_of(r))
+        self.assertFalse(lab.refused_or_empty(r))
+
+    def test_empty_mailbox_object_is_not_authorization_evidence(self):
+        server = FakeBichon()
+        def transport(method, url, headers, body):
+            if url.endswith("/list-mailboxes/%d" % BAKERY):
+                return 200, {}, b"{}"
+            return server(method, url, headers, body)
+        code, text = run(transport)
+        self.assertEqual(code, 1)
+        self.assertTrue(line(text, "Reader refused Bakery mailboxes").startswith("[FAIL]"))
+
+    def test_existing_foreign_attachment_leak_fails(self):
+        server = FakeBichon()
+        def transport(method, url, headers, body):
+            if "/download-attachment/%d/" % BAKERY in url:
+                headers = {**headers, "Authorization": "Bearer " + TOKENS["admin"]}
+            return server(method, url, headers, body)
+        code, text = run(transport)
+        self.assertEqual(code, 1)
+        self.assertTrue(line(text, "Reader refused a Bakery attachment download").startswith("[FAIL]"))
+
+    def test_host_budget_rejects_overflow_instead_of_truncating(self):
+        from unittest.mock import patch
+        with patch.object(lab, "MAX_BODY", 4):
+            self.assertEqual(lab.read_bounded(io.BytesIO(b"1234")), b"1234")
+            with self.assertRaises(ValueError):
+                lab.read_bounded(io.BytesIO(b"12345"))
+
+    def test_bad_urls_and_prefix_make_no_requests(self):
+        for args in (["https://user:pass@lab.example"], ["https://lab.example#fragment"],
+                     ["https://lab.example:99999"], ["https://lab.example:bad"],
+                     ["https://lab.example", "--api-prefix", "/../other"]):
+            out = io.StringIO()
+            self.assertEqual(lab.main(args, keys=("a", "b"),
+                            transport=lambda *a: self.fail("no request expected"), out=out), 2)
 
     def test_only_allowlisted_posts(self):
         l = lab.Lab("https://lab.example", "/api/v1", lambda *a: (200, {}, b"{}"))
