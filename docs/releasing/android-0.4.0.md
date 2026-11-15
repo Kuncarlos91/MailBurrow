@@ -18,6 +18,10 @@
 
 Build numbers 24 and 25 were private test builds (`0.4.0-dev.1` and `0.4.0-dev.2`) on the maintainer's phone, so this release uses 26. It is intended to install as an update over 0.3.0-rc.9 and those test builds; the exact APK must pass the upgrade checks below before that claim is published. This allocates an Android build number only; no iOS build is included (see the rc.9 record for iOS version rules).
 
+## Reader cancellation follow-up
+
+Build 26 predates scoped reader-request cancellation: Back could hide a loading message while its network response continued. The identity and commands below describe that frozen candidate. Before building a candidate containing the reader fix, allocate a higher build number and update the native flags, Settings stamp and identity checklist together. Retest the fixed APK and record its own hash; keep build-26 evidence as historical rather than transferring its pass to changed bytes.
+
 ## What is in 0.4.0
 
 - Open Archiver 0.6.2 as a second server type, chosen explicitly in setup.
