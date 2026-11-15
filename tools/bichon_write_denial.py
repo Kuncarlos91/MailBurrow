@@ -16,8 +16,8 @@ The run touches only the message whose subject and sender are exactly the
 probe's; if it does not find exactly one, it stops before sending any
 change. It then:
 - with the ADMIN token, adds a visible tag to prove the reader Add request
-  shape; tag removal is retried on 429/5xx and reported as informational
-  because final cleanup deletes this sacrificial probe;
+  shape; restores the original tags using a required Overwrite control
+  (avoids the Bichon 2.4.2 Add/Remove bug on already-tagged messages);
 - proves repair request shape with an ADMIN repair on the sacrificial probe;
 - with the READER token, tries tag, repair and delete, expecting 403 each
   time; 401 is not permission evidence. The admin compares validated envelope

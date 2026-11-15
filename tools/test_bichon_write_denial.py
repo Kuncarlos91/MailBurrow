@@ -130,6 +130,27 @@ class WriteDenialTests(unittest.TestCase):
         self.assertFalse([c for c in fake.calls if c[0] == "reader" and not c[2].startswith("/envelope/")])
         self.assertNotIn(PROBE, fake.envs)
 
+    def test_overwrite_200_without_restoring_fails_before_reader_writes(self):
+        fake = FakeBichon()
+        def transport(method, url, headers, body):
+            if url.endswith("/update-tags") and body and json.loads(body).get("action") == "Overwrite":
+                return 200, {}, b"{}"
+            return fake(method, url, headers, body)
+        code, out = run(transport)
+        self.assertEqual(code, 1)
+        self.assertIn("[FAIL] Admin restores the probe's tags", out)
+        self.assertFalse(any(role == "reader" and method == "POST" for role, method, _ in fake.calls))
+        self.assertNotIn(PROBE, fake.envs)
+
+    def test_pre_tagged_probe_cannot_pass_add_control_on_242(self):
+        fake = FakeBichon()
+        fake.envs[PROBE]["tags"] = ["/existing"]
+        code, out = run(fake)
+        self.assertEqual(code, 1)
+        self.assertIn("[FAIL] Tag request is well formed", out)
+        self.assertFalse(any(role == "reader" and method == "POST" for role, method, _ in fake.calls))
+        self.assertNotIn(PROBE, fake.envs)
+
     def test_invisible_admin_add_fails_shape_control(self):
         fake = FakeBichon()
         def transport(method, url, headers, body):
