@@ -28,6 +28,7 @@ message text, addresses or other values sent by the server.
 import argparse
 import getpass
 import json
+import re
 import ssl
 import sys
 import time
@@ -68,6 +69,19 @@ KNOWN_HEADERS = {"ratelimit-limit", "ratelimit-remaining", "ratelimit-reset", "r
                  "x-ratelimit-limit", "x-ratelimit-remaining", "x-ratelimit-reset"}
 # Search text the app must handle without a server error (plan decision D09).
 ODD_QUERIES = ['"unbalanced', "harbor AND OR", "(", "*", "café", "a" * 300, "x:y", "-"]
+
+# Candidate literal-search encoding for lab diagnostics, not app implementation:
+# backslash-escape Tantivy query syntax and lowercase standalone operators.
+LITERAL_SPECIAL = set('+-&|!(){}[]^"~*?:\\/')
+LITERAL_EXTRA = ["AND", "OR", "NOT", "a\\b", "  ", "&&", "||", "AND\tOR", "NOT\nclockwork", "(AND)"]
+# Literal phrases from Alex demo subjects; every Alex message whose subject
+# contains the phrase must be returned when the phrase is searched literally.
+LITERAL_MATCHES = ["club: next", "notes (long)", "cruise!!!", "dinner?"]
+
+
+def literal_query(text):
+    text = re.sub(r"\b(?:AND|OR|NOT)\b", lambda match: match.group().lower(), text)
+    return "".join("\\" + c if c in LITERAL_SPECIAL else c for c in text)
 REFUSED = (401, 403, 404)
 
 
@@ -233,6 +247,30 @@ def find_accounts(lab, admin):
     return resp, accounts, by_email.get(EXPECT["reader_email"]), by_email.get(EXPECT["other_email"])
 
 
+def all_subjects(lab, token, account_id):
+    """Return a complete validated ID/subject inventory, or None on failure."""
+    out, total = {}, None
+    for page in range(1, 11):
+        resp = lab.search(token, {"account_ids": [account_id]}, page=page, page_size=25)
+        items = items_of(resp)
+        stated = resp.obj().get("total_items")
+        if (resp.status != 200 or items is None or len(items) > 25
+                or not is_int(stated) or stated < 0 or (total is not None and stated != total)):
+            return None
+        total = stated
+        for item in items:
+            ident, subject = item.get("id"), item.get("subject")
+            if subject is None:
+                subject = ""
+            if (not isinstance(ident, str) or not ident or not isinstance(subject, str)
+                    or item.get("account_id") != account_id or ident in out):
+                return None
+            out[ident] = subject
+        if len(items) < 25:
+            return out if len(out) == total else None
+    return None
+
+
 def all_pages(lab, token, account_id, page_size=10, limit=20):
     """Collect every envelope of one account; returns (ok, ids, totals, foreign)."""
     ids, totals, foreign, ok = [], set(), 0, True
@@ -354,6 +392,26 @@ def run_checks(lab, admin, reader, revoked, expired):
                   resp.status in (200, 400, 422),
                   "%s, %s" % (st(resp), "items" if items_of(resp) is not None else
                               ("error {%s}" % names(resp.obj().keys()) if resp.obj() else "no json")),
+                  required=False)
+
+    for query in ODD_QUERIES + LITERAL_EXTRA:
+        resp = lab.search(reader, {"account_ids": [own_id], "text": literal_query(query)}, page_size=5)
+        lab.check("Literal-encoded search text accepted (%d chars)" % len(query),
+                  resp.status == 200 and items_of(resp) is not None, st(resp), required=False)
+    subjects = all_subjects(lab, reader, own_id)
+    lab.check("Literal search fixture inventory complete", subjects is not None,
+              "validated" if subjects is not None else "invalid or incomplete", required=False)
+    for phrase in LITERAL_MATCHES:
+        expected = {i for i, subj in (subjects or {}).items() if phrase.lower() in subj.lower()}
+        resp = lab.search(reader, {"account_ids": [own_id], "text": literal_query(phrase)}, page_size=25)
+        hits = items_of(resp)
+        valid_hits = (hits is not None and len(hits) <= 25
+                      and all(isinstance(i.get("id"), str) and i["id"]
+                              and i.get("account_id") == own_id for i in hits))
+        got = {i["id"] for i in hits} if valid_hits else set()
+        lab.check("Literal-encoded search finds its demo subject (%d chars)" % len(phrase),
+                  resp.status == 200 and subjects is not None and valid_hits and bool(expected) and expected <= got,
+                  "%s, %d of %d expected found, %d hits" % (st(resp), len(expected & got), len(expected), len(got)),
                   required=False)
 
     # Messages and attachments
