@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mailburrow/archive_api.dart';
 import 'package:mailburrow/bichon_api.dart';
 import 'package:mailburrow/search_filters.dart';
+import 'package:mailburrow/message_load.dart';
 
 // Fictional fixtures shaped like Bichon 2.4.2 Community responses.
 const alex = 579812555935764;
@@ -189,7 +190,143 @@ final mailboxes = {
   ],
 };
 
+Map<String, Object?> attachmentFixture() => {
+  'file_type': 'image/png',
+  'inline': false,
+  'filename': 'fictional.png',
+  'size': 412,
+  'content_hash': hash,
+};
+
+class HeldBichon extends BichonApi {
+  HeldBichon() : super(server, 'test-only-token');
+  final started = Completer<void>();
+  final release = Completer<void>();
+  late Future<MailMessage> operation;
+  @override
+  Future<MailMessage> message(String id) => operation = super.message(id);
+  @override
+  Future<T> send<T>(
+    String path,
+    Map<String, String>? query,
+    Future<T> Function(Stream<List<int>>, int) read, {
+    Duration? timeout,
+    List<int>? requestBody,
+  }) async {
+    Object data = envelope(envA);
+    if (path.startsWith('message-content/')) {
+      started.complete();
+      await release.future;
+      data = {
+        'text': 'body',
+        'attachments': [attachmentFixture()],
+      };
+    }
+    final bytes = json(data).$2;
+    return read(Stream.value(bytes), bytes.length);
+  }
+}
+
 void main() {
+  test(
+    'unknown, invalid-message and stale attachment handles never download',
+    () async {
+      var content = <String, Object?>{
+        'text': 'body',
+        'attachments': [attachmentFixture()],
+      };
+      final client = FakeBichonClient({
+        'envelope/*': (_) => json(envelope(envA)),
+        'message-content/*': (_) => json(content),
+      });
+      final file = File('${Directory.systemTemp.path}/bichon-not-created');
+      await withClient(client, (api) async {
+        await expectLater(
+          api.downloadAttachment('$alex:$envA', hash, file),
+          throwsA(isA<ArchiveMessageRefused>()),
+        );
+        expect(client.sent, isEmpty);
+        // A valid attachment followed by an invalid body must publish nothing.
+        content['text'] = 42;
+        await expectLater(api.message('$alex:$envA'), throwsFormatException);
+        final count = client.sent.length;
+        await expectLater(
+          api.downloadAttachment('$alex:$envA', hash, file),
+          throwsA(isA<ArchiveMessageRefused>()),
+        );
+        expect(client.sent, hasLength(count));
+        content['text'] = 'body';
+        await api.message('$alex:$envA');
+        content['attachments'] = [];
+        await api.message('$alex:$envA');
+        final afterReload = client.sent.length;
+        await expectLater(
+          api.downloadAttachment('$alex:$envA', hash, file),
+          throwsA(isA<ArchiveMessageRefused>()),
+        );
+        expect(client.sent, hasLength(afterReload));
+      });
+    },
+  );
+
+  test(
+    'a cancelled late Bichon message cannot register attachment handles',
+    () async {
+      final api = HeldBichon();
+      final load = MessageLoad();
+      final work = api.messageWithCancellation('$alex:$envA', load);
+      await api.started.future;
+      load.cancel();
+      await expectLater(work, throwsA(isA<MessageLoadCancelled>()));
+      final late = expectLater(
+        api.operation,
+        throwsA(isA<MessageLoadCancelled>()),
+      );
+      api.release.complete();
+      await late;
+      await expectLater(
+        api.downloadAttachment(
+          '$alex:$envA',
+          hash,
+          File('${Directory.systemTemp.path}/bichon-not-created'),
+        ),
+        throwsA(isA<ArchiveMessageRefused>()),
+      );
+    },
+  );
+
+  test(
+    'invalid date extremes and non-integer zero are format errors',
+    () async {
+      for (final value in [-9223372036854775808, 8640000000000001, 0.0]) {
+        final client = FakeBichonClient({
+          'search-messages': (_) => json({
+            'items': [
+              {...envelope(envA), 'date': value},
+            ],
+            'total_items': 1,
+          }),
+        });
+        await expectLater(
+          withClient(client, (api) => api.emails('$alex', '', 1)),
+          throwsFormatException,
+        );
+      }
+    },
+  );
+
+  test('mailbox states other than ready are not adopted', () async {
+    for (final state in ['fetching', 'error', 'unexpected']) {
+      final client = FakeBichonClient({
+        'list-mailboxes/*': (_) => json({...mailboxes, 'status': state}),
+      });
+      await expectLater(
+        withClient(client, (api) => api.folders('$alex')),
+        throwsFormatException,
+      );
+    }
+  });
+
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('literal search', () {

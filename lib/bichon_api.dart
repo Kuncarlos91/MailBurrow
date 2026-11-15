@@ -3,6 +3,7 @@ import 'dart:io';
 import 'archive_api.dart';
 import 'archive_capabilities.dart';
 import 'attachment_download.dart';
+import 'message_load.dart';
 import 'search_filters.dart';
 
 /// Results per page, matching the other backends.
@@ -109,10 +110,11 @@ String? _sender(String? name, String? address) {
 /// Bichon dates are milliseconds since the epoch. Mail imported without a
 /// date is stored as 0, which means "not reported", not January 1970.
 String? _date(Object? value) {
-  if (value == null || value == 0) return null;
-  if (value is! int || value.abs() > 8640000000000000) {
+  if (value == null) return null;
+  if (value is! int || value < -8640000000000000 || value > 8640000000000000) {
     throw const FormatException('Invalid Bichon date');
   }
+  if (value == 0) return null;
   return DateTime.fromMillisecondsSinceEpoch(
     value,
     isUtc: true,
@@ -122,7 +124,7 @@ String? _date(Object? value) {
 /// The Bichon implementation of [ArchiveBackend] for 2.4.2 Community, using
 /// its API under `/api/v1/` with a bearer token for a read-only user.
 ///
-/// Requests (plan decisions D02 to D09): the account list from
+/// Requests: the account list from
 /// `minimal-account-list` (never `accounts` or `current-user`), mailboxes
 /// from `list-mailboxes` without `remote`, mail lists and searches through
 /// the read-only `search-messages` POST with literal search text, messages
@@ -181,7 +183,7 @@ class BichonApi extends ArchiveApi {
     final json = _object(await get('list-mailboxes/$account'), 'mailbox list');
     final status = json['status'];
     final mailboxes = json['mailboxes'];
-    if (status is! String || status == 'error' || mailboxes is! List) {
+    if (status != 'ready' || mailboxes is! List) {
       throw const FormatException('Invalid Bichon mailbox list');
     }
     final ids = <String, int>{};
@@ -317,6 +319,7 @@ class BichonApi extends ArchiveApi {
     final message = _messageId(id);
     final path = '${message.account}/${Uri.encodeComponent(message.envelope)}';
     final envelope = _object(await get('envelope/$path'), 'message');
+    MessageLoad.current?.throwIfCancelled();
     if (envelope['id'] != message.envelope ||
         envelope['account_id'] != message.account) {
       throw const FormatException('Invalid Bichon message');
@@ -330,6 +333,7 @@ class BichonApi extends ArchiveApi {
       ),
       'message content',
     );
+    MessageLoad.current?.throwIfCancelled();
     final attachments = content['attachments'];
     if (attachments != null && attachments is! List) {
       throw const FormatException('Invalid Bichon attachments');
@@ -346,8 +350,7 @@ class BichonApi extends ArchiveApi {
       if (hash is! String) throw const FormatException('Invalid attachment');
       final size = _count(file['size'], 'attachment size');
       final name = _text(file, 'filename')?.trim() ?? '';
-      if (_attachmentSizes.length > 2000) _attachmentSizes.clear();
-      _attachmentSizes['$id/${_hash(hash)}'] = size;
+      _hash(hash);
       files.add(
         MailAttachment(
           hash,
@@ -357,7 +360,7 @@ class BichonApi extends ArchiveApi {
         ),
       );
     }
-    return MailMessage(
+    final result = MailMessage(
       subject: _text(envelope, 'subject'),
       from: _sender(_text(envelope, 'from_name'), _text(envelope, 'from')),
       sentDate: _date(envelope['date']),
@@ -366,6 +369,15 @@ class BichonApi extends ArchiveApi {
       textBody: _text(content, 'text') ?? '',
       attachments: files,
     );
+    // Publish handles only after all message fields validate and the reader
+    // remains active. Reopening replaces this message's previous handles.
+    MessageLoad.current?.throwIfCancelled();
+    _attachmentSizes.removeWhere((key, _) => key.startsWith('$id/'));
+    if (_attachmentSizes.length > 2000) _attachmentSizes.clear();
+    for (final file in files) {
+      _attachmentSizes['$id/${file.id}'] = file.size;
+    }
+    return result;
   }
 
   @override
@@ -378,6 +390,12 @@ class BichonApi extends ArchiveApi {
   }) async {
     final message = _messageId(emailId);
     final hash = _hash(attachmentId);
+    final expected = _attachmentSizes['$emailId/$hash'];
+    if (expected == null) {
+      throw const ArchiveMessageRefused(
+        'Open the message again to save this attachment.',
+      );
+    }
     await downloadTo(
       server.replace(
         path:
@@ -388,7 +406,7 @@ class BichonApi extends ArchiveApi {
       destination,
       transfer: transfer,
       onProgress: onProgress,
-      expectedBytes: _attachmentSizes['$emailId/$hash'],
+      expectedBytes: expected,
     );
   }
 }

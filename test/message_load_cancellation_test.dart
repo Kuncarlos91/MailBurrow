@@ -50,7 +50,7 @@ class HeldOpenArchiver extends fixtures.FakeOpenArchiver {
     Map<String, String>? query,
     Future<T> Function(Stream<List<int>>, int) read, {
     Duration? timeout,
-  List<int>? requestBody,
+    List<int>? requestBody,
   }) async {
     await gate.future;
     return super.send(
