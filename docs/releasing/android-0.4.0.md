@@ -41,11 +41,11 @@ Full list: [CHANGELOG](../../CHANGELOG.md).
 
 ## Before building
 
-- [ ] **Preserve Original File source:** import `riverside-garden-club.zip` as a source with Preserve Original File on, rerun `tools/oa_lab_check.py` (the preserve-original check must pass, not skip), and confirm the app refuses that source's messages with its explanation.
-- [ ] **Real-backend memory and cancellation:** using synthetic mail on the reference phone, measure peak memory through response reading, MIME parsing and body preparation, including repeated opens, inline resources, nested/encoded mail and inputs near the approved limits. Verify oversized inputs fail safely and real-network cancellation stops reads/cleans temporary files. The earlier before/after samples from a tiny message do not close this gate. Record results against the approved budgets privately. Use the stress messages and memory sampler in [test archive servers](../development/test-archive-servers.md#phone-memory-check-with-stress-mail).
-- [ ] **Compatibility and maintenance:** prepare a backend/version/feature/platform matrix with tested Android behavior and iOS explicitly unverified; identify the maintainer responsible for upstream compatibility monitoring. Do not imply support for untested server versions.
-- [ ] Merge this preparation, then merge `feature/open-archiver` into `main` only when the maintainer approves the release. Confirm the website deployment configuration first: if deployment from `main` is automatic, the merge can publish the setup guide and privacy notice before any APK upload. Otherwise, website rendering/deployment is a separate explicit step. Set the notice’s "Updated" date to its actual publication date and keep RC9 download links until the new asset exists.
-- [ ] Select the exact `main` commit with all required checks passing. Record the source SHA, pinned Flutter/engine and resolved dependency graph privately; run `flutter pub get --enforce-lockfile` and verify notice inputs without dependency upgrades.
+- [x] **Preserve Original File source:** import `riverside-garden-club.zip` as a source with Preserve Original File on, rerun `tools/oa_lab_check.py` (the preserve-original check must pass, not skip), and confirm the app refuses that source's messages with its explanation.
+- [x] **Real-backend memory and cancellation:** using synthetic mail on the reference phone, measure peak memory through response reading, MIME parsing and body preparation, including repeated opens, inline resources, nested/encoded mail and inputs near the approved limits. Verify oversized inputs fail safely and real-network cancellation stops reads/cleans temporary files. The earlier before/after samples from a tiny message do not close this gate. Record results against the approved budgets privately. Use the stress messages and memory sampler in [test archive servers](../development/test-archive-servers.md#phone-memory-check-with-stress-mail). **Peak memory was measured; real-network cancellation timing was not (see [Release decisions](#release-decisions)).**
+- [ ] **Compatibility and maintenance:** prepare a backend/version/feature/platform matrix with tested Android behavior and iOS explicitly unverified; identify the maintainer responsible for upstream compatibility monitoring. Do not imply support for untested server versions. **Not done before release.**
+- [x] Merge this preparation, then merge `feature/open-archiver` into `main` only when the maintainer approves the release. Confirm the website deployment configuration first: if deployment from `main` is automatic, the merge can publish the setup guide and privacy notice before any APK upload. Otherwise, website rendering/deployment is a separate explicit step. Set the notice’s "Updated" date to its actual publication date and keep RC9 download links until the new asset exists.
+- [x] Select the exact `main` commit with all required checks passing. Record the source SHA, pinned Flutter/engine and resolved dependency graph privately; run `flutter pub get --enforce-lockfile` and verify notice inputs without dependency upgrades.
 
 ## Build and freeze
 
@@ -59,12 +59,12 @@ Expected output: `build/app/outputs/flutter-apk/app-release.apk`. Freeze that ex
 
 ## Artifact gates
 
-- [ ] `python tools/check_apk_abis.py build/app/outputs/flutter-apk/app-release.apk` passes (arm64-v8a only).
-- [ ] `python tools/privacy_check.py --artifact build/app/outputs/flutter-apk/app-release.apk` reports **0 findings**, including no personal path in `lib/arm64-v8a/libapp.so`. Do not weaken the classifier.
-- [ ] Package, version `0.4.0`, code `27`, not debuggable, no broad storage or media permissions (`aapt2 dump badging`).
-- [ ] `apksigner verify --print-certs build/app/outputs/flutter-apk/app-release.apk` succeeds and shows the established certificate; review its DN privately before upload.
-- [ ] Notices present (`NOTICES.Z`, Guava asset checksum as recorded for rc.9).
-- [ ] SHA-256 and file size recorded.
+- [x] `python tools/check_apk_abis.py build/app/outputs/flutter-apk/app-release.apk` passes (arm64-v8a only).
+- [x] `python tools/privacy_check.py --artifact build/app/outputs/flutter-apk/app-release.apk` reports **0 findings**, including no personal path in `lib/arm64-v8a/libapp.so`. Do not weaken the classifier.
+- [x] Package, version `0.4.0`, code `27`, not debuggable, no broad storage or media permissions (`aapt2 dump badging`).
+- [x] `apksigner verify --print-certs build/app/outputs/flutter-apk/app-release.apk` succeeds and shows the established certificate; review its DN privately before upload.
+- [x] Notices present (`NOTICES.Z`, Guava asset checksum as recorded for rc.9).
+- [x] SHA-256 and file size recorded.
 
 ## Device check on the exact APK
 

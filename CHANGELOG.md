@@ -4,7 +4,7 @@ All notable changes to MailBurrow are recorded here. Versions follow the app ver
 
 ## Unreleased
 
-- Refresh the GitHub README with release/build badges, download/demo/setup navigation, tested-server scope, captioned demo screenshots and privacy-preserving feedback links. Update issue forms for both supported server types.
+- Refresh the GitHub README with release/build badges, download/demo/setup navigation, tested-server badges, captioned demo screenshots and privacy-preserving feedback links. Update issue forms and issue-chooser links for both supported server types. Move the tested-server table to project status, show the setup screen under Connect, and record the completed 0.4.0 checklist items.
 
 ## 0.4.0 (build27) - 2026-11-14
 

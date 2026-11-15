@@ -18,7 +18,7 @@
 
 A read-only Android and iOS app for browsing your own [Mail-Archiver](https://github.com/s1t5/mail-archiver) or [Open Archiver](https://github.com/LogicLabs-OU/OpenArchiver) server. Browse and search archived mail, filter by date and supported folder options, read messages in a simplified view, and save attachments when you choose to.
 
-MailBurrow is an early preview. A signed Android release, [0.4.0](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.4.0), is available for 64-bit ARM phones; it is not in the app stores, and iPhone/iPad builds are source-only. See [project status](docs/testing/status.md).
+MailBurrow is an early preview. A signed Android release, [0.4.0](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.4.0), is available for 64-bit ARM phones; iPhone/iPad builds are source-only. See [project status](docs/testing/status.md).
 
 **New here?** Install the Android APK and tap **Try the demo** for fictional mail with no server or network needed. The demo is inside the app. To connect your own archive, follow the [setup guide](docs/setup-guide.md).
 
@@ -32,18 +32,11 @@ MailBurrow is an early preview. A signed Android release, [0.4.0](https://github
 ## Tested servers
 
 <p>
-  <a href="#tested-servers"><img src="https://img.shields.io/badge/Mail--Archiver-2611.2-555555" alt="Tested with Mail-Archiver 2611.2; see scope below"></a>
-  <a href="#tested-servers"><img src="https://img.shields.io/badge/Open%20Archiver-0.6.2-555555" alt="Tested with Open Archiver 0.6.2; see scope below"></a>
+  <a href="docs/testing/status.md#tested-servers"><img src="https://img.shields.io/badge/Mail--Archiver-2611.2-555555" alt="Tested with Mail-Archiver 2611.2"></a>
+  <a href="docs/testing/status.md#tested-servers"><img src="https://img.shields.io/badge/Open%20Archiver-0.6.2-555555" alt="Tested with Open Archiver 0.6.2"></a>
 </p>
 
-These are reviewed release facts, not live backend monitoring. Build checks above report source checks only.
-
-| Android app | Server tested | Scope and limits |
-| --- | --- | --- |
-| [0.4.0 (build 27)](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.4.0) | Mail-Archiver 2611.2 | Browse, search, filters, folders, reader and attachment save/open on Android 16. |
-| [0.4.0 (build 27)](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.4.0) | Open Archiver 0.6.2 | Source browsing, search, reader and attachment saving on Android 16. No folders or archive totals; search counts are estimates. Messages from Preserve Original File sources cannot be opened. Expired-key handling is untested. |
-
-Recorded for the November 14, 2026 release; see [release validation and limitations](docs/releasing/android-0.4.0.md#release-decisions) and [project status](docs/testing/status.md). Other server versions are unverified. iPhone/iPad builds are source-only, with 0.4.0 device behavior unverified. You need your own supported archive server; MailBurrow does not provide hosting or connect directly to Gmail.
+Android 0.4.0 was tested with Mail-Archiver 2611.2 and Open Archiver 0.6.2; other server versions are unverified. See [tested servers and known limits](docs/testing/status.md#tested-servers).
 
 ## What you need before connecting
 
@@ -91,6 +84,10 @@ If MailBurrow is useful to you, you can [star the project](https://github.com/Ku
 4. Enter your API key and tap **Connect to archive**.
 5. If your key can see more than one mail account or source, switch between them from the account row or Settings.
 6. To add another archive, tap the archive name above the account, then **Add archive**. **Settings → Archives** renames, changes or forgets saved archives.
+
+The setup screen in dark mode: choose the server type, then enter the server address and API key.
+
+<img src="docs/images/setup-screen.jpg" alt="MailBurrow setup in dark mode: a Mail-Archiver or Open Archiver server-type choice, empty server address and API key fields, Connect to archive, Try the demo, Support and Privacy notice" width="270">
 
 Your server address and key are saved in the device's secure storage. Never send them to app support. If the connection fails, see the [setup guide's checks](docs/setup-guide.md#if-something-goes-wrong) and [troubleshooting](docs/troubleshooting/README.md).
 
