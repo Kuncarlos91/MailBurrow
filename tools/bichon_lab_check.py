@@ -68,6 +68,19 @@ KNOWN_HEADERS = {"ratelimit-limit", "ratelimit-remaining", "ratelimit-reset", "r
                  "x-ratelimit-limit", "x-ratelimit-remaining", "x-ratelimit-reset"}
 # Search text the app must handle without a server error (plan decision D09).
 ODD_QUERIES = ['"unbalanced', "harbor AND OR", "(", "*", "café", "a" * 300, "x:y", "-"]
+
+# D09 candidate literal-search encoding, mirrored later by the app adapter:
+# backslash-escape Tantivy query syntax and lowercase standalone operators.
+LITERAL_SPECIAL = set('+-&|!(){}[]^"~*?:\\/')
+LITERAL_EXTRA = ["AND", "OR", "NOT", "a\\b", "  ", "&&", "||"]
+# Literal phrases from Alex demo subjects; every Alex message whose subject
+# contains the phrase must be returned when the phrase is searched literally.
+LITERAL_MATCHES = ["club: next", "notes (long)", "cruise!!!", "dinner?"]
+
+
+def literal_query(text):
+    escaped = "".join("\\" + c if c in LITERAL_SPECIAL else c for c in text)
+    return " ".join(w.lower() if w in ("AND", "OR", "NOT") else w for w in escaped.split(" "))
 REFUSED = (401, 403, 404)
 
 
@@ -233,6 +246,20 @@ def find_accounts(lab, admin):
     return resp, accounts, by_email.get(EXPECT["reader_email"]), by_email.get(EXPECT["other_email"])
 
 
+def all_subjects(lab, token, account_id):
+    """Map envelope ID to subject for one account (bounded paging)."""
+    out = {}
+    for page in range(1, 11):
+        resp = lab.search(token, {"account_ids": [account_id]}, page=page, page_size=25)
+        items = items_of(resp) or []
+        for i in items:
+            if isinstance(i.get("id"), str) and isinstance(i.get("subject"), str):
+                out[i["id"]] = i["subject"]
+        if len(items) < 25:
+            break
+    return out
+
+
 def all_pages(lab, token, account_id, page_size=10, limit=20):
     """Collect every envelope of one account; returns (ok, ids, totals, foreign)."""
     ids, totals, foreign, ok = [], set(), 0, True
@@ -354,6 +381,20 @@ def run_checks(lab, admin, reader, revoked, expired):
                   resp.status in (200, 400, 422),
                   "%s, %s" % (st(resp), "items" if items_of(resp) is not None else
                               ("error {%s}" % names(resp.obj().keys()) if resp.obj() else "no json")),
+                  required=False)
+
+    for query in ODD_QUERIES + LITERAL_EXTRA:
+        resp = lab.search(reader, {"account_ids": [own_id], "text": literal_query(query)}, page_size=5)
+        lab.check("Literal-encoded search text accepted (%d chars)" % len(query),
+                  resp.status == 200 and items_of(resp) is not None, st(resp), required=False)
+    subjects = all_subjects(lab, reader, own_id)
+    for phrase in LITERAL_MATCHES:
+        expected = {i for i, subj in subjects.items() if phrase.lower() in subj.lower()}
+        resp = lab.search(reader, {"account_ids": [own_id], "text": literal_query(phrase)}, page_size=25)
+        got = {i.get("id") for i in (items_of(resp) or [])}
+        lab.check("Literal-encoded search finds its demo subject (%d chars)" % len(phrase),
+                  resp.status == 200 and bool(expected) and expected <= got,
+                  "%s, %d of %d expected found, %d hits" % (st(resp), len(expected & got), len(expected), len(got)),
                   required=False)
 
     # Messages and attachments
