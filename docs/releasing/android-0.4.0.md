@@ -4,7 +4,7 @@
 
 ## Status and identity
 
-**Not built or published.** This page is the plan and checklist for the 0.4.0 release. Keep detailed gate results, device measurements and build records in the maintainer’s private release records. This public page describes required checks; public release notes may include the final source commit, artifact hash, size and tested-version summary. Never record keys, certificate fields, private hosts, server addresses or raw logs here.
+**Built and checked; not yet published.** Build 27 from `da4a5375d151aefe30947472d7655e102563af90` (SHA-256 `3cc4c7c1e1f4840b45d9608b2741de37117bcac17e70f68629aca70d4c3fd6e5`, 20,205,590 bytes) passed the artifact and device checks, and the maintainer approved the memory and cancellation gates. No app input changed between that commit and the release merge. This page is the plan and checklist for the 0.4.0 release. Keep detailed gate results, device measurements and build records in the maintainer’s private release records. This public page describes required checks; public release notes may include the final source commit, artifact hash, size and tested-version summary. Never record keys, certificate fields, private hosts, server addresses or raw logs here.
 
 | Item | Intended value |
 | --- | --- |
@@ -93,7 +93,7 @@ A read-only mobile viewer for your own Mail-Archiver or Open Archiver server. Th
 
 Tested with Open Archiver 0.6.2 and Mail-Archiver 2611.2 on Android 16. **Known limits:** Open Archiver's handling of an *expired* API key has not been tested yet (revoked keys are refused); other Open Archiver versions are untested; complex mail may use a simplified layout; links and attachments are not malware-scanned; attachment downloads are limited to 50 MiB and two minutes. No sending or deleting mail, offline mail cache, analytics or crash-report upload. The APK is for 64-bit ARM (arm64-v8a) Android devices only; no iOS download, and 0.4.0 behavior on iOS/iPadOS is unverified.
 
-Installs as an update over 0.3.0-rc.9. Saved connections migrate automatically; that path is covered by automated tests, and the device upgrade was tested from earlier 0.4.0 test builds. Compare the APK's SHA-256 with `<sha256>` before installing.
+Installs as an update over 0.3.0-rc.9. Saved connections migrate automatically; that path is covered by automated tests, and the device upgrade was tested from earlier 0.4.0 test builds. Compare the APK's SHA-256 with `3cc4c7c1e1f4840b45d9608b2741de37117bcac17e70f68629aca70d4c3fd6e5` before installing.
 
 ## Publication handoff
 
