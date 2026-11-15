@@ -77,7 +77,7 @@ class FakeBichon:
                     return deny
                 pool = [m for m in pool if m["account_id"] in f["account_ids"]]
             if text:
-                if self.reject_syntax and re.search(r'(?<!\\)[():"]|(?:^| )(?:AND|OR|NOT)(?: |$)|^-$', text):
+                if self.reject_syntax and re.search(r'(?<!\\)[():"]|\b(?:AND|OR|NOT)\b|^-$', text):
                     return 400, {}, b'{"message":"query syntax","code":400}'
                 plain = re.sub(r"\\(.)", r"\1", text)  # literal-encoded input searches its unescaped words
                 pool = [m for m in pool if plain.lower() in m["text"].lower()]
@@ -149,6 +149,34 @@ class BichonLabCheckTest(unittest.TestCase):
         self.assertEqual(q("café"), "café")
         for ch in lab.LITERAL_SPECIAL:
             self.assertEqual(q(ch), "\\" + ch)
+
+    def test_operators_at_whitespace_and_punctuation_boundaries(self):
+        self.assertEqual(lab.literal_query("AND\tOR\nNOT"), "and\tor\nnot")
+        self.assertEqual(lab.literal_query("(AND)"), r"\(and\)")
+        self.assertEqual(lab.literal_query("ANDROID ORBIT NOTHING"), "ANDROID ORBIT NOTHING")
+
+    def test_subject_inventory_rejects_failed_or_incomplete_pages(self):
+        for mode in ("failure", "truncated", "duplicate", "foreign", "bad_subject"):
+            server = FakeBichon()
+            def transport(method, url, headers, body):
+                status, response_headers, data = server(method, url, headers, body)
+                if url.endswith("/search-messages"):
+                    request = json.loads(body)
+                    obj = json.loads(data)
+                    if mode == "failure" and request["page"] == 2:
+                        return 500, {}, b"{}"
+                    if mode == "truncated":
+                        obj["items"] = obj["items"][:1]
+                    if mode == "duplicate" and request["page"] == 2:
+                        obj["items"][0]["id"] = server.messages[0]["id"]
+                    if mode == "foreign":
+                        obj["items"][0]["account_id"] = BAKERY
+                    if mode == "bad_subject":
+                        obj["items"][0]["subject"] = []
+                    data = json.dumps(obj).encode()
+                return status, response_headers, data
+            instance = lab.Lab("https://lab.example", "/api/v1", transport)
+            self.assertIsNone(lab.all_subjects(instance, TOKENS["reader"], ALEX), mode)
 
     def test_literal_phrases_occur_in_alex_demo_subjects(self):
         alex = [m for m in demo() if m["account_id"] == ALEX]
