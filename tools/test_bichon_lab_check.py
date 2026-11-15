@@ -12,7 +12,7 @@ TOKENS = {"admin": "admin-token", "reader": "reader-token", "revoked": "revoked-
 
 
 def demo():
-    data = json.loads((ROOT / "assets/demo/archive.json").read_text())
+    data = json.loads((ROOT / "assets/demo/archive.json").read_text(encoding="utf-8"))
     ids = {1: ALEX, 2: BAKERY}
     messages = []
     for i, m in enumerate(data["messages"]):
