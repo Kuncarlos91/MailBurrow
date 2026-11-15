@@ -12,6 +12,10 @@
 - Security: public contacts and artifact-classification rules. Root SECURITY/PRIVACY remain the policies.
 - Root CHANGELOG: change/release history. Root third-party notices must remain intact.
 
+## Planning location
+
+Keep feature/automation plans, scope decisions and living task trackers in the owner’s private planning repository. Public PRs describe the delivered implementation and validation; public documentation describes current behavior, procedures and verified compatibility. Do not copy or link private plans/evidence here.
+
 ## Required rolling update
 
 For every meaningful feature, fix, API/native change, configuration change or failure-recovery change, review the playbook and update affected behavior/status/source-map/decision entries when needed. Review relevant setup and troubleshooting guidance too. Include updates in the same feature/fix commit. For changes with no documentation impact, record that determination in the work summary rather than inventing an entry.
