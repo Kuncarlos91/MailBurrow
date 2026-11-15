@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mailburrow/archive_api.dart';
 import 'package:mailburrow/archive_server_type.dart';
+import 'package:mailburrow/bichon_api.dart';
 import 'package:mailburrow/open_archiver_api.dart';
 import 'package:mailburrow/screens/setup_view.dart';
 import 'package:mailburrow/search_filters.dart';
@@ -23,7 +24,7 @@ class TypedBackend extends FakeArchiveBackend {
 
   @override
   Future<List<ArchiveAccount>> accounts() async {
-    if (fail) throw const ArchiveFailure(401);
+    if (fail) throw ArchiveFailure(401, credential: type.credential);
     return [
       ArchiveAccount(id: '${type.id}-1', name: '${type.label} one'),
       ArchiveAccount(id: '${type.id}-2', name: '${type.label} two'),
@@ -244,5 +245,191 @@ void main() {
     await tester.tap(find.text('Mail-Archiver'));
     await tester.pumpAndSettle();
     expect(value.setupServerType, ArchiveServerType.openArchiver);
+  });
+
+  test('Bichon has its own client, stored name and credential wording', () {
+    final bichon = createArchiveBackend(
+      ArchiveServerType.bichon,
+      Uri.parse('https://archive.example'),
+      'test-only',
+    );
+    expect(bichon, isA<BichonApi>());
+    bichon.close();
+    expect(ArchiveServerType.bichon.id, 'bichon');
+    expect(ArchiveServerType.fromId('bichon'), ArchiveServerType.bichon);
+    expect(ArchiveServerType.bichon.label, 'Bichon');
+    expect(ArchiveServerType.bichon.credentialLabel, 'Access token');
+    expect(ArchiveServerType.mailArchiver.credentialLabel, 'API key');
+    expect(ArchiveServerType.openArchiver.credentialLabel, 'API key');
+  });
+
+  test('an empty Bichon token asks for an access token', () async {
+    final value = session();
+    addTearDown(value.dispose);
+    value.chooseServerType(ArchiveServerType.bichon);
+    value.server.text = 'https://archive.example';
+    await value.connect();
+    expect(created, isEmpty);
+    expect(value.error, 'Enter your access token.');
+  });
+
+  test('connecting and restoring use the saved Bichon type', () async {
+    final value = session();
+    addTearDown(value.dispose);
+    value.chooseServerType(ArchiveServerType.bichon);
+    value.server.text = 'https://archive.example';
+    value.keyInput.text = 'test-only';
+    await value.connect();
+    expect(created.single.type, ArchiveServerType.bichon);
+    expect((await saved())?['serverType'], 'bichon');
+
+    final restored = session();
+    addTearDown(restored.dispose);
+    await restored.restore();
+    expect(created.last.type, ArchiveServerType.bichon);
+    expect(restored.serverType, ArchiveServerType.bichon);
+    expect(restored.account?.id, 'bichon-1');
+  });
+
+  test(
+    'switching among all three types pairs each archive with its own key',
+    () async {
+      final value = session();
+      addTearDown(value.dispose);
+      final types = [
+        (ArchiveServerType.mailArchiver, 'https://a.example', 'key-a'),
+        (ArchiveServerType.openArchiver, 'https://b.example', 'key-b'),
+        (ArchiveServerType.bichon, 'https://c.example', 'key-c'),
+      ];
+      for (final (type, server, key) in types) {
+        if (value.api != null) value.openSetup();
+        value.chooseServerType(type);
+        value.server.text = server;
+        value.keyInput.text = key;
+        await value.connect();
+        expect(value.error, isNull, reason: type.label);
+      }
+      expect(value.archives.map((a) => a.serverType), [
+        for (final (type, _, _) in types) type,
+      ]);
+      // Every order of switching, including back to where it started.
+      for (final from in value.archives.toList()) {
+        for (final to in value.archives.toList()) {
+          if (from.id == to.id) continue;
+          await value.switchArchive(from.id);
+          await value.switchArchive(to.id);
+          final backend = value.api as TypedBackend;
+          final expected = types.firstWhere((t) => t.$1 == to.serverType);
+          expect(backend.type, to.serverType);
+          expect(backend.key, expected.$3, reason: 'never another archive key');
+          expect(value.serverType, to.serverType);
+          expect(value.messages.single.subject, 'From ${to.serverType.id}-1');
+        }
+      }
+      for (final backend in created) {
+        final expected = types.firstWhere((t) => t.$1 == backend.type);
+        expect(backend.key, expected.$3);
+      }
+    },
+  );
+
+  testWidgets('setup offers Bichon with access-token wording', (tester) async {
+    final value = session();
+    addTearDown(value.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ListenableBuilder(
+            listenable: value,
+            builder: (_, _) => SetupView(session: value),
+          ),
+        ),
+      ),
+    );
+    expect(find.text('Bichon'), findsOneWidget);
+    expect(find.text('Access token'), findsNothing);
+    await tester.tap(find.text('Bichon'));
+    await tester.pumpAndSettle();
+    expect(value.setupServerType, ArchiveServerType.bichon);
+    expect(find.text('Access token'), findsOneWidget);
+    expect(find.text('API key'), findsNothing);
+    expect(
+      find.textContaining('Tested with Bichon 2.4.2 Community'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('Never enter your mailbox password'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Member user Viewer access'), findsOneWidget);
+    await tester.tap(find.text('Mail-Archiver'));
+    await tester.pumpAndSettle();
+    expect(find.text('API key'), findsOneWidget);
+    expect(find.textContaining('Tested with Bichon'), findsNothing);
+  });
+
+  for (final width in [320.0, 360.0]) {
+    testWidgets(
+      'three server types fit a ${width.toInt()} dp screen at 200% text',
+      (tester) async {
+        tester.view.physicalSize = Size(width, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final value = session();
+        addTearDown(value.dispose);
+        await tester.pumpWidget(
+          MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+            child: MaterialApp(
+              home: Scaffold(
+                body: ListenableBuilder(
+                  listenable: value,
+                  builder: (_, _) => SetupView(session: value),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        for (final type in ArchiveServerType.values) {
+          expect(find.text(type.label), findsOneWidget);
+        }
+        await tester.tap(find.text('Bichon'));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        expect(value.setupServerType, ArchiveServerType.bichon);
+      },
+    );
+  }
+
+  testWidgets('a refused Bichon token offers a new access token', (tester) async {
+    final first = session();
+    await tester.runAsync(() async {
+      first.chooseServerType(ArchiveServerType.bichon);
+      first.server.text = 'https://archive.example';
+      first.keyInput.text = 'test-only';
+      await first.connect();
+    });
+    first.dispose();
+    failTypes = {ArchiveServerType.bichon};
+    final value = session();
+    addTearDown(value.dispose);
+    await tester.runAsync(value.restore);
+    expect(value.api, isNull);
+    expect(value.error, contains('Your access token was not accepted.'));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ListenableBuilder(
+            listenable: value,
+            builder: (_, _) => SetupView(session: value),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Enter a new access token for archive.example'), findsOneWidget);
+    expect(find.textContaining('Enter a new key'), findsNothing);
   });
 }

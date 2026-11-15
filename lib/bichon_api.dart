@@ -24,6 +24,7 @@ const bichonMaxSearchLength = 256;
 /// only, totals are exact, and server totals are not requested.
 final bichonCapabilities = ArchiveCapabilities(
   folders: true,
+  folderCounts: false,
   dateRangeFilter: true,
   directionFilter: false,
   sortFields: {'sentDate'},
@@ -169,6 +170,9 @@ class BichonApi extends ArchiveApi {
 
   @override
   bool isMailRequest(String path) => path == 'search-messages';
+
+  @override
+  String get credentialName => 'access token';
 
   @override
   bool allowsPost(String path) => path == 'search-messages';

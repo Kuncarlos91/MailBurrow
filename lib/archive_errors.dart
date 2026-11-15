@@ -32,8 +32,11 @@ class ArchiveFoldersUnavailable implements Exception {
 }
 
 class ArchiveFailure implements Exception {
-  const ArchiveFailure(this.status);
+  const ArchiveFailure(this.status, {this.credential = 'API key'});
   final int status;
+
+  /// What the failing server calls its credential, for 401 and 403 wording.
+  final String credential;
 }
 
 String readableError(Object error) {
@@ -43,7 +46,7 @@ String readableError(Object error) {
   if (error is ArchiveMessageRefused) return error.reason;
   if (error is ArchiveSearchRefused) return error.reason;
   if (error is ArchiveUnsupportedResponse) {
-    return "${error.server} returned an unexpected response. This adapter was tested with ${error.server} ${error.testedVersion}. Check the server type, address and version, then retry.";
+    return "${error.server} returned a response MailBurrow doesn't recognize. MailBurrow was tested with ${error.server} ${error.testedVersion}. Check the server type, address and ${error.server} version, then retry.";
   }
   if (error is ArchiveFoldersUnavailable) {
     return error.loading
@@ -52,8 +55,9 @@ String readableError(Object error) {
   }
   if (error is ArchiveFailure) {
     return switch (error.status) {
-      401 => 'Your API key was not accepted.',
-      403 => 'Your API key does not have permission for this request.',
+      401 => 'Your ${error.credential} was not accepted.',
+      403 =>
+        'Your ${error.credential} does not have permission for this request.',
       404 => 'Archive API or message unavailable.',
       429 => 'Too many requests. Wait and retry.',
       _ => 'The server could not complete the request.',

@@ -841,7 +841,7 @@ void main() {
       expect(error, isA<ArchiveUnsupportedResponse>());
       expect(
         readableError(error!),
-        "Bichon returned an unexpected response. This adapter was tested with Bichon 2.4.2. Check the server type, address and version, then retry.",
+        "Bichon returned a response MailBurrow doesn't recognize. MailBurrow was tested with Bichon 2.4.2. Check the server type, address and Bichon version, then retry.",
       );
       expect(
         readableError(const FormatException('x')),
@@ -897,4 +897,47 @@ void main() {
       ]);
     },
   );
+
+  test('credential failures name the access token; other servers keep API key', () async {
+    for (final (status, text) in [
+      (401, 'Your access token was not accepted.'),
+      (403, 'Your access token does not have permission for this request.'),
+    ]) {
+      final client = FakeBichonClient({
+        'minimal-account-list': (_) => (status, utf8.encode('{"message":"x","code":$status}')),
+      });
+      final error = await withClient(client, (api) => api.accounts())
+          .then<Object?>((_) => null, onError: (Object e) => e);
+      expect(readableError(error!), text);
+      expect(readableError(error), isNot(contains('test-only-token')));
+    }
+    final client = FakeBichonClient({
+      'accounts': (_) => (401, utf8.encode('{}')),
+    });
+    final error = await HttpOverrides.runZoned(
+      () => ArchiveApi(server, 'test-only').accounts(),
+      createHttpClient: (_) => client,
+    ).then<Object?>((_) => null, onError: (Object e) => e);
+    expect(readableError(error!), 'Your API key was not accepted.');
+  });
+
+  test('an attachment refused with 401 also names the access token', () async {
+    final client = FakeBichonClient({
+      'envelope/*': (_) => json(envelope(envA, regular: 1)),
+      'message-content/*': (_) => json({
+        'has_remote_content': false,
+        'attachments': [
+          {'file_type': 'image/png', 'inline': false, 'filename': 'a.png', 'size': 4, 'content_hash': hash, 'is_message': false, 'extracted_is_ocr': false},
+        ],
+      }),
+      'download-attachment/*': (_) => (401, utf8.encode('{}')),
+    });
+    final dir = await Directory.systemTemp.createTemp('bichon-test');
+    addTearDown(() => dir.delete(recursive: true));
+    final error = await withClient(client, (api) async {
+      await api.message('$alex:$envA');
+      return api.downloadAttachment('$alex:$envA', hash, File('${dir.path}/a.png'));
+    }).then<Object?>((_) => null, onError: (Object e) => e);
+    expect(readableError(error!), 'Your access token was not accepted.');
+  });
 }
