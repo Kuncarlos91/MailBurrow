@@ -25,6 +25,12 @@ class ArchiveUnsupportedResponse implements Exception {
   final String server, testedVersion;
 }
 
+/// A known folder-list state that can recover without changing versions.
+class ArchiveFoldersUnavailable implements Exception {
+  const ArchiveFoldersUnavailable({this.loading = false});
+  final bool loading;
+}
+
 class ArchiveFailure implements Exception {
   const ArchiveFailure(this.status);
   final int status;
@@ -37,7 +43,12 @@ String readableError(Object error) {
   if (error is ArchiveMessageRefused) return error.reason;
   if (error is ArchiveSearchRefused) return error.reason;
   if (error is ArchiveUnsupportedResponse) {
-    return "This ${error.server} version isn't supported yet. MailBurrow is tested with ${error.server} ${error.testedVersion}.";
+    return "${error.server} returned an unexpected response. This adapter was tested with ${error.server} ${error.testedVersion}. Check the server type, address and version, then retry.";
+  }
+  if (error is ArchiveFoldersUnavailable) {
+    return error.loading
+        ? 'The archive is still loading its folders. Wait a moment and retry.'
+        : 'The archive could not load its folders. Retry or check the server.';
   }
   if (error is ArchiveFailure) {
     return switch (error.status) {

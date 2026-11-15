@@ -13,7 +13,7 @@ const bichonPageSize = 25;
 const bichonMessageReadTimeout = Duration(seconds: 60);
 
 /// The Bichon version MailBurrow is tested with, named in the message shown
-/// when a response does not match the tested contract (plan decision D08).
+/// when a response does not match the tested contract.
 const bichonTestedVersion = '2.4.2';
 
 /// Longest search text, in Unicode code points, counted before escaping.
@@ -204,6 +204,9 @@ class BichonApi extends ArchiveApi {
       );
       final status = json['status'];
       final mailboxes = json['mailboxes'];
+      if (status == 'fetching' || status == 'error') {
+        throw ArchiveFoldersUnavailable(loading: status == 'fetching');
+      }
       if (status != 'ready' || mailboxes is! List) {
         throw const FormatException('Invalid Bichon mailbox list');
       }

@@ -322,8 +322,26 @@ void main() {
     },
   );
 
+  test(
+    'known transient folder states offer retry rather than version blame',
+    () async {
+      for (final state in ['fetching', 'error']) {
+        final client = FakeBichonClient({
+          'list-mailboxes/*': (_) => json({...mailboxes, 'status': state}),
+        });
+        final error = await withClient(
+          client,
+          (api) => api.folders('$alex'),
+        ).then<Object?>((_) => null, onError: (Object e) => e);
+        expect(error, isA<ArchiveFoldersUnavailable>());
+        expect(readableError(error!).toLowerCase(), contains('retry'));
+        expect(readableError(error), isNot(contains('version')));
+      }
+    },
+  );
+
   test('mailbox states other than ready are not adopted', () async {
-    for (final state in ['fetching', 'error', 'unexpected']) {
+    for (final state in ['unexpected']) {
       final client = FakeBichonClient({
         'list-mailboxes/*': (_) => json({...mailboxes, 'status': state}),
       });
@@ -410,7 +428,7 @@ void main() {
     },
   );
 
-  test('rejects mailboxes of another account and an error status', () async {
+  test('rejects mailboxes of another account', () async {
     for (final body in [
       {
         'status': 'ready',
@@ -418,7 +436,6 @@ void main() {
           {'id': inbox, 'account_id': bakery, 'name': 'INBOX', 'exists': 0},
         ],
       },
-      {'status': 'error', 'mailboxes': []},
     ]) {
       final client = FakeBichonClient({'list-mailboxes/*': (_) => json(body)});
       await expectLater(
@@ -824,7 +841,7 @@ void main() {
       expect(error, isA<ArchiveUnsupportedResponse>());
       expect(
         readableError(error!),
-        "This Bichon version isn't supported yet. MailBurrow is tested with Bichon 2.4.2.",
+        "Bichon returned an unexpected response. This adapter was tested with Bichon 2.4.2. Check the server type, address and version, then retry.",
       );
       expect(
         readableError(const FormatException('x')),
