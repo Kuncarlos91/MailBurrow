@@ -391,57 +391,67 @@ void main() {
       await tester.tap(find.text('Archives'));
       await tester.pumpAndSettle();
 
-      // The open archive is marked and tapping it does nothing.
-      expect(find.textContaining('Open now'), findsOneWidget);
-      Finder tile(String host) =>
-          find.ancestor(of: find.text(host), matching: find.byType(ListTile));
-      expect(
-        find.descendant(
-          of: tile('a.example'),
-          matching: find.byIcon(Icons.chevron_right),
-        ),
-        findsOneWidget,
-        reason: 'an archive that can be opened shows a chevron',
+      // A radio list: the open archive's radio is selected and its row
+      // tinted; the others are unselected. No chevron or "Open now" text.
+      Finder tile(String host) => find.ancestor(
+        of: find.text(host),
+        matching: find.byType(RadioListTile<String>),
       );
-      expect(
-        find.descendant(
-          of: tile('c.example'),
-          matching: find.byIcon(Icons.chevron_right),
-        ),
-        findsNothing,
-        reason: 'the open archive has none',
+      final open = tester.widget<RadioListTile<String>>(tile('c.example'));
+      final other = tester.widget<RadioListTile<String>>(tile('a.example'));
+      final group = tester.widget<RadioGroup<String>>(
+        find.byType(RadioGroup<String>),
       );
-      expect(
-        find.descendant(
-          of: tile('c.example'),
-          matching: find.byIcon(Icons.dns),
-        ),
-        findsOneWidget,
-        reason: 'the open archive has a filled icon',
+      expect(group.groupValue, open.value);
+      expect(open.selected, isTrue);
+      expect(other.selected, isFalse);
+      Material rowMaterial(String host) => tester.widget<Material>(
+        find.ancestor(of: tile(host), matching: find.byType(Material)).first,
       );
+      expect(rowMaterial('c.example').color, isNot(Colors.transparent));
+      expect(rowMaterial('a.example').color, Colors.transparent);
+      expect(other.value, isNot(group.groupValue));
+      expect(find.textContaining('Open now'), findsNothing);
+      expect(find.byIcon(Icons.chevron_right), findsNothing);
+      expect(find.byIcon(Icons.dns), findsNothing);
       expect(
-        find.descendant(
-          of: tile('a.example'),
-          matching: find.byIcon(Icons.dns_outlined),
-        ),
+        find.textContaining('Tap an archive to switch to it.'),
         findsOneWidget,
       );
       final semantics = tester.ensureSemantics();
       expect(
-        tester.getSemantics(tile('a.example')),
-        isSemantics(onTapHint: 'open a.example', hasTapAction: true),
+        tester.getSemantics(tile('c.example')),
+        isSemantics(isChecked: true, isInMutuallyExclusiveGroup: true),
       );
-      // A busy session disables opening; its accessibility hint must agree.
+      expect(
+        tester.getSemantics(tile('a.example')),
+        isSemantics(
+          isChecked: false,
+          isInMutuallyExclusiveGroup: true,
+          hasTapAction: true,
+          isEnabled: true,
+        ),
+      );
+      expect(
+        tester.getSemantics(find.byTooltip('Actions for a.example')).id,
+        isNot(tester.getSemantics(tile('a.example')).id),
+        reason:
+            'archive selection and its menu must remain separate accessible actions',
+      );
+      // A busy session disables switching; other rows must agree.
       final session = tester
           .widget<ArchivesPage>(find.byType(ArchivesPage))
           .session;
       session.busy = true;
       session.setTab(session.tab);
       await tester.pump();
-      expect(tester.widget<ListTile>(tile('a.example')).onTap, isNull);
       expect(
-        tester.getSemantics(tile('a.example')).getSemanticsData().hint,
-        isEmpty,
+        tester.widget<RadioListTile<String>>(tile('a.example')).enabled,
+        isFalse,
+      );
+      expect(
+        tester.getSemantics(tile('a.example')),
+        isSemantics(isEnabled: false, hasEnabledState: true),
       );
       session.busy = false;
       session.setTab(session.tab);

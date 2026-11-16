@@ -26,69 +26,78 @@ class ArchivesPage extends StatelessWidget {
           return ListView(
             padding: const EdgeInsets.symmetric(vertical: 8),
             children: [
-              for (final profile in session.archives)
-                Semantics(
-                  onTapHint: profile.id == activeId || !session.canSwitchArchive
-                      ? null
-                      : 'open ${profile.label}',
-                  child: ListTile(
-                    key: ValueKey('manage-archive-${profile.id}'),
-                    // Filled for the open archive, outlined for the others.
-                    leading: Icon(
-                      profile.id == activeId ? Icons.dns : Icons.dns_outlined,
-                    ),
-                    title: Text(
-                      profile.label,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: Text(
-                      profile.id == session.activeArchive?.id
-                          ? '${archiveDetails(profile)}\nOpen now'
-                          : archiveDetails(profile),
-                    ),
-                    isThreeLine: profile.id == activeId,
-                    // Tapping another archive opens it, like the Mail page's
-                    // archive row; the switch shows its own progress.
-                    onTap: profile.id == activeId || !session.canSwitchArchive
-                        ? null
-                        : () {
-                            Navigator.pop(context);
-                            session.switchArchive(profile.id);
-                          },
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (profile.id != activeId)
-                          const ExcludeSemantics(
-                            child: Icon(Icons.chevron_right),
-                          ),
-                        PopupMenuButton<_ArchiveAction>(
-                          tooltip: 'Actions for ${profile.label}',
-                          enabled: !busy,
-                          onSelected: (action) =>
-                              _act(context, profile, action),
-                          itemBuilder: (_) => [
-                            const PopupMenuItem(
-                              value: _ArchiveAction.rename,
-                              child: Text('Rename'),
-                            ),
-                            PopupMenuItem(
-                              value: _ArchiveAction.change,
-                              child: Text(
-                                'Change address or ${profile.serverType.credential == 'access token' ? 'token' : 'key'}',
+              // A single-choice list: the selected radio and tinted row mark
+              // the open archive; tapping another row opens it through the
+              // same switch as the Mail page's archive row.
+              RadioGroup<String>(
+                groupValue: activeId,
+                onChanged: (id) {
+                  if (id == null ||
+                      id == activeId ||
+                      !session.canSwitchArchive) {
+                    return;
+                  }
+                  Navigator.pop(context);
+                  session.switchArchive(id);
+                },
+                child: Column(
+                  children: [
+                    for (final profile in session.archives)
+                      Material(
+                        color: profile.id == activeId
+                            ? Theme.of(context).colorScheme.secondaryContainer
+                                  .withValues(alpha: 0.4)
+                            : Colors.transparent,
+                        child: Row(
+                          children: [
+                            // RadioListTile merges semantics. Keep the menu
+                            // outside it so it has its own accessible action.
+                            Expanded(
+                              child: RadioListTile<String>(
+                                key: ValueKey('manage-archive-${profile.id}'),
+                                value: profile.id,
+                                controlAffinity:
+                                    ListTileControlAffinity.leading,
+                                selected: profile.id == activeId,
+                                enabled:
+                                    profile.id == activeId ||
+                                    session.canSwitchArchive,
+                                title: Text(
+                                  profile.label,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                subtitle: Text(archiveDetails(profile)),
                               ),
                             ),
-                            const PopupMenuItem(
-                              value: _ArchiveAction.forget,
-                              child: Text('Forget on this device'),
+                            PopupMenuButton<_ArchiveAction>(
+                              tooltip: 'Actions for ${profile.label}',
+                              enabled: !busy,
+                              onSelected: (action) =>
+                                  _act(context, profile, action),
+                              itemBuilder: (_) => [
+                                const PopupMenuItem(
+                                  value: _ArchiveAction.rename,
+                                  child: Text('Rename'),
+                                ),
+                                PopupMenuItem(
+                                  value: _ArchiveAction.change,
+                                  child: Text(
+                                    'Change address or ${profile.serverType.credential == 'access token' ? 'token' : 'key'}',
+                                  ),
+                                ),
+                                const PopupMenuItem(
+                                  value: _ArchiveAction.forget,
+                                  child: Text('Forget on this device'),
+                                ),
+                              ],
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                  ),
+                      ),
+                  ],
                 ),
+              ),
               ListTile(
                 leading: const Icon(Icons.add),
                 title: const Text('Add archive'),
@@ -101,7 +110,7 @@ class ArchivesPage extends StatelessWidget {
               const Padding(
                 padding: EdgeInsets.all(16),
                 child: Text(
-                  'Archives are saved only on this device. Forgetting one removes its address and API key or access token here; it does not change mail on the server or revoke the key or token.',
+                  'Tap an archive to switch to it. Use ⋮ to rename, change or forget it.\n\nArchives are saved only on this device. Forgetting one removes its address and API key or access token here; it does not change mail on the server or revoke the key or token.',
                 ),
               ),
             ],
