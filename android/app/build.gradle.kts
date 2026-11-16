@@ -60,6 +60,13 @@ android {
         debug {
             applicationIdSuffix = ".debug"
         }
+        // PROBE BRANCH ONLY: Flutter's profile build type copies debug before
+        // this block runs, so without its own suffix it would share the
+        // release ID and `flutter run --profile` could replace MailBurrow.
+        getByName("profile") {
+            applicationIdSuffix = ".probe"
+            manifestPlaceholders["appLabel"] = "MailBurrow Probe"
+        }
         release {
             manifestPlaceholders["appLabel"] = "MailBurrow"
             signingConfig = signingConfigs.getByName("release")
