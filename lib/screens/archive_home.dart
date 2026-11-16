@@ -160,7 +160,9 @@ class _ArchiveHomeState extends State<ArchiveHome> {
                   leading: const Icon(Icons.folder_outlined),
                   title: Text(folder.name),
                   subtitle: folder.depth > 0 ? Text(folder.path) : null,
-                  trailing: Text('${folder.count}'),
+                  trailing: session.capabilities.folderCounts
+                      ? Text('${folder.count}')
+                      : null,
                   selected: session.selectedFolder == folder.path,
                   onTap: () => Navigator.pop(context, folder),
                 ),

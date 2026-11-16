@@ -9,6 +9,7 @@ import 'search_filters.dart';
 class ArchiveCapabilities {
   ArchiveCapabilities({
     required this.folders,
+    this.folderCounts = true,
     required this.dateRangeFilter,
     required this.directionFilter,
     required Set<String> sortFields,
@@ -40,6 +41,11 @@ class ArchiveCapabilities {
 
   /// Accounts have folders to browse.
   final bool folders;
+
+  /// Whether a folder's stated message count is the archived total and can
+  /// be shown in the folder list. Bichon reports the mail server's count
+  /// (0 for imported accounts), so its folders show no number.
+  final bool folderCounts;
 
   /// Searches can be limited to a sent-date range.
   final bool dateRangeFilter;

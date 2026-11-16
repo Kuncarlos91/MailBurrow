@@ -148,6 +148,9 @@ class ArchiveApi implements ArchiveBackend, CancellableMessageBackend {
   /// [cancelEmailRequests] stops.
   bool isMailRequest(String path) => path == 'emails';
 
+  /// What this server calls its credential, used in 401 and 403 messages.
+  String get credentialName => 'API key';
+
   /// Whether [path] is a read-only route this backend may POST to. No
   /// Mail-Archiver or Open Archiver route is; Bichon allows only its search.
   bool allowsPost(String path) => false;
@@ -225,7 +228,9 @@ class ArchiveApi implements ArchiveBackend, CancellableMessageBackend {
       // Once headers arrive, abort() no longer has any effect; the body is
       // read through a subscription this call owns so cancelling stops it.
       final body = call.trackBody(response);
-      if (response.statusCode != 200) throw ArchiveFailure(response.statusCode);
+      if (response.statusCode != 200) {
+        throw ArchiveFailure(response.statusCode, credential: credentialName);
+      }
       final result = await call.guard(
         read(body, response.contentLength).timeout(timeout ?? responseTimeout),
       );
@@ -354,7 +359,9 @@ class ArchiveApi implements ArchiveBackend, CancellableMessageBackend {
       final response = await active.wait(
         request.close().timeout(const Duration(seconds: 30)),
       );
-      if (response.statusCode != 200) throw ArchiveFailure(response.statusCode);
+      if (response.statusCode != 200) {
+        throw ArchiveFailure(response.statusCode, credential: credentialName);
+      }
       if (response.contentLength > attachmentByteLimit) {
         throw const AttachmentTooLarge();
       }

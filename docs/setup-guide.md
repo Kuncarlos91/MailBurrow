@@ -2,19 +2,20 @@
 
 [Main index](../README.md) · [Troubleshooting](troubleshooting/README.md) · [Privacy notice](../PRIVACY.md)
 
-MailBurrow is a phone app for reading the mail you already archive with [Mail-Archiver](https://github.com/s1t5/mail-archiver) or [Open Archiver](https://github.com/LogicLabs-OU/OpenArchiver). It talks only to your own archive servers, over HTTPS, with API keys you create. This guide covers how the pieces fit together and the exact settings each one needs.
+MailBurrow is a phone app for reading the mail you already archive with [Mail-Archiver](https://github.com/s1t5/mail-archiver), [Open Archiver](https://github.com/LogicLabs-OU/OpenArchiver) or [Bichon](https://github.com/rustmailer/bichon). It talks only to your own archive servers, over HTTPS, with API keys or access tokens you create. This guide covers how the pieces fit together and the exact settings each one needs.
 
 - **Mail-Archiver:** follow steps 1 to 4.
 - **Open Archiver:** follow [Open Archiver steps 1 and 2](#open-archiver-step-1-create-a-read-only-role), then steps 3 and 4.
-- **Both:** set up one, then add the other in the app. See [several archives](#several-archives).
+- **Bichon:** follow [Bichon steps 1 and 2](#bichon-step-1-create-a-read-only-user), then steps 3 and 4.
+- **More than one:** set up one, then add the others in the app. See [several archives](#several-archives).
 
-**App version:** Open Archiver, the server-type choice and several saved archives need MailBurrow 0.4.0 or later.
+**App version:** Open Archiver, the server-type choice and several saved archives need MailBurrow 0.4.0 or later. Bichon is available in development builds on `feature/bichon` for the intended 0.5.0 release; the published 0.4.0 APK does not support it.
 
-The same guide is on the [MailBurrow website](https://mailburrow.pages.dev/setup.html).
+The [published website guide](https://mailburrow.pages.dev/setup.html) covers the released app. Bichon instructions here describe development builds; website updates are deferred to release review.
 
 To see what the app looks like before setting anything up, tap **Try the demo** on the setup screen: it opens fictional sample mail built into the app, with no server needed.
 
-Checked against Mail-Archiver's [REST API guide](https://github.com/s1t5/mail-archiver/blob/main/doc/API.md), Open Archiver 0.6.2, the TrueNAS Mail Archiver, Open Archiver and Tailscale apps, and Tailscale's HTTPS and Serve documentation, as of November 2026. Menu names can change between versions.
+Checked against Mail-Archiver's [REST API guide](https://github.com/s1t5/mail-archiver/blob/main/doc/API.md), Open Archiver 0.6.2, Bichon 2.4.2 Community, the TrueNAS Mail Archiver, Open Archiver and Tailscale apps, and Tailscale's HTTPS and Serve documentation, as of November 2026. Menu names can change between versions.
 
 ## How it works
 
@@ -26,20 +27,20 @@ flowchart LR
   phone["MailBurrow on your phone"] -->|"HTTPS + API key<br>read-only"| https
 ```
 
-- **Your archive server does the archiving.** Mail-Archiver or Open Archiver copies mail from your providers into its own storage. MailBurrow never connects to Gmail, Outlook or any mail provider, and never sees your mailbox passwords. Open Archiver works the same way as the diagram, with its own database and search service.
+- **Your archive server does the archiving.** Mail-Archiver, Open Archiver or Bichon copies mail from your providers into its own storage. MailBurrow never connects to Gmail, Outlook or any mail provider, and never sees your mailbox passwords. Open Archiver works the same way as the diagram, with its own database and search service.
 - **MailBurrow only reads.** It uses the server's API to list accounts or sources, folders and messages, run searches, and download attachments you ask for. It can't change, delete or send mail.
-- **Nothing is kept on the phone.** Messages are fetched when you open them and aren't stored for offline reading. Saved archive names, server types, addresses, API keys and selected accounts or sources are kept in the phone's secure storage; user-saved attachments stay where you save them.
+- **Nothing is kept on the phone.** Messages are fetched when you open them and aren't stored for offline reading. Saved archive names, server types, addresses, API keys or access tokens and selected accounts or sources are kept in the phone's secure storage; user-saved attachments stay where you save them.
 - **HTTPS is required.** The app checks the server's certificate and refuses plain `http://` addresses, so your key is never sent unencrypted.
 
 ## What you need
 
 | Piece | Required? | What it does |
 | --- | --- | --- |
-| [Mail-Archiver](https://github.com/s1t5/mail-archiver), release **2607.3 or later**, or [Open Archiver](https://github.com/LogicLabs-OU/OpenArchiver) **0.6.2** | Yes, at least one | Archives your mail and provides the API. Mail-Archiver's API is **off by default**. Other Open Archiver versions haven't been tested. |
-| An API key for that server | Yes | Lets the app read the archive with its user's permissions. |
+| [Mail-Archiver](https://github.com/s1t5/mail-archiver), release **2607.3 or later**, or [Open Archiver](https://github.com/LogicLabs-OU/OpenArchiver) **0.6.2**; development builds also support [Bichon](https://github.com/rustmailer/bichon) **2.4.2 Community** | Yes, at least one | Archives your mail and provides the API. Mail-Archiver's API is **off by default**. Other Open Archiver/Bichon versions are unverified for this build. Bichon is not in the published 0.4.0 APK. |
+| An API key or Bichon access token for that server | Yes | Lets the app read the archive with its user's permissions. |
 | An HTTPS address with a **trusted certificate** | Yes | For example `https://archive.example.ts.net`. Self-signed certificates don't work. |
 | [Tailscale](https://tailscale.com/) on the server and the phone | Recommended | Private access from anywhere, plus a free trusted certificate through Tailscale Serve. |
-| TrueNAS | Optional | One easy way to run either server, through its community app. Docker on any machine works too. |
+| TrueNAS | Optional | One easy way to run either server, through its community app. A suitable Docker host works too. |
 | Your own domain and a reverse proxy | Optional | An alternative to Tailscale for the HTTPS address. |
 
 ## Step 1: Turn on Mail-Archiver's API
@@ -118,6 +119,30 @@ Keep the key private, as for Mail-Archiver. If your phone is lost, revoke the ke
 - **Searches can match text inside attachments.** Results can include full message text and extracted attachment text, not just the matching words. That text is held in memory, never displayed as attachment content, and discarded with the results; it isn't saved on the phone. Attachments themselves download only when you save one.
 - **Rate limit:** by default, Open Archiver allows about 100 requests a minute per client IP address. Devices or keys behind the same proxy/address can share that budget. If you see *Too many requests*, wait before retrying; changing keys does not reset an IP-based limit.
 
+## Bichon step 1: Create a read-only user
+
+MailBurrow reads Bichon with an access token, and **a token has its user's permissions**. An administrator's token can change and delete mail, so give the phone its own user that can only view the accounts you want on it. Never enter your mailbox (IMAP) password in MailBurrow; the app only needs the token.
+
+1. Sign in to Bichon as an administrator and add a user for the phone, for example "mailburrow-phone".
+2. Give it the global role **Member**, which only lets it sign in.
+3. Under the user's account permissions, give it the **Account viewer** role on each mail account the phone should read, and nothing else. Viewers can read and search mail and save attachments; they can't tag, repair or delete mail.
+4. Leave the user's IP whitelist and rate quota at their defaults unless you need them.
+
+## Bichon step 2: Create an access token
+
+1. Create an access token for the phone's user from step 1, not for an administrator. Give it a clear name such as "MailBurrow phone" and choose an expiry.
+2. Copy the token. Keep it private, as for an API key. Bichon can show the full token again later, so protect access to Bichon's own interface too.
+
+If your phone is lost, delete the token in Bichon. When a token expires or is removed, MailBurrow offers **Enter a new access token** for that archive.
+
+**What the app shows from Bichon:**
+
+- **Bichon accounts appear as accounts** and its mailboxes as folders. Folder lists show no message counts, because Bichon reports the mail server's count rather than what is archived. Opening a folder shows its exact total.
+- **Search looks for the words you type**, including punctuation such as `:` or `?`. Bichon's search operators (like `OR` or `-word`) are not used.
+- **Messages open with remote content blocked.** The app never downloads a message's raw original; attachments download only when you save one.
+- **Your Bichon server may record searches.** Bichon emits a search event with the search text and user name; depending on its edition and settings, the server may keep or forward it. MailBurrow itself keeps no search history.
+- MailBurrow is tested with **Bichon 2.4.2 Community**. If another version returns something the app doesn't recognize, it says so instead of guessing.
+
 ## Step 3: Give the server an HTTPS address
 
 Mail-Archiver and Open Archiver both serve plain HTTP. On TrueNAS, Mail-Archiver's default web port is `30315`; for Open Archiver, use the web port shown in its app settings. Put one of the following in front of each server.
@@ -172,10 +197,10 @@ If you already run a reverse proxy such as Caddy, Nginx Proxy Manager or Traefik
 
 1. If you use Tailscale, install the **Tailscale** app on your phone and sign in to the same Tailscale network. Turn it on.
 2. Optional check: open your HTTPS address in the phone's browser. You should see your server's sign-in page with no certificate warning.
-3. Open MailBurrow and choose the server type, **Mail-Archiver** or **Open Archiver**. The app never guesses it.
+3. Open MailBurrow and choose the server type: **Mail-Archiver**, **Open Archiver** or **Bichon**. The app never guesses it.
 4. Enter:
    - **HTTPS server address:** for example `truenas.your-tailnet.ts.net`, with `:8443` or another port if you used one. `https://` is added if you leave it out. Don't add `/api`.
-   - **API key:** the key from step 2.
+   - **API key** (Mail-Archiver, Open Archiver) or **Access token** (Bichon): the key or token from step 2.
 5. Tap **Connect to archive**.
 
 If the key can see more than one mail account or source, switch between them from the account row or in Settings. **Disconnect and forget connection** in Settings removes the open archive's address and key from the phone; it doesn't revoke the key on the server.
@@ -198,6 +223,7 @@ Only one archive is open at a time. There's no combined inbox or search across a
 | Unable to connect. Check your HTTPS address and private network. | Tailscale is off on the phone, the address is wrong, or Serve or the proxy isn't running | Turn on Tailscale, open the address in the phone's browser, check `tailscale serve status` |
 | The server certificate could not be verified. | Self-signed or untrusted certificate | Use Tailscale Serve or a Let's Encrypt certificate |
 | Your API key was not accepted. | Key mistyped, expired or revoked, or its user is inactive | Create a new key and enter it again; for a saved archive, use **Enter a new key** |
+| Your access token was not accepted. (Bichon) | Token mistyped, expired or deleted, or its user can no longer sign in | Create a new token for the phone's read-only user; for a saved archive, use **Enter a new access token** |
 | This source keeps full original messages… | The Open Archiver source has Preserve Original File turned on | Read it on Open Archiver's website; MailBurrow doesn't open those messages |
 | Archive API or message unavailable. | Mail-Archiver's API isn't enabled or it's older than 2607.3, the wrong server type is chosen, the address points at the wrong service, or the message is outside the key's accounts or sources | Check the server type, `Api__Enabled=true` and the version, then the address |
 | Too many requests. Wait and retry. | More than the rate limit (120 a minute by default for Mail-Archiver, about 100 for Open Archiver) | Wait a minute |

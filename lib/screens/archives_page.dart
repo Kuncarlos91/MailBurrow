@@ -71,7 +71,7 @@ class ArchivesPage extends StatelessWidget {
               const Padding(
                 padding: EdgeInsets.all(16),
                 child: Text(
-                  'Archives are saved only on this device. Forgetting one removes its address and API key here; it does not change mail on the server or revoke the key.',
+                  'Archives are saved only on this device. Forgetting one removes its address and API key or access token here; it does not change mail on the server or revoke the key or token.',
                 ),
               ),
             ],
@@ -107,7 +107,7 @@ class ArchivesPage extends StatelessWidget {
           builder: (context) => AlertDialog(
             title: Text('Forget ${profile.label}?'),
             content: Text(
-              '${open ? 'This archive is open and will be closed. ' : ''}Its address and API key are removed from this device. Mail on the server is not changed and the key is not revoked.',
+              '${open ? 'This archive is open and will be closed. ' : ''}Its address and ${profile.serverType.credential} are removed from this device. Mail on the server is not changed and the ${profile.serverType.credential} is not revoked.',
             ),
             actions: [
               TextButton(

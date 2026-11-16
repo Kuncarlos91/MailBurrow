@@ -10,6 +10,7 @@ import '../demo/demo_archive.dart';
 import '../archive_capabilities.dart';
 import '../search_filters.dart';
 import '../archive_server_type.dart';
+import '../bichon_api.dart';
 import '../open_archiver_api.dart';
 import 'connection_store.dart';
 
@@ -30,6 +31,7 @@ ArchiveBackend createArchiveBackend(
 ) => switch (type) {
   ArchiveServerType.mailArchiver => ArchiveApi(server, key),
   ArchiveServerType.openArchiver => OpenArchiverApi(server, key),
+  ArchiveServerType.bichon => BichonApi(server, key),
 };
 
 /// Opens the built-in demo archive.
@@ -482,7 +484,8 @@ class ArchiveSession extends ChangeNotifier {
       }
       final key = savedKey ?? keyInput.text.trim();
       if (key.isEmpty) {
-        error = 'Enter your API key.';
+        error =
+            'Enter your ${(savedKey == null ? setupServerType : serverType).credential}.';
         _notify();
         return;
       }

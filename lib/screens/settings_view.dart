@@ -79,7 +79,7 @@ class SettingsView extends StatelessWidget {
           ListTile(
             title: const Text('Server and private network'),
             subtitle: Text(
-              'You manage your ${session.serverType.label} server, HTTPS address, API keys and Tailscale setup. This app does not host or configure those services.',
+              'You manage your ${session.serverType.label} server, HTTPS address, ${session.serverType.credential}s and Tailscale setup. This app does not host or configure those services.',
             ),
           ),
         const ListTile(
@@ -95,6 +95,7 @@ class SettingsView extends StatelessWidget {
                 ? session.switchAccount
                 : null,
             onRefreshed: session.retryFailedMailAfterRecovery,
+            credential: session.serverType.credential,
           ),
         const PublicInformationLinks(),
         const ThirdPartyLicensesTile(),

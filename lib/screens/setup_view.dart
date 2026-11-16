@@ -5,7 +5,7 @@ import '../archive_server_type.dart';
 import '../public_information.dart';
 import '../state/archive_session.dart';
 
-/// Connection form: server address, API key and saved-connection retry.
+/// Connection form: server address, API key or access token, and saved-connection retry.
 class SetupView extends StatelessWidget {
   const SetupView({super.key, required this.session});
   final ArchiveSession session;
@@ -15,6 +15,7 @@ class SetupView extends StatelessWidget {
     final busy = session.busy;
     final type = session.setupServerType;
     final openArchiver = type == ArchiveServerType.openArchiver;
+    final bichon = type == ArchiveServerType.bichon;
     final changing = session.reconfiguring;
     // Saved archives are listed when setup is the landing screen. With one
     // saved archive, "Retry saved connection" already covers it.
@@ -40,7 +41,7 @@ class SetupView extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Enter the API key again; the saved key is never sent to a changed address. To use another server type, add it as a new archive.',
+            'Enter the ${type.credential} again; the saved one is never sent to a changed address. To use another server type, add it as a new archive.',
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
@@ -94,6 +95,13 @@ class SetupView extends StatelessWidget {
                 : (selection) => session.chooseServerType(selection.single),
           ),
         ),
+        if (bichon) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Tested with Bichon 2.4.2 Community. Use a Bichon user that can only view the accounts you want here. Never enter your mailbox password.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
         if (openArchiver) ...[
           const SizedBox(height: 8),
           Text(
@@ -123,10 +131,15 @@ class SetupView extends StatelessWidget {
           autocorrect: false,
           enableSuggestions: false,
           decoration: InputDecoration(
-            labelText: 'API key',
-            helperText: openArchiver
-                ? 'Create an API key in your Open Archiver for a user whose role can only read the sources you want here.'
-                : 'Create an API key on your own Mail-Archiver server.',
+            labelText: type.credentialLabel,
+            helperText: switch (type) {
+              ArchiveServerType.openArchiver =>
+                'Create an API key in your Open Archiver for a user whose role can only read the sources you want here.',
+              ArchiveServerType.bichon =>
+                'In Bichon, give a Member user Viewer access to only the accounts you want, then create an access token for that user.',
+              ArchiveServerType.mailArchiver =>
+                'Create an API key on your own Mail-Archiver server.',
+            },
             helperMaxLines: 3,
             border: const OutlineInputBorder(),
           ),
@@ -144,7 +157,11 @@ class SetupView extends StatelessWidget {
             onPressed: busy
                 ? null
                 : () => session.openReconfigure(refused.id),
-            child: Text('Enter a new key for ${refused.label}'),
+            child: Text(
+              refused.serverType == ArchiveServerType.bichon
+                  ? 'Enter a new access token for ${refused.label}'
+                  : 'Enter a new key for ${refused.label}',
+            ),
           ),
         if (session.hasSavedConnection && changing == null)
           TextButton(
@@ -189,7 +206,7 @@ class SetupView extends StatelessWidget {
       builder: (context) => AlertDialog(
         title: const Text('Remove all saved archives?'),
         content: const Text(
-          'This removes every saved archive and API key from this device. Mail on your servers is not changed. You will need to enter your API keys again.',
+          'This removes every saved archive with its API key or access token from this device. Mail on your servers is not changed. You will need to enter them again.',
         ),
         actions: [
           TextButton(
