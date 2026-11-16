@@ -49,7 +49,7 @@ Signed releases are published on the [Releases page](https://github.com/Kuncarlo
 3. Enter your server address. `https://` is added if you leave it out.
 4. Enter your API key and tap **Connect to archive**.
 5. If your key can see more than one mail account or source, switch between them from the account row or Settings.
-6. To add another archive, tap the archive name above the account, then **Add archive**. **Settings → Archives** renames, changes or forgets saved archives.
+6. To add another archive, tap the archive name above the account, then **Add archive**. **Settings → Archives** opens, renames, changes or forgets saved archives.
 
 Your server address and key are saved in the device's secure storage. Never send them to app support. If the connection fails, see the [setup guide's checks](docs/setup-guide.md#if-something-goes-wrong) and [troubleshooting](docs/troubleshooting/README.md).
 

@@ -325,5 +325,61 @@ void main() {
       expect(find.text('Save and connect'), findsOneWidget);
       expect(find.text('Try the demo'), findsNothing);
     });
+
+    testWidgets('tapping another archive in Settings → Archives opens it', (tester) async {
+      await tester.runAsync(() async {
+        await store.add(
+          serverType: ArchiveServerType.mailArchiver,
+          server: first,
+          key: 'key-a',
+          accountId: '1',
+        );
+        await store.add(
+          serverType: ArchiveServerType.bichon,
+          server: 'https://c.example',
+          key: 'token-c',
+          accountId: '1',
+        );
+      });
+      HostArchive? opened;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ArchiveHome(
+            apiFactory: (server, key) => opened = HostArchive(server, key),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('c.example mail'), findsOneWidget);
+      await tester.tap(find.text('Settings'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Archives'));
+      await tester.pumpAndSettle();
+
+      // The open archive is marked and tapping it does nothing.
+      expect(find.textContaining('Open now'), findsOneWidget);
+      await tester.tap(find.text('c.example'));
+      await tester.pumpAndSettle();
+      expect(find.text('Archives'), findsWidgets);
+
+      // A Bichon archive's menu says token; Mail-Archiver's says key.
+      await tester.tap(find.byTooltip('Actions for c.example'));
+      await tester.pumpAndSettle();
+      expect(find.text('Change address or token'), findsOneWidget);
+      await tester.tapAt(const Offset(5, 5));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Actions for a.example'));
+      await tester.pumpAndSettle();
+      expect(find.text('Change address or key'), findsOneWidget);
+      await tester.tapAt(const Offset(5, 5));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('a.example'));
+      await tester.pumpAndSettle();
+      expect(find.text('a.example mail'), findsOneWidget);
+      expect(find.text('c.example mail'), findsNothing);
+      expect(opened?.key, 'key-a', reason: 'only that archive key is used');
+      expect(find.byType(NavigationBar), findsOneWidget);
+    });
   });
 }

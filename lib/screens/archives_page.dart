@@ -6,9 +6,10 @@ import '../state/connection_store.dart';
 
 enum _ArchiveAction { rename, change, forget }
 
-/// Settings → Archives: rename, change the address or key of, or forget each
-/// saved archive, and add another. Nothing here contacts a server except
-/// "Change address or key", which validates in setup before saving.
+/// Settings → Archives: open, rename, change the address and key or token
+/// of, or forget each saved archive, and add another. Opening uses the same
+/// switch as the Mail page's archive row; "Change address" validates in
+/// setup before saving. Nothing else here contacts a server.
 class ArchivesPage extends StatelessWidget {
   const ArchivesPage({super.key, required this.session});
   final ArchiveSession session;
@@ -21,6 +22,7 @@ class ArchivesPage extends StatelessWidget {
         listenable: session,
         builder: (context, _) {
           final busy = session.busy && !session.mailLoading;
+          final activeId = session.activeArchive?.id;
           return ListView(
             padding: const EdgeInsets.symmetric(vertical: 8),
             children: [
@@ -38,21 +40,31 @@ class ArchivesPage extends StatelessWidget {
                         ? '${archiveDetails(profile)}\nOpen now'
                         : archiveDetails(profile),
                   ),
-                  isThreeLine: profile.id == session.activeArchive?.id,
+                  isThreeLine: profile.id == activeId,
+                  // Tapping another archive opens it, like the Mail page's
+                  // archive row; the switch shows its own progress.
+                  onTap: profile.id == activeId || !session.canSwitchArchive
+                      ? null
+                      : () {
+                          Navigator.pop(context);
+                          session.switchArchive(profile.id);
+                        },
                   trailing: PopupMenuButton<_ArchiveAction>(
                     tooltip: 'Actions for ${profile.label}',
                     enabled: !busy,
                     onSelected: (action) => _act(context, profile, action),
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(
+                    itemBuilder: (_) => [
+                      const PopupMenuItem(
                         value: _ArchiveAction.rename,
                         child: Text('Rename'),
                       ),
                       PopupMenuItem(
                         value: _ArchiveAction.change,
-                        child: Text('Change address or key'),
+                        child: Text(
+                          'Change address or ${profile.serverType.credential == 'access token' ? 'token' : 'key'}',
+                        ),
                       ),
-                      PopupMenuItem(
+                      const PopupMenuItem(
                         value: _ArchiveAction.forget,
                         child: Text('Forget on this device'),
                       ),

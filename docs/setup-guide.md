@@ -210,8 +210,8 @@ If the key can see more than one mail account or source, switch between them fro
 MailBurrow can keep up to 20 archives, for example a Mail-Archiver and an Open Archiver server, and switch between them without entering keys again.
 
 - **Add one:** tap the archive name above the account on the Mail tab, then **Add archive**. Choose its type, then enter its address and key.
-- **Switch:** tap the archive name and pick another. The previous archive's mail is cleared before the new one loads, and each archive remembers the account or source you last used in it. If one can't be reached, the app says which, and offers **Retry saved connection** and your other archives. **Cancel** stops waiting before secure saving begins; it is disabled during the save commit and once the archive is open.
-- **Manage:** **Settings → Archives** lets you rename an archive, change its address or key, or forget it on this device. Changing an address or key always asks for the key again; the saved key is never sent to a new address. To use another server type, add it as a new archive.
+- **Switch:** tap the archive name and pick another, or tap it in **Settings → Archives**. The previous archive's mail is cleared before the new one loads, and each archive remembers the account or source you last used in it. If one can't be reached, the app says which, and offers **Retry saved connection** and your other archives. **Cancel** stops waiting before secure saving begins; it is disabled during the save commit and once the archive is open.
+- **Manage:** in **Settings → Archives**, tap an archive to open it, or use its menu to rename it, change its address and key (or token), or forget it on this device. Changing an address or key always asks for the key again; the saved key is never sent to a new address. To use another server type, add it as a new archive.
 
 Only one archive is open at a time. There's no combined inbox or search across archives.
 
