@@ -27,48 +27,66 @@ class ArchivesPage extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 8),
             children: [
               for (final profile in session.archives)
-                ListTile(
-                  key: ValueKey('manage-archive-${profile.id}'),
-                  leading: const Icon(Icons.dns_outlined),
-                  title: Text(
-                    profile.label,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  subtitle: Text(
-                    profile.id == session.activeArchive?.id
-                        ? '${archiveDetails(profile)}\nOpen now'
-                        : archiveDetails(profile),
-                  ),
-                  isThreeLine: profile.id == activeId,
-                  // Tapping another archive opens it, like the Mail page's
-                  // archive row; the switch shows its own progress.
-                  onTap: profile.id == activeId || !session.canSwitchArchive
+                Semantics(
+                  onTapHint: profile.id == activeId
                       ? null
-                      : () {
-                          Navigator.pop(context);
-                          session.switchArchive(profile.id);
-                        },
-                  trailing: PopupMenuButton<_ArchiveAction>(
-                    tooltip: 'Actions for ${profile.label}',
-                    enabled: !busy,
-                    onSelected: (action) => _act(context, profile, action),
-                    itemBuilder: (_) => [
-                      const PopupMenuItem(
-                        value: _ArchiveAction.rename,
-                        child: Text('Rename'),
-                      ),
-                      PopupMenuItem(
-                        value: _ArchiveAction.change,
-                        child: Text(
-                          'Change address or ${profile.serverType.credential == 'access token' ? 'token' : 'key'}',
+                      : 'open ${profile.label}',
+                  child: ListTile(
+                    key: ValueKey('manage-archive-${profile.id}'),
+                    // Filled for the open archive, outlined for the others.
+                    leading: Icon(
+                      profile.id == activeId ? Icons.dns : Icons.dns_outlined,
+                    ),
+                    title: Text(
+                      profile.label,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      profile.id == session.activeArchive?.id
+                          ? '${archiveDetails(profile)}\nOpen now'
+                          : archiveDetails(profile),
+                    ),
+                    isThreeLine: profile.id == activeId,
+                    // Tapping another archive opens it, like the Mail page's
+                    // archive row; the switch shows its own progress.
+                    onTap: profile.id == activeId || !session.canSwitchArchive
+                        ? null
+                        : () {
+                            Navigator.pop(context);
+                            session.switchArchive(profile.id);
+                          },
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (profile.id != activeId)
+                          const ExcludeSemantics(
+                            child: Icon(Icons.chevron_right),
+                          ),
+                        PopupMenuButton<_ArchiveAction>(
+                          tooltip: 'Actions for ${profile.label}',
+                          enabled: !busy,
+                          onSelected: (action) =>
+                              _act(context, profile, action),
+                          itemBuilder: (_) => [
+                            const PopupMenuItem(
+                              value: _ArchiveAction.rename,
+                              child: Text('Rename'),
+                            ),
+                            PopupMenuItem(
+                              value: _ArchiveAction.change,
+                              child: Text(
+                                'Change address or ${profile.serverType.credential == 'access token' ? 'token' : 'key'}',
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: _ArchiveAction.forget,
+                              child: Text('Forget on this device'),
+                            ),
+                          ],
                         ),
-                      ),
-                      const PopupMenuItem(
-                        value: _ArchiveAction.forget,
-                        child: Text('Forget on this device'),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ListTile(
@@ -174,7 +192,8 @@ class _RenameDialogState extends State<_RenameDialog> {
       maxLength: ConnectionStore.maxLabelLength,
       decoration: InputDecoration(
         labelText: 'Name',
-        helperText: 'Leave empty to use ${ConnectionStore.defaultLabel(widget.profile.server)}.',
+        helperText:
+            'Leave empty to use ${ConnectionStore.defaultLabel(widget.profile.server)}.',
         helperMaxLines: 2,
       ),
       onSubmitted: (value) => Navigator.pop(context, value),

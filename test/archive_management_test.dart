@@ -392,6 +392,35 @@ void main() {
 
       // The open archive is marked and tapping it does nothing.
       expect(find.textContaining('Open now'), findsOneWidget);
+      Finder tile(String host) => find.ancestor(
+        of: find.text(host),
+        matching: find.byType(ListTile),
+      );
+      expect(
+        find.descendant(of: tile('a.example'), matching: find.byIcon(Icons.chevron_right)),
+        findsOneWidget,
+        reason: 'an archive that can be opened shows a chevron',
+      );
+      expect(
+        find.descendant(of: tile('c.example'), matching: find.byIcon(Icons.chevron_right)),
+        findsNothing,
+        reason: 'the open archive has none',
+      );
+      expect(
+        find.descendant(of: tile('c.example'), matching: find.byIcon(Icons.dns)),
+        findsOneWidget,
+        reason: 'the open archive has a filled icon',
+      );
+      expect(
+        find.descendant(of: tile('a.example'), matching: find.byIcon(Icons.dns_outlined)),
+        findsOneWidget,
+      );
+      final semantics = tester.ensureSemantics();
+      expect(
+        tester.getSemantics(tile('a.example')),
+        isSemantics(onTapHint: 'open a.example', hasTapAction: true),
+      );
+      semantics.dispose();
       await tester.tap(find.text('c.example'));
       await tester.pumpAndSettle();
       expect(find.text('Archives'), findsWidgets);
