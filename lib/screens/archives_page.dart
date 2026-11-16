@@ -43,38 +43,54 @@ class ArchivesPage extends StatelessWidget {
                 child: Column(
                   children: [
                     for (final profile in session.archives)
-                      RadioListTile<String>(
-                        key: ValueKey('manage-archive-${profile.id}'),
-                        value: profile.id,
-                        controlAffinity: ListTileControlAffinity.leading,
-                        selected: profile.id == activeId,
-                        enabled:
-                            profile.id == activeId || session.canSwitchArchive,
-                        title: Text(
-                          profile.label,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        subtitle: Text(archiveDetails(profile)),
-                        secondary: PopupMenuButton<_ArchiveAction>(
-                          tooltip: 'Actions for ${profile.label}',
-                          enabled: !busy,
-                          onSelected: (action) =>
-                              _act(context, profile, action),
-                          itemBuilder: (_) => [
-                            const PopupMenuItem(
-                              value: _ArchiveAction.rename,
-                              child: Text('Rename'),
-                            ),
-                            PopupMenuItem(
-                              value: _ArchiveAction.change,
-                              child: Text(
-                                'Change address or ${profile.serverType.credential == 'access token' ? 'token' : 'key'}',
+                      Material(
+                        color: profile.id == activeId
+                            ? Theme.of(context).colorScheme.secondaryContainer
+                                  .withValues(alpha: 0.4)
+                            : Colors.transparent,
+                        child: Row(
+                          children: [
+                            // RadioListTile merges semantics. Keep the menu
+                            // outside it so it has its own accessible action.
+                            Expanded(
+                              child: RadioListTile<String>(
+                                key: ValueKey('manage-archive-${profile.id}'),
+                                value: profile.id,
+                                controlAffinity:
+                                    ListTileControlAffinity.leading,
+                                selected: profile.id == activeId,
+                                enabled:
+                                    profile.id == activeId ||
+                                    session.canSwitchArchive,
+                                title: Text(
+                                  profile.label,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                subtitle: Text(archiveDetails(profile)),
                               ),
                             ),
-                            const PopupMenuItem(
-                              value: _ArchiveAction.forget,
-                              child: Text('Forget on this device'),
+                            PopupMenuButton<_ArchiveAction>(
+                              tooltip: 'Actions for ${profile.label}',
+                              enabled: !busy,
+                              onSelected: (action) =>
+                                  _act(context, profile, action),
+                              itemBuilder: (_) => [
+                                const PopupMenuItem(
+                                  value: _ArchiveAction.rename,
+                                  child: Text('Rename'),
+                                ),
+                                PopupMenuItem(
+                                  value: _ArchiveAction.change,
+                                  child: Text(
+                                    'Change address or ${profile.serverType.credential == 'access token' ? 'token' : 'key'}',
+                                  ),
+                                ),
+                                const PopupMenuItem(
+                                  value: _ArchiveAction.forget,
+                                  child: Text('Forget on this device'),
+                                ),
+                              ],
                             ),
                           ],
                         ),

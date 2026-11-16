@@ -405,11 +405,19 @@ void main() {
       expect(group.groupValue, open.value);
       expect(open.selected, isTrue);
       expect(other.selected, isFalse);
+      Material rowMaterial(String host) => tester.widget<Material>(
+        find.ancestor(of: tile(host), matching: find.byType(Material)).first,
+      );
+      expect(rowMaterial('c.example').color, isNot(Colors.transparent));
+      expect(rowMaterial('a.example').color, Colors.transparent);
       expect(other.value, isNot(group.groupValue));
       expect(find.textContaining('Open now'), findsNothing);
       expect(find.byIcon(Icons.chevron_right), findsNothing);
       expect(find.byIcon(Icons.dns), findsNothing);
-      expect(find.textContaining('Tap an archive to switch to it.'), findsOneWidget);
+      expect(
+        find.textContaining('Tap an archive to switch to it.'),
+        findsOneWidget,
+      );
       final semantics = tester.ensureSemantics();
       expect(
         tester.getSemantics(tile('c.example')),
@@ -424,6 +432,12 @@ void main() {
           isEnabled: true,
         ),
       );
+      expect(
+        tester.getSemantics(find.byTooltip('Actions for a.example')).id,
+        isNot(tester.getSemantics(tile('a.example')).id),
+        reason:
+            'archive selection and its menu must remain separate accessible actions',
+      );
       // A busy session disables switching; other rows must agree.
       final session = tester
           .widget<ArchivesPage>(find.byType(ArchivesPage))
@@ -431,7 +445,10 @@ void main() {
       session.busy = true;
       session.setTab(session.tab);
       await tester.pump();
-      expect(tester.widget<RadioListTile<String>>(tile('a.example')).enabled, isFalse);
+      expect(
+        tester.widget<RadioListTile<String>>(tile('a.example')).enabled,
+        isFalse,
+      );
       expect(
         tester.getSemantics(tile('a.example')),
         isSemantics(isEnabled: false, hasEnabledState: true),
