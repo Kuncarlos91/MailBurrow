@@ -28,7 +28,7 @@ class ArchivesPage extends StatelessWidget {
             children: [
               for (final profile in session.archives)
                 Semantics(
-                  onTapHint: profile.id == activeId
+                  onTapHint: profile.id == activeId || !session.canSwitchArchive
                       ? null
                       : 'open ${profile.label}',
                   child: ListTile(
