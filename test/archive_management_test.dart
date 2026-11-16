@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -7,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mailburrow/archive_models.dart';
 import 'package:mailburrow/archive_server_type.dart';
 import 'package:mailburrow/screens/archive_home.dart';
+import 'package:mailburrow/screens/setup_view.dart';
 import 'package:mailburrow/search_filters.dart';
 import 'package:mailburrow/state/archive_session.dart';
 import 'package:mailburrow/state/connection_store.dart';
@@ -49,6 +51,16 @@ class HostArchive extends FakeArchiveBackend {
 
   @override
   void close() => closed = true;
+}
+
+class HeldHostArchive extends HostArchive {
+  HeldHostArchive(super.server, super.key);
+  final ready = Completer<void>();
+  @override
+  Future<List<ArchiveAccount>> accounts() async {
+    await ready.future;
+    return super.accounts();
+  }
 }
 
 Future<Map<String, String>> keyEntries() async => {
@@ -118,7 +130,10 @@ void main() {
 
     test('an unreadable index blocks rename and forget', () async {
       final id = ConnectionStore.newProfileId();
-      final values = {'connections': '{"version":99}', 'connection.key.$id': 'k'};
+      final values = {
+        'connections': '{"version":99}',
+        'connection.key.$id': 'k',
+      };
       FlutterSecureStorage.setMockInitialValues(values);
       await expectLater(store.rename(id, 'x'), throwsA(anything));
       await expectLater(store.forget(id), throwsA(anything));
@@ -147,60 +162,71 @@ void main() {
     ConnectionProfile archive(String host) =>
         session.archives.firstWhere((item) => item.server.contains(host));
 
-    test('failed saved retry discards another archive reconfiguration target', () async {
-      final a = archive('a.example');
-      session.openReconfigure(a.id);
-      session.keyInput.text = 'unsaved-edit-key';
-      HostArchive.offlineHosts.add('b.example');
-      await session.retrySaved();
-      expect(session.reconfiguring, isNull);
-      expect(session.keyInput.text, isEmpty);
-      expect((await store.connection(a.id)).server, first);
-      expect((await store.connection(a.id)).key, 'key-a');
-    });
+    test(
+      'failed saved retry discards another archive reconfiguration target',
+      () async {
+        final a = archive('a.example');
+        session.openReconfigure(a.id);
+        session.keyInput.text = 'unsaved-edit-key';
+        HostArchive.offlineHosts.add('b.example');
+        await session.retrySaved();
+        expect(session.reconfiguring, isNull);
+        expect(session.keyInput.text, isEmpty);
+        expect((await store.connection(a.id)).server, first);
+        expect((await store.connection(a.id)).key, 'key-a');
+      },
+    );
 
-    test('failed archive switch discards another archive edit target', () async {
-      final a = archive('a.example');
-      final b = archive('b.example');
-      session.openReconfigure(a.id);
-      HostArchive.offlineHosts.add('b.example');
-      await session.switchArchive(b.id);
-      expect(session.reconfiguring, isNull);
-      session.server.text = 'https://c.example';
-      session.keyInput.text = 'key-c';
-      await session.connect();
-      expect((await store.connection(a.id)).server, first);
-      expect((await store.connection(a.id)).key, 'key-a');
-      expect(session.archives, hasLength(3));
-    });
+    test(
+      'failed archive switch discards another archive edit target',
+      () async {
+        final a = archive('a.example');
+        final b = archive('b.example');
+        session.openReconfigure(a.id);
+        HostArchive.offlineHosts.add('b.example');
+        await session.switchArchive(b.id);
+        expect(session.reconfiguring, isNull);
+        session.server.text = 'https://c.example';
+        session.keyInput.text = 'key-c';
+        await session.connect();
+        expect((await store.connection(a.id)).server, first);
+        expect((await store.connection(a.id)).key, 'key-a');
+        expect(session.archives, hasLength(3));
+      },
+    );
 
-    test('changing an address needs the key again and keeps the type', () async {
-      final b = archive('b.example');
-      session.openReconfigure(b.id);
-      expect(session.reconfiguring?.id, b.id);
-      expect(session.server.text, second);
-      expect(session.keyInput.text, isEmpty);
-      expect(session.setupServerType, ArchiveServerType.openArchiver);
-      session.chooseServerType(ArchiveServerType.mailArchiver);
-      expect(session.setupServerType, ArchiveServerType.openArchiver);
-      final before = created.length;
-      session.server.text = 'c.example';
-      await session.connect();
-      expect(session.error, 'Enter your API key.');
-      expect(created.length, before, reason: 'no request without a new key');
-      session.keyInput.text = 'key-c';
-      await session.connect();
-      expect(session.setup, isFalse);
-      expect(session.reconfiguring, isNull);
-      expect((session.api! as HostArchive).key, 'key-c');
-      expect(session.messages.single.subject, 'c.example mail');
-      final changed = session.archives.firstWhere((item) => item.label == b.label);
-      expect(changed.server, 'https://c.example');
-      expect(changed.serverType, ArchiveServerType.openArchiver);
-      expect(session.archives, hasLength(2));
-      final keys = (await keyEntries()).values.toSet();
-      expect(keys, {'key-a', 'key-c'});
-    });
+    test(
+      'changing an address needs the key again and keeps the type',
+      () async {
+        final b = archive('b.example');
+        session.openReconfigure(b.id);
+        expect(session.reconfiguring?.id, b.id);
+        expect(session.server.text, second);
+        expect(session.keyInput.text, isEmpty);
+        expect(session.setupServerType, ArchiveServerType.openArchiver);
+        session.chooseServerType(ArchiveServerType.mailArchiver);
+        expect(session.setupServerType, ArchiveServerType.openArchiver);
+        final before = created.length;
+        session.server.text = 'c.example';
+        await session.connect();
+        expect(session.error, 'Enter your API key.');
+        expect(created.length, before, reason: 'no request without a new key');
+        session.keyInput.text = 'key-c';
+        await session.connect();
+        expect(session.setup, isFalse);
+        expect(session.reconfiguring, isNull);
+        expect((session.api! as HostArchive).key, 'key-c');
+        expect(session.messages.single.subject, 'c.example mail');
+        final changed = session.archives.firstWhere(
+          (item) => item.label == b.label,
+        );
+        expect(changed.server, 'https://c.example');
+        expect(changed.serverType, ArchiveServerType.openArchiver);
+        expect(session.archives, hasLength(2));
+        final keys = (await keyEntries()).values.toSet();
+        expect(keys, {'key-a', 'key-c'});
+      },
+    );
 
     test('a failed change keeps the saved archive and the open one', () async {
       final b = archive('b.example');
@@ -272,7 +298,9 @@ void main() {
       await tester.runAsync(seedTwo);
       await tester.pumpWidget(
         MaterialApp(
-          home: ArchiveHome(apiFactory: (server, key) => HostArchive(server, key)),
+          home: ArchiveHome(
+            apiFactory: (server, key) => HostArchive(server, key),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -295,7 +323,9 @@ void main() {
       expect(find.text('Family'), findsOneWidget);
     });
 
-    testWidgets('forget needs confirmation and keeps server mail', (tester) async {
+    testWidgets('forget needs confirmation and keeps server mail', (
+      tester,
+    ) async {
       await openArchives(tester);
       await tester.tap(find.byTooltip('Actions for a.example'));
       await tester.pumpAndSettle();
@@ -315,7 +345,9 @@ void main() {
       expect(await tester.runAsync(keyEntries), hasLength(1));
     });
 
-    testWidgets('change address or key opens setup for that archive', (tester) async {
+    testWidgets('change address or key opens setup for that archive', (
+      tester,
+    ) async {
       await openArchives(tester);
       await tester.tap(find.byTooltip('Actions for b.example'));
       await tester.pumpAndSettle();
@@ -324,6 +356,157 @@ void main() {
       expect(find.text('Change b.example'), findsOneWidget);
       expect(find.text('Save and connect'), findsOneWidget);
       expect(find.text('Try the demo'), findsNothing);
+    });
+
+    testWidgets('tapping another archive in Settings → Archives opens it', (
+      tester,
+    ) async {
+      await tester.runAsync(() async {
+        await store.add(
+          serverType: ArchiveServerType.mailArchiver,
+          server: first,
+          key: 'key-a',
+          accountId: '1',
+        );
+        await store.add(
+          serverType: ArchiveServerType.bichon,
+          server: 'https://c.example',
+          key: 'token-c',
+          accountId: '1',
+        );
+      });
+      HostArchive? opened;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ArchiveHome(
+            apiFactory: (server, key) => opened = HostArchive(server, key),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('c.example mail'), findsOneWidget);
+      await tester.tap(find.text('Settings'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Archives'));
+      await tester.pumpAndSettle();
+
+      // The open archive is marked and tapping it does nothing.
+      expect(find.textContaining('Open now'), findsOneWidget);
+      await tester.tap(find.text('c.example'));
+      await tester.pumpAndSettle();
+      expect(find.text('Archives'), findsWidgets);
+
+      // A Bichon archive's menu says token; Mail-Archiver's says key.
+      await tester.tap(find.byTooltip('Actions for c.example'));
+      await tester.pumpAndSettle();
+      expect(find.text('Change address or token'), findsOneWidget);
+      await tester.tapAt(const Offset(5, 5));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Actions for a.example'));
+      await tester.pumpAndSettle();
+      expect(find.text('Change address or key'), findsOneWidget);
+      await tester.tapAt(const Offset(5, 5));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('a.example'));
+      await tester.pumpAndSettle();
+      expect(find.text('a.example mail'), findsOneWidget);
+      expect(find.text('c.example mail'), findsNothing);
+      expect(opened?.key, 'key-a', reason: 'only that archive key is used');
+      expect(find.byType(NavigationBar), findsOneWidget);
+    });
+    testWidgets('Settings archive switch failure preserves saved profiles', (
+      tester,
+    ) async {
+      await tester.runAsync(seedTwo);
+      HostArchive.offlineHosts.add('a.example');
+      final clients = <HostArchive>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ArchiveHome(
+            apiFactory: (server, key) {
+              final api = HostArchive(server, key);
+              clients.add(api);
+              return api;
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Settings'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Archives'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('a.example'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Could not open a.example'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Retry saved connection'),
+        200,
+        scrollable: find
+            .descendant(
+              of: find.byType(SetupView),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      expect(find.text('Retry saved connection'), findsOneWidget);
+      expect(find.text('b.example mail'), findsNothing);
+      expect(clients.last.key, 'key-a');
+      expect(clients.last.closed, isTrue);
+      await tester.runAsync(() async {
+        final saved = await store.read();
+        expect(saved?.server, second);
+        expect(saved?.key, 'key-b');
+        expect(await keyEntries(), hasLength(2));
+      });
+    });
+
+    testWidgets('Settings archive switch Cancel ignores late success', (
+      tester,
+    ) async {
+      await tester.runAsync(seedTwo);
+      HeldHostArchive? pending;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ArchiveHome(
+            apiFactory: (server, key) => server.host == 'a.example'
+                ? pending = HeldHostArchive(server, key)
+                : HostArchive(server, key),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Settings'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Archives'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('a.example'));
+      await tester.pump(const Duration(milliseconds: 350));
+      expect(find.textContaining('Opening a.example'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(pending?.closed, isTrue);
+      pending!.ready.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('a.example mail'), findsNothing);
+      await tester.scrollUntilVisible(
+        find.text('Retry saved connection'),
+        200,
+        scrollable: find
+            .descendant(
+              of: find.byType(SetupView),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      expect(find.text('Retry saved connection'), findsOneWidget);
+      await tester.runAsync(() async {
+        final saved = await store.read();
+        expect(saved?.server, second);
+        expect(saved?.key, 'key-b');
+        expect(await keyEntries(), hasLength(2));
+      });
     });
   });
 }

@@ -56,7 +56,7 @@ class SettingsView extends StatelessWidget {
           ListTile(
             title: const Text('Archives'),
             subtitle: const Text(
-              'Rename, change the address or key of, forget or add archives saved on this device',
+              'Open, rename, change or forget archives saved on this device, or add one',
             ),
             trailing: const Icon(Icons.chevron_right),
             onTap: busy
