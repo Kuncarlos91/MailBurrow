@@ -733,6 +733,7 @@ class ArchiveSession extends ChangeNotifier {
             '${query.isEmpty ? 'Messages loaded' : 'Search complete'} · $count · ${(watch.elapsedMilliseconds / 1000).toStringAsFixed(1)} s';
         _notify();
         if (scrollToTop) onScrollToTop?.call(current);
+        retryFailedFoldersAfterRecovery();
       }
     } catch (failure) {
       if (current()) {
@@ -764,6 +765,15 @@ class ArchiveSession extends ChangeNotifier {
   void retryFailedMailAfterRecovery() {
     if (!_disposed && !setup && !busy && mailRequestFailed && api != null) {
       unawaited(load(page));
+    }
+  }
+
+  // The reverse of [retryFailedMailAfterRecovery]: mail loading again is a
+  // sign the server is reachable, so revalidate folders that failed instead
+  // of leaving their error on screen.
+  void retryFailedFoldersAfterRecovery() {
+    if (!_disposed && !setup && folderError != null && !foldersBusy) {
+      unawaited(loadFolders());
     }
   }
 

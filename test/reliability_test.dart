@@ -184,6 +184,7 @@ class PagingApi extends LandscapeApi {
 
 class SectionRecoveryApi extends PagingApi {
   bool networkOffline = false;
+  bool foldersOffline = false;
   bool mailDenied = false;
   @override
   Future<MailPage> emails(
@@ -202,7 +203,9 @@ class SectionRecoveryApi extends PagingApi {
 
   @override
   Future<List<ArchiveFolder>> folders(String id) async {
-    if (networkOffline) throw const SocketException('private detail');
+    if (networkOffline || foldersOffline) {
+      throw const SocketException('private detail');
+    }
     return [];
   }
 
@@ -543,6 +546,52 @@ void main() {
           findsNothing,
         );
         expect(find.byType(SnackBar), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  for (final stillOffline in [false, true]) {
+    testWidgets(
+      'mail Retry also revalidates failed folders (${stillOffline ? 'folders still failing' : 'recovered'})',
+      (tester) async {
+        FlutterSecureStorage.setMockInitialValues({
+          'connection': jsonEncode({
+            'server': 'https://example.com',
+            'key': 'test-only',
+          }),
+        });
+        final api = SectionRecoveryApi();
+        await tester.pumpWidget(
+          MaterialApp(home: ArchiveHome(apiFactory: (_, _) => api)),
+        );
+        await tester.pumpAndSettle();
+        api.networkOffline = true;
+        await tester.tap(find.byTooltip('Reload folders'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('Refresh'));
+        await tester.pumpAndSettle();
+        const folderError = 'Could not load folders. Tap Retry.';
+        expect(find.text(folderError), findsOneWidget);
+        expect(find.byType(SnackBar), findsOneWidget);
+        api.networkOffline = false;
+        api.foldersOffline = stillOffline;
+        // The Retry on the mail notice, not the folder line's own Retry.
+        await tester.tap(
+          find.descendant(
+            of: find.byType(SnackBar),
+            matching: find.text('Retry'),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.text(readableError(const SocketException(''))),
+          findsNothing,
+        );
+        expect(find.byType(SnackBar), findsNothing);
+        // Recovered folders clear their error; a folder failure that persists
+        // keeps it, so the line never claims success it did not see.
+        expect(find.text(folderError), stillOffline ? findsOneWidget : findsNothing);
         expect(tester.takeException(), isNull);
       },
     );
