@@ -1,4 +1,4 @@
-"""Fictional Bichon measurement fixtures for the B30 phone checks.
+"""Fictional Bichon fixtures for phone measurement checks.
 
 Writes one mbox file to import into the Alex Rivera lab account. Bichon
 puts it in its own folder, named after the file, so the fixtures stay
@@ -7,9 +7,9 @@ apart from the 40 demo messages:
     python tools\\bichon_fixtures.py --out build\\mailburrow-fixtures.mbox
 
 It holds:
-- a large message whose parsed content (HTML plus plain text) is close to,
-  but under, the app's 8 MiB response limit, for memory and message
-  cancellation measurements;
+- a large message intended to approach the 8 MiB message-response limit;
+  measure the actual parsed JSON after import before using it for memory
+  or cancellation measurements;
 - a message with a 45 MiB attachment, under the 50 MiB attachment cap, for
   download cancellation;
 - 30 small messages, so a search for the fixture marker fills a 25-item
@@ -36,8 +36,8 @@ START = datetime(2026, 11, 16, 9, 0, tzinfo=timezone.utc)
 
 # Parsed content of the large message: HTML and text bodies of this many
 # bytes each. Bichon returns both in one JSON response; two bodies of
-# 4.12 MB give a Bichon 2.4.2 response of about 8.29 MB, under 8 MiB
-# (8,388,608 bytes) with about 1% headroom; record the measured size.
+# 4.12 MB target a response near 8 MiB (8,388,608 bytes). Server
+# normalization/metadata can change that size; record the measured response.
 LARGE_BODY_BYTES = 4_120_000
 ATTACHMENT_BYTES = 45 * 1024 * 1024
 SMALL_MESSAGES = 30
@@ -86,10 +86,11 @@ def base(subject, index):
 def large_message():
     msg = base("large message", 0)
     text = filler(LARGE_BODY_BYTES, 1)
-    paragraph_text = filler(LARGE_BODY_BYTES - 64, 2)
-    html = "<html><body><p>" + paragraph_text.replace("\n", "</p><p>") + "</p></body></html>"
-    # Pad or trim the HTML to the same byte budget.
-    html = html[:LARGE_BODY_BYTES] if len(html) > LARGE_BODY_BYTES else html + " " * (LARGE_BODY_BYTES - len(html))
+    prefix, suffix = "<html><body><p>", "</p></body></html>"
+    # Budget the markup before generating text. Truncating assembled HTML
+    # can cut a tag or remove the document's closing tags.
+    paragraph_text = filler(LARGE_BODY_BYTES - len(prefix) - len(suffix), 2)
+    html = prefix + paragraph_text.replace("\n", " ") + suffix
     msg.set_content(text)
     msg.add_alternative(html, subtype="html")
     msg.set_boundary("mailburrow-fixture-large")
@@ -131,13 +132,20 @@ def mbox_bytes(msg):
 def write(out):
     out.parent.mkdir(parents=True, exist_ok=True)
     total = 0
-    with out.open("wb") as fh:
-        for msg in messages():
-            data = mbox_bytes(msg)
-            total += len(data)
-            if total > MAX_OUTPUT_BYTES:
-                raise SystemExit("fixture output exceeds its bound")
-            fh.write(data)
+    # Exclusive creation protects any existing archive, including symlinks.
+    # Failed generation removes only the new output owned by this call.
+    fh = out.open("xb")
+    try:
+        with fh:
+            for msg in messages():
+                data = mbox_bytes(msg)
+                total += len(data)
+                if total > MAX_OUTPUT_BYTES:
+                    raise ValueError("fixture output exceeds its bound")
+                fh.write(data)
+    except BaseException:
+        out.unlink(missing_ok=True)
+        raise
     return total
 
 
@@ -149,7 +157,14 @@ def main(argv=None, out=sys.stdout):
     if path.suffix.lower() != ".mbox":
         print("Use an .mbox file name, for example build/mailburrow-fixtures.mbox", file=out)
         return 2
-    total = write(path)
+    try:
+        total = write(path)
+    except FileExistsError:
+        print("Output already exists; choose a new .mbox file. Nothing was overwritten.", file=out)
+        return 2
+    except (OSError, ValueError):
+        print("Could not finish the bounded fixture output; check storage and use a new file.", file=out)
+        return 2
     print("Wrote %d fictional messages (%d bytes). Import into the Alex Rivera account; "
           "Bichon creates a folder named after the file." % (2 + SMALL_MESSAGES, total), file=out)
     return 0

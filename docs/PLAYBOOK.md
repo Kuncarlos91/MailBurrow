@@ -181,3 +181,5 @@ The [Bichon lab checker](../tools/bichon_lab_check.py) is a standalone diagnosti
 The separate [Bichon write-denial procedure](../tools/bichon_write_denial.py) mutates only a positively identified sacrificial lab message, validates both tokens can read it, and uses admin controls before interpreting reader 403 responses. It verifies envelope state and deletion cleanup without reporting message values. Host tests are synthetic; this is not app functionality or live authorization evidence.
 
 Known Bichon folder states `fetching` and `error` produce retry guidance rather than an unsupported-version diagnosis. A contract failure identifies an unreadable response and the tested adapter version; it does not establish which server version is actually running.
+
+The [Bichon measurement-fixture generator](../tools/bichon_fixtures.py) writes a bounded deterministic fictional mbox with large bodies, a 45 MiB attachment and a full search page. It refuses existing files and removes newly created partial output on failure. Verify actual imported response sizes and fixture readiness separately; generation tests do not establish a phone or release-artifact pass.
