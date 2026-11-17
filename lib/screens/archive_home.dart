@@ -392,6 +392,7 @@ class _ArchiveHomeState extends State<ArchiveHome> {
                         ? SettingsView(
                             session: s,
                             onChooseAccount: chooseAccount,
+                            onChooseArchive: chooseArchive,
                           )
                         : mailView,
                   ),

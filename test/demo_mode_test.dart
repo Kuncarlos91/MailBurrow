@@ -80,7 +80,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(banner, findsOneWidget);
-    expect(find.text('Built-in demo, no server'), findsOneWidget);
+    // The same account row as Mail and Search; the demo has no saved archive.
+    expect(find.byKey(const ValueKey('current-mail-account')), findsOneWidget);
+    expect(find.byKey(const ValueKey('current-archive')), findsNothing);
     expect(find.text('Demo mode'), findsOneWidget);
     expect(find.text('Disconnect and forget connection'), findsNothing);
     final exit = find.text('Exit demo');
