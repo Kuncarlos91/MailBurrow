@@ -507,8 +507,13 @@ void main() {
       expect(find.text('Account 2 message 0'), findsOneWidget);
       await tester.tap(find.byIcon(Icons.settings_outlined).last);
       await tester.pumpAndSettle();
-      final label = find.text('Currently browsing');
-      expect(label, findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('current-mail-account')),
+          matching: find.text('second@example.com'),
+        ),
+        findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
     },
   );

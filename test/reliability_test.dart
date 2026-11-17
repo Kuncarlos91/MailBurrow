@@ -574,8 +574,10 @@ void main() {
         );
         api.networkOffline = outcome == 'offline';
         api.mailDenied = outcome == 'mail denied';
-        await tester.ensureVisible(
+        await tester.scrollUntilVisible(
           find.byTooltip('Refresh archive information'),
+          200,
+          scrollable: find.byType(Scrollable).first,
         );
         await tester.pumpAndSettle();
         await tester.tap(find.byTooltip('Refresh archive information'));

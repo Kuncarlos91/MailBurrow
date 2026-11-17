@@ -207,11 +207,11 @@ If the key can see more than one mail account or source, switch between them fro
 
 ## Several archives
 
-Opening an archive by tapping it in **Settings → Archives** is a development-build feature; the published 0.4.0 APK switches through the archive-name picker.
+The shared archive/account rows on all three tabs and opening an archive by tapping it in **Settings → Archives** are development-build features. In the published 0.4.0 APK, open the archive-name picker from Mail or Search; Settings has its older account card.
 
 MailBurrow can keep up to 20 archives, for example a Mail-Archiver and an Open Archiver server, and switch between them without entering keys again.
 
-- **Add one:** tap the archive name above the account on the Mail tab, then **Add archive**. Choose its type, then enter its address and key.
+- **Add one:** tap the archive name above the account on the Mail, Search or Settings tab, then **Add archive**. Choose its type, then enter its address and key.
 - **Switch:** tap the archive name and pick another, or tap it in **Settings → Archives**. The previous archive's mail is cleared before the new one loads, and each archive remembers the account or source you last used in it. If one can't be reached, the app says which, and offers **Retry saved connection** and your other archives. **Cancel** stops waiting before secure saving begins; it is disabled during the save commit and once the archive is open.
 - **Manage:** **Settings → Archives** lists your archives with the current one selected; tap another to switch to it, or use its menu to rename it, change its address and key (or token), or forget it on this device. Changing an address or key always asks for the key again; the saved key is never sent to a new address. To use another server type, add it as a new archive.
 

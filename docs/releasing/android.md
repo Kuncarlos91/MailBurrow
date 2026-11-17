@@ -6,10 +6,10 @@ For local testing run `flutter build apk --debug --target-platform android-arm64
 
 For signed builds, create your own keystore outside Git, copy root `keystore.properties.example` to ignored root `keystore.properties`, and set your own keystore path, alias and passwords locally. In Java properties on Windows use forward slashes for paths. Existing users' updates require the same signing key, app ID and a higher version code; do not generate a replacement key for an established app.
 
-Build only after signing configuration is ready. Pass the same version and build number to Flutter's native version flags and to the app's Settings stamp, matching `version:` in `pubspec.yaml` (the unreleased development candidate is `0.5.0+28`; the published release remains 0.4.0/build 27):
+Build only after signing configuration is ready. Pass the same version and build number to Flutter's native version flags and to the app's Settings stamp, matching `version:` in `pubspec.yaml` (the unreleased development candidate is `0.5.0+29`; build 28 was an earlier private candidate, and the published release remains 0.4.0/build 27):
 
 ```sh
-flutter build apk --release --target-platform android-arm64 --build-name=0.5.0 --build-number=28 --dart-define=MAILSHELF_BUILD_VERSION=0.5.0 --dart-define=MAILSHELF_BUILD_NUMBER=28
+flutter build apk --release --target-platform android-arm64 --build-name=0.5.0 --build-number=29 --dart-define=MAILSHELF_BUILD_VERSION=0.5.0 --dart-define=MAILSHELF_BUILD_NUMBER=29
 ```
 
 Use the same flags with `flutter build appbundle --release` for an AAB. APK: `build/app/outputs/flutter-apk/app-release.apk`; AAB: `build/app/outputs/bundle/release/app-release.aab`.
