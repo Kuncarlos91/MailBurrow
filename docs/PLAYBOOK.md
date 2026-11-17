@@ -49,7 +49,7 @@ Profiles this build cannot read are kept as stored, with their keys, and count t
 | Attachments | Confirm save, sanitize filename, private temporary download, destination picker, separate Open confirmation; risky-type caution. |
 | Settings | Selected account/server, sync/enabled status, accessible totals/address list, account selection, connection settings, build information and forget. |
 | Demo mode | Built-in fictional archive (3 accounts, 70 messages, 11 small attachments) served in memory with the same search, folder, filter, sort, paging, reader and attachment behavior as a server. Always labelled; never saved; no network. |
-| Loading/errors | Section loading, empty states, sanitized errors and retry. Mail/Search failures show a snackbar with Retry plus an inline error. |
+| Loading/errors | Section loading, empty states, sanitized errors and retry. Mail/Search failures show a snackbar with Retry plus an inline error. Recovery revalidates the other section: folders loading again retries failed mail, and mail loading again retries failed folders (`retryFailedFoldersAfterRecovery`), so no stale error stays after the server is reachable. |
 
 Unread emphasis, editing/deletion, background sync, offline mail, attachment filtering and server administration are not features.
 
