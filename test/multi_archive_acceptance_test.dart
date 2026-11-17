@@ -653,7 +653,11 @@ void main() {
         find.descendant(of: archiveRow, matching: find.text(hostA)),
         findsOneWidget,
       );
-      expect(find.widgetWithText(NavigationDestination, 'Settings'), findsOneWidget);
+      // Destination presence alone does not prove switching returned to Mail.
+      expect(
+        tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+        0,
+      );
       expect(tester.takeException(), isNull);
     });
 

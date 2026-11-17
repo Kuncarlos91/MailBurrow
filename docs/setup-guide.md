@@ -207,7 +207,7 @@ If the key can see more than one mail account or source, switch between them fro
 
 ## Several archives
 
-Opening an archive by tapping it in **Settings → Archives** is a development-build feature; the published 0.4.0 APK switches through the archive-name picker.
+The shared archive/account rows on all three tabs and opening an archive by tapping it in **Settings → Archives** are development-build features. In the published 0.4.0 APK, open the archive-name picker from Mail or Search; Settings has its older account card.
 
 MailBurrow can keep up to 20 archives, for example a Mail-Archiver and an Open Archiver server, and switch between them without entering keys again.
 
