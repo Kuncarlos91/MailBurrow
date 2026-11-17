@@ -7,9 +7,11 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 
+import '../archive_api.dart';
 import '../attachment_download.dart';
 import '../bichon_api.dart';
 import '../message_load.dart';
@@ -60,6 +62,19 @@ class _IsolatedOpen {
 double _mib(int bytes) => (bytes / mib * 100).roundToDouble() / 100;
 
 /// Samples process RSS while [work] runs and returns the peak.
+/// RSS after the fixed settle window: the lowest of five samples 200 ms
+/// apart, so a short-lived allocation does not count as kept.
+Future<int> settledRss() async {
+  await Future<void>.delayed(_settle);
+  var low = ProcessInfo.currentRss;
+  for (var i = 0; i < 4; i++) {
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    final now = ProcessInfo.currentRss;
+    if (now < low) low = now;
+  }
+  return low;
+}
+
 Future<int> _peakWhile(Future<void> Function() work) async {
   var peak = ProcessInfo.currentRss;
   final timer = Timer.periodic(_samplerInterval, (_) {
@@ -136,17 +151,6 @@ Future<Map<String, Object?>> runBichonProbe({
       // the first included, follows the same settle window and is the lowest
       // of five samples, so a short-lived allocation does not count as kept.
       onStatus('Memory: three open/close cycles…');
-      Future<int> settledRss() async {
-        await Future<void>.delayed(_settle);
-        var low = ProcessInfo.currentRss;
-        for (var i = 0; i < 4; i++) {
-          await Future<void>.delayed(const Duration(milliseconds: 200));
-          final now = ProcessInfo.currentRss;
-          if (now < low) low = now;
-        }
-        return low;
-      }
-
       final readings = <int>[await settledRss()];
       for (var i = 0; i < 3; i++) {
         var message = await api.message(large);
@@ -280,5 +284,120 @@ Future<Map<String, Object?>> runBichonProbe({
       api.close();
     }
   }, _Overrides(meter));
+  return result;
+}
+
+/// DIAGNOSIS ONLY, never a D05 pass: separates a one-time memory rise from
+/// growth on every open. Run it from a fresh app start, so neither part
+/// inherits memory from the measured run.
+///
+/// 1. Control, no network and no MailBurrow code: decode a locally built
+///    JSON reply the size of the Bichon large-message response, ten times.
+/// 2. The app's shared decoder on that same reply, still without network.
+/// 3. The app path: open the fixture's large message ten times through
+///    `BichonApi.message()`, replacing it with a small message each time.
+Future<Map<String, Object?>> runRetentionDiagnosis({
+  required Uri server,
+  required String token,
+  required void Function(String) onStatus,
+}) async {
+  const cycles = 10;
+  final result = <String, Object?>{'kind': 'diagnosis, not a D05 pass'};
+  Map<String, Object?> summary(List<int> readings) => {
+    'readingsMiB': [for (final r in readings) _mib(r)],
+    'firstCycleRiseMiB': _mib(readings[1] - readings[0]),
+    'afterFirstCycleMiB': _mib(readings.last - readings[1]),
+    'totalMiB': _mib(readings.last - readings.first),
+  };
+
+  onStatus('Diagnosis: control without network…');
+  // Same shape as Bichon's large-message reply, padded to its measured
+  // size (8,290,934 bytes) so both parts decode the same amount.
+  const replyTarget = 8290934;
+  const bodyChars = 4120001;
+  final words = 'harbor lantern meadow orchard pebble quartz ribbon ';
+  String body(int n) => (words * (n ~/ words.length + 1)).substring(0, n);
+  final shell = utf8
+      .encode(
+        jsonEncode({
+          'text': body(bodyChars),
+          'html': body(bodyChars),
+          'attachments': <Object>[],
+          'has_remote_content': false,
+          'pad': '',
+        }),
+      )
+      .length;
+  final reply = utf8.encode(
+    jsonEncode({
+      'text': body(bodyChars),
+      'html': body(bodyChars),
+      'attachments': <Object>[],
+      'has_remote_content': false,
+      'pad': body(replyTarget > shell ? replyTarget - shell : 0),
+    }),
+  );
+  final control = <int>[await settledRss()];
+  for (var i = 0; i < cycles; i++) {
+    onStatus('Diagnosis: control cycle ${i + 1} of $cycles…');
+    var decoded = jsonDecode(utf8.decode(reply)) as Map<String, Object?>;
+    if ((decoded['html'] as String).isEmpty) break;
+    decoded = const {};
+    control.add(await settledRss());
+  }
+  result['control'] = {'replyBytes': reply.length, ...summary(control)};
+
+  // Same reply through the app's shared decoder (every backend uses it):
+  // a background isolate decodes it and hands the result back. No network.
+  final shared = <int>[await settledRss()];
+  for (var i = 0; i < cycles; i++) {
+    onStatus('Diagnosis: shared decoder cycle ${i + 1} of $cycles…');
+    var decoded =
+        await decodeArchiveJson(Stream.value(reply)) as Map<String, Object?>;
+    if ((decoded['html'] as String).isEmpty) break;
+    decoded = const {};
+    shared.add(await settledRss());
+  }
+  result['sharedDecoder'] = summary(shared);
+
+  final api = BichonApi(server, token);
+  try {
+    final account = (await api.accounts()).first.id;
+    await api.folders(account); // the folder list maps the fixture folder
+    final page = await api.emails(
+      account,
+      '',
+      1,
+      folder: fixtureFolder,
+      filters: const SearchFilters(sortOrder: 'asc'),
+    );
+    String? find(String subject) {
+      for (final e in page.items) {
+        if (e.subject == subject) return e.id;
+      }
+      return null;
+    }
+
+    final large = find(largeSubject), small = find(attachmentSubject);
+    if (large == null || small == null) {
+      result['error'] = 'fixture messages not found';
+      return result;
+    }
+    final app = <int>[await settledRss()];
+    for (var i = 0; i < cycles; i++) {
+      onStatus('Diagnosis: app cycle ${i + 1} of $cycles…');
+      var message = await api.message(large);
+      if (message.htmlBody.isEmpty && message.textBody.isEmpty) break;
+      message = await api.message(small);
+      app.add(await settledRss());
+    }
+    result['app'] = summary(app);
+  } on Object catch (error) {
+    result['error'] = error.runtimeType.toString();
+  } finally {
+    api.close();
+  }
+  result['settleSeconds'] = _settle.inSeconds;
+  result['samplesPerReading'] = 5;
   return result;
 }

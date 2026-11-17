@@ -52,7 +52,7 @@ class _BichonProbeScreenState extends State<BichonProbeScreen> {
     super.dispose();
   }
 
-  Future<void> run() async {
+  Future<void> run({bool diagnosis = false}) async {
     final Uri address;
     try {
       address = validateServer(server.text);
@@ -69,7 +69,8 @@ class _BichonProbeScreenState extends State<BichonProbeScreen> {
       output = null;
     });
     final watch = Stopwatch()..start();
-    final result = await runBichonProbe(
+    final probe = diagnosis ? runRetentionDiagnosis : runBichonProbe;
+    final result = await probe(
       server: address,
       token: token.text.trim(),
       onStatus: (value) {
@@ -124,6 +125,12 @@ class _BichonProbeScreenState extends State<BichonProbeScreen> {
           FilledButton(
             onPressed: running ? null : run,
             child: const Text('Run probe'),
+          ),
+          const SizedBox(height: 8),
+          // Diagnosis only: start it from a fresh app launch, not after a run.
+          OutlinedButton(
+            onPressed: running ? null : () => run(diagnosis: true),
+            child: const Text('Run retention diagnosis (fresh start)'),
           ),
           const SizedBox(height: 16),
           Text(status),
