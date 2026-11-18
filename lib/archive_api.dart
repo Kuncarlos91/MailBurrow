@@ -423,21 +423,47 @@ class ArchiveApi implements ArchiveBackend, CancellableMessageBackend {
   }
 }
 
+/// Bound folder conversion and picker state independently of response bytes.
+const maxArchiveFolders = 2000;
+const maxArchiveFolderTextLength = 8192;
+const maxArchiveFolderDepth = 32; // Root folders have depth zero.
+
 List<ArchiveFolder> flattenFolders(List<dynamic> nodes, [int depth = 0]) {
   final result = <ArchiveFolder>[];
-  for (final item in nodes) {
-    final node = item as Map<String, dynamic>;
-    result.add(
-      ArchiveFolder(
-        node['name'] as String,
-        node['fullPath'] as String,
-        node['totalCount'] as int,
-        depth,
-      ),
-    );
-    result.addAll(
-      flattenFolders(node['children'] as List<dynamic>? ?? [], depth + 1),
-    );
+  final paths = <String>{};
+  // One cursor per ancestor, rather than one copied result per subtree.
+  final pending = <(List<dynamic>, int, int)>[(nodes, 0, depth)];
+  while (pending.isNotEmpty) {
+    final (siblings, index, level) = pending.removeLast();
+    if (index >= siblings.length) continue;
+    if (level < 0 ||
+        level > maxArchiveFolderDepth ||
+        siblings.length - index > maxArchiveFolders - result.length) {
+      throw const FormatException('Folder response exceeds supported limits');
+    }
+    final node = siblings[index];
+    if (node is! Map<String, dynamic>) {
+      throw const FormatException('Invalid folder response');
+    }
+    final name = node['name'], path = node['fullPath'];
+    final count = node['totalCount'], children = node['children'];
+    if (name is! String ||
+        name.isEmpty ||
+        name.length > maxArchiveFolderTextLength ||
+        path is! String ||
+        path.isEmpty ||
+        path.length > maxArchiveFolderTextLength ||
+        count is! int ||
+        count < 0 ||
+        !paths.add(path) ||
+        (children != null && children is! List<dynamic>)) {
+      throw const FormatException('Invalid folder response');
+    }
+    result.add(ArchiveFolder(name, path, count, level));
+    pending.add((siblings, index + 1, level));
+    if (children is List<dynamic> && children.isNotEmpty) {
+      pending.add((children, 0, level + 1));
+    }
   }
   return result;
 }

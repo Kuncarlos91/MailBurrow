@@ -428,6 +428,30 @@ void main() {
     },
   );
 
+  test('bounds Bichon mailbox count and nesting before adoption', () async {
+    final original = (mailboxes['mailboxes'] as List).first as Map;
+    final excessive = List.generate(
+      maxArchiveFolders + 1,
+      (i) => {...original, 'id': i + 1, 'name': 'Folder $i'},
+    );
+    final deep = [
+      {
+        ...original,
+        'name': List.filled(maxArchiveFolderDepth + 2, 'x').join('/'),
+        'delimiter': '/',
+      },
+    ];
+    for (final list in [excessive, deep]) {
+      final client = FakeBichonClient({
+        'list-mailboxes/*': (_) => json({...mailboxes, 'mailboxes': list}),
+      });
+      await expectLater(
+        withClient(client, (api) => api.folders('$alex')),
+        throwsA(isA<ArchiveUnsupportedResponse>()),
+      );
+    }
+  });
+
   test('rejects mailboxes of another account', () async {
     for (final body in [
       {

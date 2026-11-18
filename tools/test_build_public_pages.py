@@ -21,6 +21,21 @@ class PublicPagesTests(unittest.TestCase):
             self.assertNotRegex(result, r"(?i)(?:src|href)=[\"']https?://[^\"']+\.(?:css|js)")
             self.assertIn('href="styles.css"', result)
 
+    def test_bichon_candidate_setup_and_privacy_keep_release_boundary(self):
+        files = public_files(self.contact)
+        setup, privacy = files["setup.html"], files["privacy.html"]
+        for page in (setup, privacy):
+            self.assertRegex(page, r"published 0\.4\.0 APK does not support (?:Bichon|it)")
+            self.assertIn("Account viewer", page)
+            self.assertIn("Member", page)
+            self.assertIn("Pro", page)
+            self.assertIn("Community", page)
+        self.assertIn("256 Unicode code points", privacy)
+        self.assertIn("60-second body-read/decode timeout after headers", privacy)
+        self.assertIn("search event containing the query and user name", privacy)
+        self.assertIn("Community discards this event", privacy)
+        self.assertIn("without a persistent copy", privacy)
+
     def test_missing_identity_fails(self):
         with self.assertRaises(ValueError):
             render("test", "")
