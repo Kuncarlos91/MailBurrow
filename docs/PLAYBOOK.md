@@ -137,7 +137,7 @@ The setup guide and website describe Open Archiver 0.6.2 source-scoped read/sear
 | --- | --- |
 | `pubspec.yaml`, `pubspec.lock` | Dependency and native version/build source; docs moves do not upgrade dependencies. |
 | `keystore.properties.example` → ignored `keystore.properties` | Android signing config stays at root; keystore stays outside Git. Never overwrite existing local settings. |
-| `android/`, `ios/` | Platform projects, IDs, entitlements and native integrations stay in place. Android's release ID is `com.kuncarlos91.mailburrow`. iOS uses `com.kuncarlos91.mailburrow` from 0.5.0 (bundle name `MailBurrow`); earlier iOS TestFlight builds used `com.kuncarlos91.mailshelf`, a separate app whose saved connections and Keychain items don't carry over. The internal platform-channel name `mailshelf/saved_files` is unchanged. |
+| `android/`, `ios/` | Platform projects, IDs, entitlements and native integrations stay in place. Android's release ID is `com.kuncarlos91.mailburrow`. iOS development source is prepared for `com.kuncarlos91.mailburrow` (bundle name `MailBurrow`); no new TestFlight upload or device validation is implied; earlier iOS TestFlight builds used `com.kuncarlos91.mailshelf`, a separate app whose saved connections and Keychain items don't carry over. The internal platform-channel name `mailshelf/saved_files` is unchanged. |
 | `.github/workflows/` | Existing CI/manual signing paths unchanged; docs do not dispatch them. |
 | `assets/demo/` | Generated fictional demo archive and attachments; edit the generator, not the files. Must contain only invented people and reserved example domains. |
 | `THIRD_PARTY_NOTICES.md` | Root content/path preserved; privacy tooling depends on it. |
