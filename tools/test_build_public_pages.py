@@ -21,6 +21,23 @@ class PublicPagesTests(unittest.TestCase):
             self.assertNotRegex(result, r"(?i)(?:src|href)=[\"']https?://[^\"']+\.(?:css|js)")
             self.assertIn('href="styles.css"', result)
 
+    def test_bichon_setup_and_privacy_state_the_release_boundary(self):
+        files = public_files(self.contact)
+        setup, privacy = files["setup.html"], files["privacy.html"]
+        self.assertIn("Bichon needs MailBurrow 0.5.0 or later", setup)
+        self.assertIn("MailBurrow 0.5.0 and later support Bichon", privacy)
+        for page in (setup, privacy):
+            self.assertNotRegex(page, r"(?i)development build|unreleased|candidate")
+            self.assertIn("Account viewer", page)
+            self.assertIn("Member", page)
+            self.assertIn("Pro", page)
+            self.assertIn("Community", page)
+        self.assertIn("256 Unicode code points", privacy)
+        self.assertIn("60-second body-read/decode timeout after headers", privacy)
+        self.assertIn("search event containing the query and user name", privacy)
+        self.assertIn("Community discards this event", privacy)
+        self.assertIn("without a persistent copy", privacy)
+
     def test_missing_identity_fails(self):
         with self.assertRaises(ValueError):
             render("test", "")
@@ -96,7 +113,7 @@ class PublicPackageTests(unittest.TestCase):
         support, privacy = self.files["index.html"], self.files["privacy.html"]
         self.assertIn("early preview for Android and iOS", support)
         self.assertIn("signed Android release for 64-bit ARM phones", support)
-        self.assertIn("releases/tag/v0.4.0", support)
+        self.assertIn("releases/tag/v0.5.0", support)
         self.assertIn("MailBurrow limits attachment downloads", support)
         self.assertIn("This recovery action is Android-only", support)
         self.assertIn("Issues are public", support)

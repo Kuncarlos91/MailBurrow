@@ -135,6 +135,7 @@ class FakeOpenArchiver extends OpenArchiverApi {
     Map<String, String>? query,
     Future<T> Function(Stream<List<int>> body, int contentLength) read, {
     Duration? timeout,
+  List<int>? requestBody,
   }) {
     sentPath = path;
     return read(

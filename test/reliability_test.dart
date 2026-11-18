@@ -184,6 +184,8 @@ class PagingApi extends LandscapeApi {
 
 class SectionRecoveryApi extends PagingApi {
   bool networkOffline = false;
+  bool foldersOffline = false;
+  List<ArchiveFolder> folderItems = [];
   bool mailDenied = false;
   @override
   Future<MailPage> emails(
@@ -202,8 +204,10 @@ class SectionRecoveryApi extends PagingApi {
 
   @override
   Future<List<ArchiveFolder>> folders(String id) async {
-    if (networkOffline) throw const SocketException('private detail');
-    return [];
+    if (networkOffline || foldersOffline) {
+      throw const SocketException('private detail');
+    }
+    return folderItems;
   }
 
   @override
@@ -548,6 +552,71 @@ void main() {
     );
   }
 
+  testWidgets('large folder picker builds visible rows and still selects a folder', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({
+      'connection': jsonEncode({'server': 'https://example.com', 'key': 'test-only'}),
+    });
+    final api = SectionRecoveryApi()
+      ..folderItems = List.generate(2000, (i) => ArchiveFolder('Folder $i', 'path/$i', 0, 0));
+    await tester.pumpWidget(MaterialApp(home: ArchiveHome(apiFactory: (_, _) => api)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('All archived mail ▾'));
+    await tester.pumpAndSettle();
+    expect(find.text('Folder 0'), findsOneWidget);
+    expect(find.text('Folder 1999'), findsNothing);
+    expect(find.byType(ListTile).evaluate().length, lessThan(30));
+    await tester.tap(find.text('Folder 0'));
+    await tester.pumpAndSettle();
+    expect(find.text('path/0 ▾'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final stillOffline in [false, true]) {
+    testWidgets(
+      'mail Retry also revalidates failed folders (${stillOffline ? 'folders still failing' : 'recovered'})',
+      (tester) async {
+        FlutterSecureStorage.setMockInitialValues({
+          'connection': jsonEncode({
+            'server': 'https://example.com',
+            'key': 'test-only',
+          }),
+        });
+        final api = SectionRecoveryApi();
+        await tester.pumpWidget(
+          MaterialApp(home: ArchiveHome(apiFactory: (_, _) => api)),
+        );
+        await tester.pumpAndSettle();
+        api.networkOffline = true;
+        await tester.tap(find.byTooltip('Reload folders'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('Refresh'));
+        await tester.pumpAndSettle();
+        const folderError = 'Could not load folders. Tap Retry.';
+        expect(find.text(folderError), findsOneWidget);
+        expect(find.byType(SnackBar), findsOneWidget);
+        api.networkOffline = false;
+        api.foldersOffline = stillOffline;
+        // The Retry on the mail notice, not the folder line's own Retry.
+        await tester.tap(
+          find.descendant(
+            of: find.byType(SnackBar),
+            matching: find.text('Retry'),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.text(readableError(const SocketException(''))),
+          findsNothing,
+        );
+        expect(find.byType(SnackBar), findsNothing);
+        // Recovered folders clear their error; a folder failure that persists
+        // keeps it, so the line never claims success it did not see.
+        expect(find.text(folderError), stillOffline ? findsOneWidget : findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   for (final outcome in ['recovered', 'offline', 'mail denied']) {
     testWidgets(
       'archive information refresh revalidates prior mail error: $outcome',
@@ -574,8 +643,10 @@ void main() {
         );
         api.networkOffline = outcome == 'offline';
         api.mailDenied = outcome == 'mail denied';
-        await tester.ensureVisible(
+        await tester.scrollUntilVisible(
           find.byTooltip('Refresh archive information'),
+          200,
+          scrollable: find.byType(Scrollable).first,
         );
         await tester.pumpAndSettle();
         await tester.tap(find.byTooltip('Refresh archive information'));

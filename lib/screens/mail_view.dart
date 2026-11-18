@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../account_selector.dart';
-import '../archive_picker.dart';
 import '../message_date.dart';
 import '../state/archive_session.dart';
+import '../widgets/current_archive_rows.dart';
 import 'message_reader.dart';
 
 /// Mail and Search tabs: account, filters, folder, search field, message
@@ -38,7 +37,6 @@ class MailView extends StatelessWidget {
     final page = s.page;
     final totalPages = s.totalPages;
     final folders = s.capabilities.folders;
-    final archive = s.activeArchive;
     return CustomScrollView(
       controller: scrollController,
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -46,28 +44,10 @@ class MailView extends StatelessWidget {
         SliverToBoxAdapter(
           child: Column(
             children: [
-              if (archive != null)
-                ListTile(
-                  key: const ValueKey('current-archive'),
-                  dense: true,
-                  visualDensity: VisualDensity.compact,
-                  leading: const Icon(Icons.dns_outlined),
-                  title: Text(
-                    archive.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  subtitle: Text(archiveDetails(archive)),
-                  trailing: const Icon(Icons.unfold_more),
-                  onTap: s.canSwitchArchive ? onChooseArchive : null,
-                ),
-              ListTile(
-                key: const ValueKey('current-mail-account'),
-                leading: const Icon(Icons.account_circle_outlined),
-                title: Text(accountAddress(s.account)),
-                subtitle: const Text('Currently browsing'),
-                trailing: const Icon(Icons.unfold_more),
-                onTap: s.canSwitchAccount ? onChooseAccount : null,
+              CurrentArchiveRows(
+                session: s,
+                onChooseAccount: onChooseAccount,
+                onChooseArchive: onChooseArchive,
               ),
               if (s.accountNotice != null)
                 Padding(

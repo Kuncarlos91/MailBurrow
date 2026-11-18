@@ -631,6 +631,36 @@ void main() {
       });
     }
 
+    testWidgets('Settings shows the same rows and switches archives', (tester) async {
+      await tester.runAsync(seed);
+      await tester.pumpWidget(app());
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(NavigationDestination, 'Settings'));
+      await tester.pumpAndSettle();
+      final archiveRow = find.byKey(const ValueKey('current-archive'));
+      expect(archiveRow, findsOneWidget);
+      expect(find.byKey(const ValueKey('current-mail-account')), findsOneWidget);
+      expect(
+        find.descendant(of: archiveRow, matching: find.text(hostB)),
+        findsOneWidget,
+      );
+      await tester.tap(archiveRow);
+      await tester.pumpAndSettle();
+      expect(find.text('Add archive'), findsOneWidget);
+      await tester.tap(find.text(hostA).last);
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(of: archiveRow, matching: find.text(hostA)),
+        findsOneWidget,
+      );
+      // Destination presence alone does not prove switching returned to Mail.
+      expect(
+        tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+        0,
+      );
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('the Opening screen has Cancel', (tester) async {
       await tester.runAsync(seed);
       await tester.pumpWidget(app());

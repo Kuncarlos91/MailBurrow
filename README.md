@@ -16,9 +16,9 @@
   <a href="https://github.com/Kuncarlos91/MailBurrow/issues/new/choose">Feedback / report a problem</a>
 </p>
 
-A read-only Android and iOS app for browsing your own [Mail-Archiver](https://github.com/s1t5/mail-archiver) or [Open Archiver](https://github.com/LogicLabs-OU/OpenArchiver) server. Browse and search archived mail, filter by date and supported folder options, read messages in a simplified view, and save attachments when you choose to.
+A read-only Android and iOS app for browsing your own [Mail-Archiver](https://github.com/s1t5/mail-archiver), [Open Archiver](https://github.com/LogicLabs-OU/OpenArchiver) or [Bichon](https://github.com/rustmailer/bichon) server. Browse and search archived mail, filter by date and supported folder options, read messages in a simplified view, and save attachments when you choose to.
 
-MailBurrow is an early preview. A signed Android release, [0.4.0](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.4.0), is available for 64-bit ARM phones; iPhone/iPad builds are source-only. See [project status](docs/testing/status.md).
+MailBurrow is an early preview. A signed Android release, [0.5.0](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.5.0), is available for 64-bit ARM phones; iPhone/iPad builds are source-only. See [project status](docs/testing/status.md).
 
 **New here?** Install the Android APK and tap **Try the demo** for fictional mail with no server or network needed. The demo is inside the app. To connect your own archive, follow the [setup guide](docs/setup-guide.md).
 
@@ -34,19 +34,20 @@ MailBurrow is an early preview. A signed Android release, [0.4.0](https://github
 <p>
   <a href="docs/testing/status.md#tested-servers"><img src="https://img.shields.io/badge/Mail--Archiver-2611.2-555555" alt="Tested with Mail-Archiver 2611.2"></a>
   <a href="docs/testing/status.md#tested-servers"><img src="https://img.shields.io/badge/Open%20Archiver-0.6.2-555555" alt="Tested with Open Archiver 0.6.2"></a>
+  <a href="docs/testing/status.md#tested-servers"><img src="https://img.shields.io/badge/Bichon-2.4.2%20Community-555555" alt="Tested with Bichon 2.4.2 Community"></a>
 </p>
 
-Android 0.4.0 was tested with Mail-Archiver 2611.2 and Open Archiver 0.6.2; other server versions are unverified. See [tested servers and known limits](docs/testing/status.md#tested-servers).
+Android 0.5.0 was tested with Mail-Archiver 2611.2, Open Archiver 0.6.2 and Bichon 2.4.2 Community; other server versions and Bichon Pro/Enterprise are unverified. See [tested servers and known limits](docs/testing/status.md#tested-servers).
 
 ## What you need before connecting
 
 MailBurrow is a client for an archive you run yourself. It is not a hosted email service and does not connect to Gmail or any mailbox with your email password.
 
-1. A [Mail-Archiver](https://github.com/s1t5/mail-archiver) server with API access turned on, or an [Open Archiver](https://github.com/LogicLabs-OU/OpenArchiver) 0.6.2 server, with your archived mail. TrueNAS is one way to host either, but not a requirement.
-2. An **HTTPS address with a valid certificate** for that server, and an API key created on it.
+1. A [Mail-Archiver](https://github.com/s1t5/mail-archiver) server with API access turned on, an [Open Archiver](https://github.com/LogicLabs-OU/OpenArchiver) 0.6.2 server, or a [Bichon](https://github.com/rustmailer/bichon) 2.4.2 Community server, with your archived mail. TrueNAS is one way to host them, but not a requirement.
+2. An **HTTPS address with a valid certificate** for that server, and an API key created on it (for Bichon, an access token for a read-only user).
 3. If your server is only reachable through **Tailscale**, your own Tailscale account with the Tailscale app connected on your phone. Any other working HTTPS setup is fine too.
 
-The [setup guide](docs/setup-guide.md) explains how the pieces fit together and the exact settings for Mail-Archiver, Open Archiver, TrueNAS and Tailscale. The project does not host servers, provide accounts or set up private networks. Server permissions, retention, logs and backups are up to you or your server administrator.
+The [setup guide](docs/setup-guide.md) explains how the pieces fit together and the exact settings for Mail-Archiver, Open Archiver, Bichon, TrueNAS and Tailscale. The project does not host servers, provide accounts or set up private networks. Server permissions, retention, logs and backups are up to you or your server administrator.
 
 ## Try it without a server
 
@@ -65,7 +66,7 @@ Android in dark mode, using fictional demo mail: **browse mail** (first), then *
 MailBurrow is not in the app stores. To try it:
 
 - **Before installing,** set up your server with the [setup guide](docs/setup-guide.md); the app needs it to connect.
-- **Android:** download `MailBurrow-0.4.0-build27.apk` from the [0.4.0 release](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.4.0) and compare its SHA-256 with the one in the release notes. It is for 64-bit ARM (arm64-v8a) devices; 32-bit-only phones cannot install it. Not ready to connect a server? Tap **Try the demo** on setup. You can also build it from source (see [Building from source](#building-from-source)): `flutter build apk --debug --target-platform android-arm64` produces a debug APK that installs as **MailBurrow Preview**, separately from the signed release.
+- **Android:** download `MailBurrow-0.5.0-build31.apk` from the [0.5.0 release](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.5.0) and compare its SHA-256 with the one in the release notes. It is for 64-bit ARM (arm64-v8a) devices; 32-bit-only phones cannot install it. Not ready to connect a server? Tap **Try the demo** on setup. You can also build it from source (see [Building from source](#building-from-source)): `flutter build apk --debug --target-platform android-arm64` produces a debug APK that installs as **MailBurrow Preview**, separately from the signed release.
 - **iPhone and iPad:** build and run from source on a Mac with Xcode.
 
 Signed releases are published on the [Releases page](https://github.com/Kuncarlos91/MailBurrow/releases) and install over each other without losing your saved connection.
@@ -79,11 +80,11 @@ If MailBurrow is useful to you, you can [star the project](https://github.com/Ku
 ## Connect
 
 1. Connect Tailscale first, if your server needs it.
-2. Choose the server type: **Mail-Archiver** or **Open Archiver**.
+2. Choose the server type: **Mail-Archiver**, **Open Archiver** or **Bichon**.
 3. Enter your server address. `https://` is added if you leave it out.
-4. Enter your API key and tap **Connect to archive**.
+4. Enter your API key (for Bichon, the access token) and tap **Connect to archive**.
 5. If your key can see more than one mail account or source, switch between them from the account row or Settings.
-6. To add another archive, tap the archive name above the account, then **Add archive**. **Settings → Archives** renames, changes or forgets saved archives.
+6. To add another archive, tap the archive name above the account, then **Add archive**. The archive and account rows are the same on Mail, Search and Settings. In **Settings → Archives**, tap an archive to open it, or use **⋮** to rename, change or forget it.
 
 The setup screen in dark mode: choose the server type, then enter the server address and API key.
 

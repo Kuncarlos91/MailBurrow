@@ -63,6 +63,67 @@ The reader needs a custom role with two rules, one on its source and one on that
 
 A successful export only proves the files match the demo data. Whether the server ingested every message and attachment, how it stores and returns them, and whether a restricted key is isolated from other sources are separate checks, run against the live test server. Record them with the server's exact version.
 
+## Bichon lab check
+
+For the planned Bichon backend (Phase 0 feasibility), [bichon_lab_check.py](../../tools/bichon_lab_check.py) checks a test Bichon server holding only the demo mail: Alex Rivera and Maple Street Bakery imported into two NoSync accounts, and a reader user with the `member` global role and `account_viewer` on the Alex account only.
+
+```
+python tools/bichon_lab_check.py https://<test-server>:9443
+```
+
+It asks for an admin token (a control; never used by the app), the reader token and, optionally, a revoked token and an expired token, without echoing them; every token must be different, and the expired one must have passed its expiry date without being revoked. It sends GET requests plus POST to the read-only search endpoint, always verifies certificates and never follows redirects. Write-denial testing must be a separate procedure on disposable fictional fixtures; this routine checker never sends tag changes or administrator cleanup writes. Its result does not close that separate authorization gate.
+
+It checks token refusal, the reader's permissions and account list, that the reader sees Alex only (listing, search, unscoped search, text search, mailboxes, messages, envelopes and attachments), attachment sizes, raw EML refusal, path-like IDs, unusual search text, and redirects. As optional, reported checks it also sends the unusual inputs through a candidate literal-search encoding (backslash-escaped query syntax, lowercased standalone `AND`/`OR`/`NOT`) and expects them to be accepted, and checks that literal phrases from Alex demo subjects, such as `club: next` and `dinner?`, find every Alex message whose subject contains them. The expected subject inventory must be complete, correctly scoped and well formed. Operator checks include tabs/newlines and punctuation boundaries. These positive match checks do not prove exact substring semantics, exclude all extra matches or establish a universal parser implementation; keep the encoding provisional until pinned live/result-set evidence supports it. The app never calls `/accounts`; the check only reports whether it would expose an IMAP password to the reader. The summary holds only statuses, counts, sizes, permission names and allowlisted field names. [test_bichon_lab_check.py](../../tools/test_bichon_lab_check.py) runs it against an in-process fake server with leaks, malformed responses, oversized bodies and forbidden method/path combinations injected. Cross-account attachment refusal uses an existing attachment with a successful admin control, not an invented hash. Host responses above 41 MiB fail rather than being silently truncated.
+
+### Bichon write-denial check
+
+[bichon_write_denial.py](../../tools/bichon_write_denial.py) is that separate procedure. It uses one sacrificial fictional message, never the demo mail:
+
+```
+python tools/bichon_write_denial.py --write-probe-eml build/probe.eml
+python tools/bichon_write_denial.py https://<test-server>:9443
+```
+
+The first command writes the probe message without touching the network; import it into the Alex Rivera account's INBOX on Bichon's Import page. The second asks for distinct admin and reader tokens. It stops before mutation unless a complete search finds exactly one probe with exact subject, sender and Message-ID, the admin can read its validated envelope, and the reader can read that same envelope. The admin adds a tag (accepted and visible on the envelope) and repairs this sacrificial probe as positive controls. The admin then restores the probe's original tags with `Overwrite`, a required control. It never uses `Remove`: in Bichon 2.4.2, update-tags `Add` and `Remove` fail with HTTP 500 on any message that already has a tag (the stored tags are re-added in tantivy's encoded form, which panics), while `Overwrite` does not read them. Imported mail can take up to about a minute to become searchable, so wait until a search finds the probe before running the check. The result requires every named control, reader denial and cleanup check to pass. Bichon tags are facet paths starting with `/`, and update-tags validates them before checking permissions, so a reader 400 would prove nothing; the controls use valid `/mailburrow-…` tags. The reader then tries tag, repair and delete, expecting **403**; 401 cannot prove authorization denial because it may mean an invalid/expired token. After each attempt the admin compares the validated envelope snapshot. An uncertain or accepted change stops further reader probes. Once mutation testing starts, admin deletion cleanup is attempted even on a contract failure. Cleanup requires both a direct 404 and a successful, complete empty probe search; an error is not absence. A failed admin control cannot establish the matching request shape. Results apply only to the tested operations, not every possible Bichon mutation. An envelope without `tags` (optional in Bichon's schema) or with null tags counts as untagged. If preflight envelope validation fails, the summary names the failing field, never its value, and no writes are sent; the probe is left for a rerun. After mutation testing begins, validation failures still trigger the cleanup attempt described above; do not assume the probe remains available. The summary holds only statuses, booleans and field names. [test_bichon_write_denial.py](../../tools/test_bichon_write_denial.py) covers wrongly allowed writes, invalid reader credentials, incomplete/ambiguous probe searches, broken controls, metadata changes and cleanup lookup failures. No live write is performed by running these unit tests.
+
+### Bichon measurement fixtures
+
+[bichon_fixtures.py](../../tools/bichon_fixtures.py) writes one fictional mbox for the Bichon phone measurements:
+
+```
+python tools/bichon_fixtures.py --out build/mailburrow-fixtures.mbox
+```
+
+Import only into an isolated fictional account. In the reviewed Bichon import flow a folder is named after the file; verify that destination and the exact fixture Message-IDs before any cleanup, never bulk-delete real mail by a broad subject search. It holds a large message with 4,120,000-byte plain-text and well-formed HTML bodies. This revision produced an 8,290,934-byte parsed response, with both bodies intact and the HTML balanced, on a diagnostic Bichon 2.4.2 build from the source tag (messages imported through the API, not the Import page). Measure it again on the lab server after import before measuring on a phone (the app response limit is 8,388,608 bytes). It also holds a message with a 45 MiB attachment (under the 50 MiB cap), and 30 small messages so a search for `MailBurrow fixture` fills a 25-item page. Every message is fictional, uses reserved example domains and carries the `MailBurrow fixture` marker in its subject and Message-ID. Output is deterministic and capped at 80 MiB; existing output is refused and a failed generation removes its newly created partial file. Use a new filename on reruns. Run the 40-message lab check before importing the fixtures, or after removing them, because they change the account's totals. [test_bichon_fixtures.py](../../tools/test_bichon_fixtures.py) checks counts, decoded sizes, balanced HTML, markers, domains, determinism and output-failure handling. Construction tests do not prove a server preserves the fixtures, the exact response size, or a phone-memory/cancellation pass. Verify all 32 fixtures are indexed and the attachment is really 45 MiB before measuring.
+
+To remove the fixtures afterwards, use [bichon_fixture_cleanup.py](../../tools/bichon_fixture_cleanup.py):
+
+```sh
+python tools/bichon_fixture_cleanup.py https://<test-server>:9443
+python tools/bichon_fixture_cleanup.py https://<test-server>:9443 --delete
+```
+
+It asks for the admin token. Without `--delete` it only checks and reports. It selects messages by the generator's exact Message-ID, subject and sender address. Before anything is deleted, all of these must hold:
+
+- the messages are in the Alex Rivera account;
+- they are in exactly one folder named `mailburrow-fixtures`;
+- that folder holds exactly the 32 fixtures and no other mail;
+- no fixture-marked message exists outside that folder.
+
+The account must also contain exactly the 32 fixtures plus its 40-message baseline before deletion. Search pages must have stable totals, bounded page lengths and unique account/envelope IDs; wrong-scope or malformed items are refused. An empty-folder rerun still verifies the 40-message baseline.
+
+Keep the fictional lab quiescent: do not import, move or delete mail concurrently. These snapshots and the server delete request are not one atomic transaction; concurrent changes can invalidate the checks. This tool is not for real archives.
+
+With `--delete` it then deletes those 32 with the admin token and waits until the folder is empty. It confirms the Alex account count is back to 40 messages. Rerun the full lab checker separately: matching the count does not prove the remaining messages or API contracts are the expected baseline. A rerun reports *nothing to remove*. It deletes no folders: remove the empty `mailburrow-fixtures` folder in Bichon's interface if you want. The summary holds only counts and statuses. [test_bichon_fixture_cleanup.py](../../tools/test_bichon_fixture_cleanup.py) covers:
+
+- the dry run, which sends no delete;
+- deleting exactly the fixtures;
+- refusal when the folder holds other mail, a fixture is missing, a marked copy exists elsewhere or there are two fixture folders;
+- a refused reader delete;
+- a summary free of tokens and addresses.
+
+These unit tests perform no live deletion.
+
 ## Phone memory check with stress mail
 
 [generate_stress_mail.py](../../tools/generate_stress_mail.py) writes `stress-mail.zip`: ten fictional messages for the 0.4.0 release check of memory on the phone. They include long bodies, quoted-printable and base64 encodings, Latin-1 plain text and Windows-1252 HTML as the selected body alternatives, six explicitly inline CID images, 30 levels of nesting, 400 parts, about 190 KiB of headers, one message just under the app's 10 MiB message limit and one just over it. Output is deterministic and uses only `stress.example` addresses.

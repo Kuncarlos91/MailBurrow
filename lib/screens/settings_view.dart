@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../account_selector.dart';
 import '../archive_information.dart';
 import '../build_information.dart';
 import '../public_information.dart';
 import '../state/archive_session.dart';
 import '../third_party_licenses.dart';
+import '../widgets/current_archive_rows.dart';
 import 'archives_page.dart';
 
 /// Settings tab: current account, connection settings, archive details,
@@ -15,9 +15,11 @@ class SettingsView extends StatelessWidget {
     super.key,
     required this.session,
     required this.onChooseAccount,
+    this.onChooseArchive,
   });
   final ArchiveSession session;
   final VoidCallback onChooseAccount;
+  final VoidCallback? onChooseArchive;
 
   @override
   Widget build(BuildContext context) {
@@ -31,21 +33,15 @@ class SettingsView extends StatelessWidget {
           'Your archive. Your server.',
           style: Theme.of(context).textTheme.headlineSmall,
         ),
-        Card(
-          child: ListTile(
-            leading: const Icon(Icons.dns_outlined),
-            title: Text(accountAddress(account)),
-            subtitle: Text(
-              session.demo
-                  ? 'Built-in demo, no server'
-                  : api == null
-                  ? ''
-                  : '${session.serverType.label} · ${api.server.host}',
-            ),
-            trailing: const Icon(Icons.unfold_more),
-            onTap: session.canSwitchAccount ? onChooseAccount : null,
-          ),
+        const SizedBox(height: 8),
+        // Same rows as Mail and Search, so the current archive and account
+        // look and switch the same way on every tab.
+        CurrentArchiveRows(
+          session: session,
+          onChooseAccount: onChooseAccount,
+          onChooseArchive: onChooseArchive,
         ),
+        const Divider(),
         if (session.demo)
           ListTile(
             title: const Text('Connection settings'),
@@ -56,7 +52,7 @@ class SettingsView extends StatelessWidget {
           ListTile(
             title: const Text('Archives'),
             subtitle: const Text(
-              'Rename, change the address or key of, forget or add archives saved on this device',
+              'Open, rename, change or forget archives saved on this device, or add one',
             ),
             trailing: const Icon(Icons.chevron_right),
             onTap: busy
@@ -79,7 +75,7 @@ class SettingsView extends StatelessWidget {
           ListTile(
             title: const Text('Server and private network'),
             subtitle: Text(
-              'You manage your ${session.serverType.label} server, HTTPS address, API keys and Tailscale setup. This app does not host or configure those services.',
+              'You manage your ${session.serverType.label} server, HTTPS address, ${session.serverType.credential}s and Tailscale setup. This app does not host or configure those services.',
             ),
           ),
         const ListTile(
@@ -95,6 +91,7 @@ class SettingsView extends StatelessWidget {
                 ? session.switchAccount
                 : null,
             onRefreshed: session.retryFailedMailAfterRecovery,
+            credential: session.serverType.credential,
           ),
         const PublicInformationLinks(),
         const ThirdPartyLicensesTile(),

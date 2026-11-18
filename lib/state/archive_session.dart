@@ -10,6 +10,7 @@ import '../demo/demo_archive.dart';
 import '../archive_capabilities.dart';
 import '../search_filters.dart';
 import '../archive_server_type.dart';
+import '../bichon_api.dart';
 import '../open_archiver_api.dart';
 import 'connection_store.dart';
 
@@ -30,6 +31,7 @@ ArchiveBackend createArchiveBackend(
 ) => switch (type) {
   ArchiveServerType.mailArchiver => ArchiveApi(server, key),
   ArchiveServerType.openArchiver => OpenArchiverApi(server, key),
+  ArchiveServerType.bichon => BichonApi(server, key),
 };
 
 /// Opens the built-in demo archive.
@@ -482,7 +484,8 @@ class ArchiveSession extends ChangeNotifier {
       }
       final key = savedKey ?? keyInput.text.trim();
       if (key.isEmpty) {
-        error = 'Enter your API key.';
+        error =
+            'Enter your ${(savedKey == null ? setupServerType : serverType).credential}.';
         _notify();
         return;
       }
@@ -730,6 +733,7 @@ class ArchiveSession extends ChangeNotifier {
             '${query.isEmpty ? 'Messages loaded' : 'Search complete'} · $count · ${(watch.elapsedMilliseconds / 1000).toStringAsFixed(1)} s';
         _notify();
         if (scrollToTop) onScrollToTop?.call(current);
+        retryFailedFoldersAfterRecovery();
       }
     } catch (failure) {
       if (current()) {
@@ -761,6 +765,15 @@ class ArchiveSession extends ChangeNotifier {
   void retryFailedMailAfterRecovery() {
     if (!_disposed && !setup && !busy && mailRequestFailed && api != null) {
       unawaited(load(page));
+    }
+  }
+
+  // The reverse of [retryFailedMailAfterRecovery]: mail loading again is a
+  // sign the server is reachable, so revalidate folders that failed instead
+  // of leaving their error on screen.
+  void retryFailedFoldersAfterRecovery() {
+    if (!_disposed && !setup && folderError != null && !foldersBusy) {
+      unawaited(loadFolders());
     }
   }
 

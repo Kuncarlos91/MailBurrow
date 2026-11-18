@@ -75,6 +75,10 @@ Future<dynamic> _decodeArchiveBytes(Uint8List bytes) =>
 /// connected, the request and response limits apply as before.
 const archiveConnectTimeout = Duration(seconds: 10);
 
+/// The largest request body the transport sends. Only a backend's
+/// allowlisted read-only POST routes send a body (see [ArchiveApi.allowsPost]).
+const maxRequestBodyBytes = 4 * 1024;
+
 /// The Mail-Archiver implementation of [ArchiveBackend], using its read-only
 /// REST API under `/api/v1/`.
 ///
@@ -144,6 +148,23 @@ class ArchiveApi implements ArchiveBackend, CancellableMessageBackend {
   /// [cancelEmailRequests] stops.
   bool isMailRequest(String path) => path == 'emails';
 
+  /// What this server calls its credential, used in 401 and 403 messages.
+  String get credentialName => 'API key';
+
+  /// Whether [path] is a read-only route this backend may POST to. No
+  /// Mail-Archiver or Open Archiver route is; Bichon allows only its search.
+  bool allowsPost(String path) => false;
+
+  /// POSTs [body] as JSON to an allowlisted read-only route and decodes the
+  /// JSON response within the API response limits.
+  Future<dynamic> postJson(String path, Object body) => send(
+    path,
+    null,
+    (response, contentLength) =>
+        decodeArchiveJson(response, contentLength: contentLength),
+    requestBody: utf8.encode(jsonEncode(body)),
+  );
+
   Future<dynamic> get(String path, [Map<String, String>? query]) => send(
     path,
     query,
@@ -159,8 +180,15 @@ class ArchiveApi implements ArchiveBackend, CancellableMessageBackend {
     Map<String, String>? query,
     Future<T> Function(Stream<List<int>> body, int contentLength) read, {
     Duration? timeout,
+    List<int>? requestBody,
   }) async {
     if (_closed) throw StateError('Archive connection closed');
+    if (requestBody != null) {
+      if (!allowsPost(path)) throw StateError('POST not allowed for $path');
+      if (requestBody.length > maxRequestBodyBytes) {
+        throw ArgumentError('Request body too large');
+      }
+    }
     final load = MessageLoad.current;
     load?.throwIfCancelled();
     validateServer(server.toString());
@@ -176,7 +204,9 @@ class ArchiveApi implements ArchiveBackend, CancellableMessageBackend {
         queryParameters: query,
       );
       Future<HttpClientRequest> open() async {
-        final request = await client.getUrl(url);
+        final request = requestBody == null
+            ? await client.getUrl(url)
+            : await client.postUrl(url);
         call.attach(request);
         return request;
       }
@@ -187,13 +217,20 @@ class ArchiveApi implements ArchiveBackend, CancellableMessageBackend {
       request.followRedirects = false;
       authorize(request);
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      if (requestBody != null) {
+        request.headers.contentType = ContentType.json;
+        request.contentLength = requestBody.length;
+        request.add(requestBody);
+      }
       final response = await call.guard(
         request.close().timeout(const Duration(seconds: 20)),
       );
       // Once headers arrive, abort() no longer has any effect; the body is
       // read through a subscription this call owns so cancelling stops it.
       final body = call.trackBody(response);
-      if (response.statusCode != 200) throw ArchiveFailure(response.statusCode);
+      if (response.statusCode != 200) {
+        throw ArchiveFailure(response.statusCode, credential: credentialName);
+      }
       final result = await call.guard(
         read(body, response.contentLength).timeout(timeout ?? responseTimeout),
       );
@@ -322,7 +359,9 @@ class ArchiveApi implements ArchiveBackend, CancellableMessageBackend {
       final response = await active.wait(
         request.close().timeout(const Duration(seconds: 30)),
       );
-      if (response.statusCode != 200) throw ArchiveFailure(response.statusCode);
+      if (response.statusCode != 200) {
+        throw ArchiveFailure(response.statusCode, credential: credentialName);
+      }
       if (response.contentLength > attachmentByteLimit) {
         throw const AttachmentTooLarge();
       }
@@ -384,21 +423,47 @@ class ArchiveApi implements ArchiveBackend, CancellableMessageBackend {
   }
 }
 
+/// Bound folder conversion and picker state independently of response bytes.
+const maxArchiveFolders = 2000;
+const maxArchiveFolderTextLength = 8192;
+const maxArchiveFolderDepth = 32; // Root folders have depth zero.
+
 List<ArchiveFolder> flattenFolders(List<dynamic> nodes, [int depth = 0]) {
   final result = <ArchiveFolder>[];
-  for (final item in nodes) {
-    final node = item as Map<String, dynamic>;
-    result.add(
-      ArchiveFolder(
-        node['name'] as String,
-        node['fullPath'] as String,
-        node['totalCount'] as int,
-        depth,
-      ),
-    );
-    result.addAll(
-      flattenFolders(node['children'] as List<dynamic>? ?? [], depth + 1),
-    );
+  final paths = <String>{};
+  // One cursor per ancestor, rather than one copied result per subtree.
+  final pending = <(List<dynamic>, int, int)>[(nodes, 0, depth)];
+  while (pending.isNotEmpty) {
+    final (siblings, index, level) = pending.removeLast();
+    if (index >= siblings.length) continue;
+    if (level < 0 ||
+        level > maxArchiveFolderDepth ||
+        siblings.length - index > maxArchiveFolders - result.length) {
+      throw const FormatException('Folder response exceeds supported limits');
+    }
+    final node = siblings[index];
+    if (node is! Map<String, dynamic>) {
+      throw const FormatException('Invalid folder response');
+    }
+    final name = node['name'], path = node['fullPath'];
+    final count = node['totalCount'], children = node['children'];
+    if (name is! String ||
+        name.isEmpty ||
+        name.length > maxArchiveFolderTextLength ||
+        path is! String ||
+        path.isEmpty ||
+        path.length > maxArchiveFolderTextLength ||
+        count is! int ||
+        count < 0 ||
+        !paths.add(path) ||
+        (children != null && children is! List<dynamic>)) {
+      throw const FormatException('Invalid folder response');
+    }
+    result.add(ArchiveFolder(name, path, count, level));
+    pending.add((siblings, index + 1, level));
+    if (children is List<dynamic> && children.isNotEmpty) {
+      pending.add((children, 0, level + 1));
+    }
   }
   return result;
 }

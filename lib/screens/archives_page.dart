@@ -6,9 +6,10 @@ import '../state/connection_store.dart';
 
 enum _ArchiveAction { rename, change, forget }
 
-/// Settings → Archives: rename, change the address or key of, or forget each
-/// saved archive, and add another. Nothing here contacts a server except
-/// "Change address or key", which validates in setup before saving.
+/// Settings → Archives: open, rename, change the address and key or token
+/// of, or forget each saved archive, and add another. Opening uses the same
+/// switch as the Mail page's archive row; "Change address" validates in
+/// setup before saving. Nothing else here contacts a server.
 class ArchivesPage extends StatelessWidget {
   const ArchivesPage({super.key, required this.session});
   final ArchiveSession session;
@@ -21,44 +22,82 @@ class ArchivesPage extends StatelessWidget {
         listenable: session,
         builder: (context, _) {
           final busy = session.busy && !session.mailLoading;
+          final activeId = session.activeArchive?.id;
           return ListView(
             padding: const EdgeInsets.symmetric(vertical: 8),
             children: [
-              for (final profile in session.archives)
-                ListTile(
-                  key: ValueKey('manage-archive-${profile.id}'),
-                  leading: const Icon(Icons.dns_outlined),
-                  title: Text(
-                    profile.label,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  subtitle: Text(
-                    profile.id == session.activeArchive?.id
-                        ? '${archiveDetails(profile)}\nOpen now'
-                        : archiveDetails(profile),
-                  ),
-                  isThreeLine: profile.id == session.activeArchive?.id,
-                  trailing: PopupMenuButton<_ArchiveAction>(
-                    tooltip: 'Actions for ${profile.label}',
-                    enabled: !busy,
-                    onSelected: (action) => _act(context, profile, action),
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(
-                        value: _ArchiveAction.rename,
-                        child: Text('Rename'),
+              // A single-choice list: the selected radio and tinted row mark
+              // the open archive; tapping another row opens it through the
+              // same switch as the Mail page's archive row.
+              RadioGroup<String>(
+                groupValue: activeId,
+                onChanged: (id) {
+                  if (id == null ||
+                      id == activeId ||
+                      !session.canSwitchArchive) {
+                    return;
+                  }
+                  Navigator.pop(context);
+                  session.switchArchive(id);
+                },
+                child: Column(
+                  children: [
+                    for (final profile in session.archives)
+                      Material(
+                        color: profile.id == activeId
+                            ? Theme.of(context).colorScheme.secondaryContainer
+                                  .withValues(alpha: 0.4)
+                            : Colors.transparent,
+                        child: Row(
+                          children: [
+                            // RadioListTile merges semantics. Keep the menu
+                            // outside it so it has its own accessible action.
+                            Expanded(
+                              child: RadioListTile<String>(
+                                key: ValueKey('manage-archive-${profile.id}'),
+                                value: profile.id,
+                                controlAffinity:
+                                    ListTileControlAffinity.leading,
+                                selected: profile.id == activeId,
+                                enabled:
+                                    profile.id == activeId ||
+                                    session.canSwitchArchive,
+                                title: Text(
+                                  profile.label,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                subtitle: Text(archiveDetails(profile)),
+                              ),
+                            ),
+                            PopupMenuButton<_ArchiveAction>(
+                              tooltip: 'Actions for ${profile.label}',
+                              enabled: !busy,
+                              onSelected: (action) =>
+                                  _act(context, profile, action),
+                              itemBuilder: (_) => [
+                                const PopupMenuItem(
+                                  value: _ArchiveAction.rename,
+                                  child: Text('Rename'),
+                                ),
+                                PopupMenuItem(
+                                  value: _ArchiveAction.change,
+                                  child: Text(
+                                    'Change address or ${profile.serverType.credential == 'access token' ? 'token' : 'key'}',
+                                  ),
+                                ),
+                                const PopupMenuItem(
+                                  value: _ArchiveAction.forget,
+                                  child: Text('Forget on this device'),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                      PopupMenuItem(
-                        value: _ArchiveAction.change,
-                        child: Text('Change address or key'),
-                      ),
-                      PopupMenuItem(
-                        value: _ArchiveAction.forget,
-                        child: Text('Forget on this device'),
-                      ),
-                    ],
-                  ),
+                  ],
                 ),
+              ),
               ListTile(
                 leading: const Icon(Icons.add),
                 title: const Text('Add archive'),
@@ -71,7 +110,7 @@ class ArchivesPage extends StatelessWidget {
               const Padding(
                 padding: EdgeInsets.all(16),
                 child: Text(
-                  'Archives are saved only on this device. Forgetting one removes its address and API key here; it does not change mail on the server or revoke the key.',
+                  'Tap an archive to switch to it. Use ⋮ to rename, change or forget it.\n\nArchives are saved only on this device. Forgetting one removes its address and API key or access token here; it does not change mail on the server or revoke the key or token.',
                 ),
               ),
             ],
@@ -107,7 +146,7 @@ class ArchivesPage extends StatelessWidget {
           builder: (context) => AlertDialog(
             title: Text('Forget ${profile.label}?'),
             content: Text(
-              '${open ? 'This archive is open and will be closed. ' : ''}Its address and API key are removed from this device. Mail on the server is not changed and the key is not revoked.',
+              '${open ? 'This archive is open and will be closed. ' : ''}Its address and ${profile.serverType.credential} are removed from this device. Mail on the server is not changed and the ${profile.serverType.credential} is not revoked.',
             ),
             actions: [
               TextButton(
@@ -162,7 +201,8 @@ class _RenameDialogState extends State<_RenameDialog> {
       maxLength: ConnectionStore.maxLabelLength,
       decoration: InputDecoration(
         labelText: 'Name',
-        helperText: 'Leave empty to use ${ConnectionStore.defaultLabel(widget.profile.server)}.',
+        helperText:
+            'Leave empty to use ${ConnectionStore.defaultLabel(widget.profile.server)}.',
         helperMaxLines: 2,
       ),
       onSubmitted: (value) => Navigator.pop(context, value),

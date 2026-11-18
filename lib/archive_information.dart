@@ -13,8 +13,12 @@ class ArchiveInformation extends StatefulWidget {
     required this.account,
     this.onRefreshed,
     this.onAccountSelected,
+    this.credential = 'API key',
   });
   final ArchiveBackend api;
+
+  /// What the archive's server calls its credential, such as "API key".
+  final String credential;
   final ArchiveAccount account;
   final VoidCallback? onRefreshed;
   final ValueChanged<ArchiveAccount>? onAccountSelected;
@@ -128,8 +132,8 @@ class _ArchiveInformationState extends State<ArchiveInformation> {
             ),
             if (stats != null) ...[
               const Divider(height: 28),
-              const Text(
-                'Totals across all accounts accessible to this API key',
+              Text(
+                'Totals across all accounts accessible to this ${widget.credential}',
               ),
               ListTile(
                 contentPadding: EdgeInsets.zero,
@@ -156,7 +160,7 @@ class _ArchiveInformationState extends State<ArchiveInformation> {
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
-            const Text('Accounts accessible to this API key.'),
+            Text('Accounts accessible to this ${widget.credential}.'),
             const SizedBox(height: 12),
             for (final item in accessibleAccounts)
               Padding(

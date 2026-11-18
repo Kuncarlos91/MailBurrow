@@ -217,4 +217,49 @@ void main() {
     );
     expect(find.text('Archived messages'), findsNothing);
   });
+
+  testWidgets('folder counts show only where the server reports archived totals', (
+    tester,
+  ) async {
+    Future<List<ListTile>> folderTiles() async {
+      await tester.tap(find.text('All archived mail ▾'));
+      await tester.pumpAndSettle();
+      final tiles = tester
+          .widgetList<ListTile>(
+            find.ancestor(
+              of: find.byIcon(Icons.folder_outlined),
+              matching: find.byType(ListTile),
+            ),
+          )
+          .toList();
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
+      return tiles;
+    }
+
+    await tester.pumpWidget(app(null));
+    await tester.pumpAndSettle();
+    await startDemo(tester);
+    final counted = await folderTiles();
+    expect(counted, isNotEmpty);
+    expect(counted.every((tile) => tile.trailing is Text), isTrue);
+
+    final uncounted = ArchiveCapabilities(
+      folders: true,
+      folderCounts: false,
+      dateRangeFilter: true,
+      directionFilter: false,
+      sortFields: {'sentDate'},
+      sortOrders: {'desc', 'asc'},
+      estimatedTotals: false,
+      archiveStats: false,
+    );
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpWidget(app(uncounted));
+    await tester.pumpAndSettle();
+    await startDemo(tester);
+    final hidden = await folderTiles();
+    expect(hidden, hasLength(counted.length));
+    expect(hidden.every((tile) => tile.trailing == null), isTrue);
+  });
 }

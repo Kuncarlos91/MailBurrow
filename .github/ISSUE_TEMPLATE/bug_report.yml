@@ -12,7 +12,7 @@ body:
     id: app-version
     attributes:
       label: App version and build
-      description: Shown in Settings, for example 0.4.0 (build 27).
+      description: Shown in Settings, for example 0.5.0 (build 31).
     validations:
       required: true
   - type: input
@@ -26,7 +26,7 @@ body:
     id: server-version
     attributes:
       label: Archive server type and version
-      description: "For example: Mail-Archiver 2611.2 or Open Archiver 0.6.2. If unknown, say so."
+      description: "For example: Mail-Archiver 2611.2, Open Archiver 0.6.2 or Bichon 2.4.2 Community. If unknown, say so."
   - type: dropdown
     id: area
     attributes:
