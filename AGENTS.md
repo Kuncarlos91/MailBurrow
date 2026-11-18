@@ -18,6 +18,10 @@ Keep README.md for people setting up and using the app: what it is, requirements
 
 Label local implementation, host tests, native builds, device testing and distribution separately. Never claim an installed build contains uncommitted changes. Verify API fields/endpoints from reliable upstream sources or established project context; do not guess schemas.
 
+## Backend copy consistency
+
+Use the backend registry for generic app lists of supported server names rather than duplicating names in UI sentences. When a backend is added or renamed, test that every offered type appears in the setup introduction and verify credential/helper/recovery copy on the actual UI. Review screenshot pixels, captions and alt text together; label screenshots from a released app accurately and do not imply an unreleased fix is already in that APK.
+
 ## Privacy and configuration preservation
 
 Do not cache mail on the device: no local mail database, offline copies or prefetching. Mail is fetched only when the user asks to view it (see the playbook's design decision log). Attachments stay limited to the explicit, temporary save flow.

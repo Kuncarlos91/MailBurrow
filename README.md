@@ -86,9 +86,9 @@ If MailBurrow is useful to you, you can [star the project](https://github.com/Ku
 5. If your key can see more than one mail account or source, switch between them from the account row or Settings.
 6. To add another archive, tap the archive name above the account, then **Add archive**. The archive and account rows are the same on Mail, Search and Settings. In **Settings → Archives**, tap an archive to open it, or use **⋮** to rename, change or forget it.
 
-The setup screen in dark mode: choose the server type, then enter the server address and API key.
+The released 0.5.0 setup screen in dark mode: choose the server type, then enter the server address and credential. Its introductory sentence omits Bichon; this wording is corrected in the next release.
 
-<img src="docs/images/setup-screen.jpg" alt="MailBurrow setup in dark mode: a Mail-Archiver or Open Archiver server-type choice, empty server address and API key fields, Connect to archive, Try the demo, Support and Privacy notice" width="270">
+<img src="docs/images/setup-screen.jpg" alt="MailBurrow setup in dark mode: a Mail-Archiver, Open Archiver or Bichon server-type choice, empty server address and API key fields, Connect to archive, Try the demo, Support and Privacy notice" width="270">
 
 Your server address and key are saved in the device's secure storage. Never send them to app support. If the connection fails, see the [setup guide's checks](docs/setup-guide.md#if-something-goes-wrong) and [troubleshooting](docs/troubleshooting/README.md).
 

@@ -348,6 +348,15 @@ void main() {
     );
     expect(find.text('Bichon'), findsOneWidget);
     expect(find.text('Access token'), findsNothing);
+    // This must automatically cover future enum entries, not just today's
+    // three names or an exact sentence copied from the implementation.
+    final introduction = tester.widget<Text>(
+      find.byKey(const ValueKey('setup-introduction')),
+    ).data!;
+    for (final type in ArchiveServerType.values) {
+      expect(introduction, contains(type.label));
+      expect(find.text(type.label), findsOneWidget);
+    }
     await tester.tap(find.text('Bichon'));
     await tester.pumpAndSettle();
     expect(value.setupServerType, ArchiveServerType.bichon);
