@@ -74,7 +74,7 @@ Signed releases are published on the [Releases page](https://github.com/Kuncarlo
 
 ## Feedback
 
-[Report a problem or ask for setup help](https://github.com/Kuncarlos91/MailBurrow/issues/new/choose). Include your app/build, server type/version, device/OS, expected and actual behavior, and steps using fictional data. Never include API keys, passwords, signing details, private server addresses, real messages or unredacted screenshots. Report security issues privately through [Security reporting](SECURITY.md).
+[Report a problem or ask for setup help](https://github.com/Kuncarlos91/MailBurrow/issues/new/choose). Questions, ideas and setups that work for you are welcome in [Discussions](https://github.com/Kuncarlos91/MailBurrow/discussions). Include your app/build, server type/version, device/OS, expected and actual behavior, and steps using fictional data. Never include API keys, passwords, signing details, private server addresses, real messages or unredacted screenshots. Report security issues privately through [Security reporting](SECURITY.md).
 
 If MailBurrow is useful to you, you can [star the project](https://github.com/Kuncarlos91/MailBurrow).
 

@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Questions, ideas and setups
+    url: https://github.com/Kuncarlos91/MailBurrow/discussions
+    about: Ask a question, suggest an idea or share what works for you. For bugs, use the forms above.
   - name: Setup guide
     url: https://github.com/Kuncarlos91/MailBurrow/blob/main/docs/setup-guide.md
     about: Step-by-step settings for Mail-Archiver, Open Archiver, Bichon, TrueNAS and Tailscale.
