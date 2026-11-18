@@ -185,3 +185,5 @@ The separate [Bichon write-denial procedure](../tools/bichon_write_denial.py) mu
 Known Bichon folder states `fetching` and `error` produce retry guidance rather than an unsupported-version diagnosis. A contract failure identifies an unreadable response and the tested adapter version; it does not establish which server version is actually running.
 
 The [Bichon measurement-fixture generator](../tools/bichon_fixtures.py) writes a bounded deterministic fictional mbox with large bodies, a 45 MiB attachment and a full search page. It refuses existing files and removes newly created partial output on failure. Verify actual imported response sizes and fixture readiness separately; generation tests do not establish a phone or release-artifact pass.
+
+The lab-only `tools/bichon_fixture_cleanup.py` defaults to a dry run, validates exact generated fixture identities, one disposable folder and the unchanged baseline, then permits deletion only with its explicit flag. It never deletes folders. Complete bounded search inventories must have stable totals and unique scoped IDs. Keep the fictional lab quiescent; preflight checks cannot make the later deletion atomic.

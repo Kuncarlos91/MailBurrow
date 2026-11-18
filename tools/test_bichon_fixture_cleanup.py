@@ -121,6 +121,66 @@ class CleanupTests(unittest.TestCase):
         for secret in (ADMIN, "example.test", "alex.rivera@example.com", "fx-0"):
             self.assertNotIn(secret, out)
 
+    def test_unexpected_baseline_stops_before_delete_and_noop_success(self):
+        fake = FakeBichon()
+        fake.demo.pop()
+        code, out = run(fake, delete=True)
+        self.assertEqual(code, 1)
+        self.assertEqual(fake.deleted, [])
+        fake.fixtures = []
+        code, out = run(fake, delete=True)
+        self.assertEqual(code, 1)
+        self.assertNotIn("RESULT: nothing to remove", out)
+
+    def test_duplicate_envelope_ids_are_refused(self):
+        fake = FakeBichon()
+        fake.fixtures[1]["id"] = fake.fixtures[0]["id"]
+        code, _ = run(fake, delete=True)
+        self.assertEqual(code, 1)
+        self.assertEqual(fake.deleted, [])
+
+    def test_cross_account_copy_cannot_hide_behind_same_envelope_id(self):
+        fake = FakeBichon()
+        fake.demo.append({**fake.fixtures[0], "account_id": BAKERY, "mailbox_id": INBOX_ID})
+        code, _ = run(fake, delete=True)
+        self.assertEqual(code, 1)
+        self.assertEqual(fake.deleted, [])
+
+    def test_inconsistent_pages_and_oversized_pages_are_refused(self):
+        for defect in ("changed total", "repeated page", "oversized page", "wrong scope"):
+            fake = FakeBichon()
+            def transport(method, url, headers, body):
+                status, response_headers, raw = fake(method, url, headers, body)
+                if urllib.parse.urlsplit(url).path.endswith("/search-messages"):
+                    payload, data = json.loads(body), json.loads(raw)
+                    if defect == "changed total" and payload["page"] == 2:
+                        data["total_items"] += 1
+                    elif defect == "repeated page" and payload["page"] == 2:
+                        data["items"] = fake.fixtures[:7]
+                    elif defect == "oversized page" and payload["page"] == 1:
+                        data["items"] += [fake.fixtures[-1]]
+                    elif defect == "wrong scope" and data["items"]:
+                        data["items"][0]["account_id"] = BAKERY
+                    raw = json.dumps(data).encode()
+                return status, response_headers, raw
+            with self.subTest(defect=defect):
+                code, _ = run(transport, delete=True)
+                self.assertEqual(code, 1)
+                self.assertEqual(fake.deleted, [])
+
+    def test_mailbox_list_must_be_ready(self):
+        fake = FakeBichon()
+        def transport(method, url, headers, body):
+            status, response_headers, raw = fake(method, url, headers, body)
+            if "/list-mailboxes/" in url:
+                data = json.loads(raw)
+                data["status"] = "fetching"
+                raw = json.dumps(data).encode()
+            return status, response_headers, raw
+        code, _ = run(transport, delete=True)
+        self.assertEqual(code, 1)
+        self.assertEqual(fake.deleted, [])
+
     def test_rejects_non_https(self):
         out = io.StringIO()
         self.assertEqual(fc.main(["http://example.test:9443"], key=ADMIN, transport=FakeBichon(), out=out), 2)

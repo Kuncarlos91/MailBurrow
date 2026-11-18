@@ -78,14 +78,28 @@ class Cleaner:
 
     def search(self, flt):
         """All items for a filter, or None if a page fails or it is larger than expected."""
-        found = []
+        found, seen, expected_total = [], set(), None
         for page in range(1, MAX_PAGES + 1):
             resp = self.send("POST", "/search-messages", {"filter": flt, "page": page, "page_size": PAGE,
                                                           "sort_by": "DATE", "desc": False})
             items = items_of(resp)
             total = resp.obj().get("total_items")
-            if resp.status != 200 or items is None or not is_int(total) or total > PAGE * MAX_PAGES:
+            if (resp.status != 200 or items is None or len(items) > PAGE or not is_int(total)
+                    or not 0 <= total <= PAGE * MAX_PAGES):
                 return None
+            if expected_total is not None and total != expected_total:
+                return None
+            expected_total = total
+            for item in items:
+                account, mailbox, envelope = item.get("account_id"), item.get("mailbox_id"), item.get("id")
+                if (not is_int(account) or account <= 0 or not is_int(mailbox) or mailbox <= 0
+                        or not isinstance(envelope, str) or not envelope
+                        or (account, envelope) in seen):
+                    return None
+                if ("account_ids" in flt and account not in flt["account_ids"]
+                        or "mailbox_ids" in flt and mailbox not in flt["mailbox_ids"]):
+                    return None
+                seen.add((account, envelope))
             found += items
             if len(found) >= total or not items:
                 return found if len(found) == total else None
@@ -100,7 +114,7 @@ def run(c, delete):
     resp = c.send("GET", "/minimal-account-list")
     accounts = resp.json if isinstance(resp.json, list) else []
     alex = [a.get("id") for a in accounts if isinstance(a, dict)
-            and a.get("email") == EXPECT["reader_email"] and is_int(a.get("id"))]
+            and a.get("email") == EXPECT["reader_email"] and is_int(a.get("id")) and a["id"] > 0]
     if not c.check("Alex Rivera account found", resp.status == 200 and len(alex) == 1, st(resp)):
         return
     alex = alex[0]
@@ -108,8 +122,8 @@ def run(c, delete):
     resp = c.send("GET", "/list-mailboxes", suffix="/%d" % alex)
     boxes = resp.obj().get("mailboxes")
     boxes = boxes if isinstance(boxes, list) else []
-    named = [b.get("id") for b in boxes if isinstance(b, dict) and b.get("name") == FOLDER and is_int(b.get("id"))]
-    if not c.check("Exactly one %s folder" % FOLDER, resp.status == 200 and len(named) == 1,
+    named = [b.get("id") for b in boxes if isinstance(b, dict) and b.get("name") == FOLDER and is_int(b.get("id")) and b["id"] > 0]
+    if not c.check("Exactly one %s folder" % FOLDER, resp.status == 200 and resp.obj().get("status") == "ready" and len(named) == 1,
                    "%s, %d found" % (st(resp), len(named))):
         return
     folder = named[0]
@@ -129,7 +143,9 @@ def run(c, delete):
                 and i.get("account_id") == alex and i.get("mailbox_id") == folder and isinstance(i.get("id"), str))
 
     if not in_folder and not any(MARKER in str(i.get("subject", "")) for i in marked):
-        c.check("Fixtures already removed", True, "folder empty, no fixture-marked messages")
+        total = c.search({"account_ids": [alex]})
+        if c.check("Alex baseline verified", total is not None and len(total) == EXPECT["reader_total"]):
+            c.check("Fixtures already removed", True, "folder empty, no fixture-marked messages; baseline verified")
         return
     ids = {i.get("message_id", "").strip("<>") for i in in_folder if isinstance(i.get("message_id"), str)}
     if not c.check("Folder holds only the %d fixtures" % len(want),
@@ -137,8 +153,17 @@ def run(c, delete):
                    "%d messages, %d exact matches" % (len(in_folder), sum(1 for i in in_folder if exact(i)))):
         return
     folder_envs = {i["id"] for i in in_folder}
-    outside = [i for i in marked if i.get("id") not in folder_envs and MARKER in str(i.get("subject", ""))]
+    scoped_envs = {(alex, envelope) for envelope in folder_envs}
+    outside = [i for i in marked if (i.get("account_id"), i.get("id")) not in scoped_envs
+               and MARKER in str(i.get("subject", ""))]
     if not c.check("No fixture-marked message outside the folder", not outside, "%d outside" % len(outside)):
+        return
+
+    # Establish the whole-account baseline before allowing any mutation.
+    inventory = c.search({"account_ids": [alex]})
+    if not c.check("Account inventory matches fixtures plus baseline",
+                   inventory is not None and len(inventory) == len(want) + EXPECT["reader_total"]
+                   and {i["id"] for i in inventory if i["mailbox_id"] == folder} == folder_envs):
         return
 
     if not delete:

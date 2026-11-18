@@ -110,7 +110,11 @@ It asks for the admin token. Without `--delete` it only checks and reports. It s
 - that folder holds exactly the 32 fixtures and no other mail;
 - no fixture-marked message exists outside that folder.
 
-With `--delete` it then deletes those 32 with the admin token and waits until the folder is empty. It confirms the Alex account is back to 40 messages, so the lab check passes again. A rerun reports *nothing to remove*. It deletes no folders: remove the empty `mailburrow-fixtures` folder in Bichon's interface if you want. The summary holds only counts and statuses. [test_bichon_fixture_cleanup.py](../../tools/test_bichon_fixture_cleanup.py) covers:
+The account must also contain exactly the 32 fixtures plus its 40-message baseline before deletion. Search pages must have stable totals, bounded page lengths and unique account/envelope IDs; wrong-scope or malformed items are refused. An empty-folder rerun still verifies the 40-message baseline.
+
+Keep the fictional lab quiescent: do not import, move or delete mail concurrently. These snapshots and the server delete request are not one atomic transaction; concurrent changes can invalidate the checks. This tool is not for real archives.
+
+With `--delete` it then deletes those 32 with the admin token and waits until the folder is empty. It confirms the Alex account count is back to 40 messages. Rerun the full lab checker separately: matching the count does not prove the remaining messages or API contracts are the expected baseline. A rerun reports *nothing to remove*. It deletes no folders: remove the empty `mailburrow-fixtures` folder in Bichon's interface if you want. The summary holds only counts and statuses. [test_bichon_fixture_cleanup.py](../../tools/test_bichon_fixture_cleanup.py) covers:
 
 - the dry run, which sends no delete;
 - deleting exactly the fixtures;
