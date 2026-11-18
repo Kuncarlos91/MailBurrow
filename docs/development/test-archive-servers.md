@@ -96,6 +96,30 @@ python tools/bichon_fixtures.py --out build/mailburrow-fixtures.mbox
 
 Import only into an isolated fictional account. In the reviewed Bichon import flow a folder is named after the file; verify that destination and the exact fixture Message-IDs before any cleanup, never bulk-delete real mail by a broad subject search. It holds a large message with 4,120,000-byte plain-text and well-formed HTML bodies. This revision produced an 8,290,934-byte parsed response, with both bodies intact and the HTML balanced, on a diagnostic Bichon 2.4.2 build from the source tag (messages imported through the API, not the Import page). Measure it again on the lab server after import before measuring on a phone (the app response limit is 8,388,608 bytes). It also holds a message with a 45 MiB attachment (under the 50 MiB cap), and 30 small messages so a search for `MailBurrow fixture` fills a 25-item page. Every message is fictional, uses reserved example domains and carries the `MailBurrow fixture` marker in its subject and Message-ID. Output is deterministic and capped at 80 MiB; existing output is refused and a failed generation removes its newly created partial file. Use a new filename on reruns. Run the 40-message lab check before importing the fixtures, or after removing them, because they change the account's totals. [test_bichon_fixtures.py](../../tools/test_bichon_fixtures.py) checks counts, decoded sizes, balanced HTML, markers, domains, determinism and output-failure handling. Construction tests do not prove a server preserves the fixtures, the exact response size, or a phone-memory/cancellation pass. Verify all 32 fixtures are indexed and the attachment is really 45 MiB before measuring.
 
+To remove the fixtures afterwards, use [bichon_fixture_cleanup.py](../../tools/bichon_fixture_cleanup.py):
+
+```sh
+python tools/bichon_fixture_cleanup.py https://<test-server>:9443
+python tools/bichon_fixture_cleanup.py https://<test-server>:9443 --delete
+```
+
+It asks for the admin token. Without `--delete` it only checks and reports. It selects messages by the generator's exact Message-ID, subject and sender address. Before anything is deleted, all of these must hold:
+
+- the messages are in the Alex Rivera account;
+- they are in exactly one folder named `mailburrow-fixtures`;
+- that folder holds exactly the 32 fixtures and no other mail;
+- no fixture-marked message exists outside that folder.
+
+With `--delete` it then deletes those 32 with the admin token and waits until the folder is empty. It confirms the Alex account is back to 40 messages, so the lab check passes again. A rerun reports *nothing to remove*. It deletes no folders: remove the empty `mailburrow-fixtures` folder in Bichon's interface if you want. The summary holds only counts and statuses. [test_bichon_fixture_cleanup.py](../../tools/test_bichon_fixture_cleanup.py) covers:
+
+- the dry run, which sends no delete;
+- deleting exactly the fixtures;
+- refusal when the folder holds other mail, a fixture is missing, a marked copy exists elsewhere or there are two fixture folders;
+- a refused reader delete;
+- a summary free of tokens and addresses.
+
+These unit tests perform no live deletion.
+
 ## Phone memory check with stress mail
 
 [generate_stress_mail.py](../../tools/generate_stress_mail.py) writes `stress-mail.zip`: ten fictional messages for the 0.4.0 release check of memory on the phone. They include long bodies, quoted-printable and base64 encodings, Latin-1 plain text and Windows-1252 HTML as the selected body alternatives, six explicitly inline CID images, 30 levels of nesting, 400 parts, about 190 KiB of headers, one message just under the app's 10 MiB message limit and one just over it. Output is deterministic and uses only `stress.example` addresses.
