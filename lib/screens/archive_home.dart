@@ -139,9 +139,9 @@ class _ArchiveHomeState extends State<ArchiveHome> {
             itemBuilder: (context, index) {
               if (index == 0) {
                 return ListTile(
-                  title: Text(
+                  title: const Text(
                     'Folders',
-                    style: Theme.of(context).textTheme.titleLarge,
+                    style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                 );
               }
