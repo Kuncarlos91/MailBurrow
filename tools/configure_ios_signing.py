@@ -4,7 +4,7 @@ import re
 import sys
 from pathlib import Path
 
-BUNDLE = 'com.kuncarlos91.mailshelf'
+BUNDLE = 'com.kuncarlos91.mailburrow'
 BLOCK = re.compile(r'(\bbuildSettings = \{\n)(.*?)(^\t{3}\};)', re.S | re.M)
 
 def configure(text, team, profile):

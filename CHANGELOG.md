@@ -4,6 +4,7 @@ All notable changes to MailBurrow are recorded here. Versions follow the app ver
 
 ## Unreleased
 
+- **iOS:** the bundle ID is now `com.kuncarlos91.mailburrow`, matching Android, and the bundle name is MailBurrow. Earlier TestFlight builds used `com.kuncarlos91.mailshelf`; the new ID installs as a separate app, so saved connections are entered again once.
 - **Fixed:** the setup screen's introduction now names Bichon alongside Mail-Archiver and Open Archiver. In 0.5.0 it listed only the first two, though choosing Bichon worked. The introduction now derives its backend names from the selector's shared server-type list, with a regression covering every entry.
 - README: setup screenshot updated to the 0.5.0 screen with three server types.
 
