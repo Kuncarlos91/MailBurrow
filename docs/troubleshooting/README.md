@@ -69,7 +69,7 @@ Save and Open have separate confirmations. There is no malware scanning; do not 
 
 | Symptom | Interpretation/next step |
 | --- | --- |
-| A "Demo · sample mail" bar is showing | You're in the built-in demo: all mail is fictional. Tap **Exit** on the bar, or **Settings → Exit demo**, to return to setup. |
+| A "Demo · sample mail" bar is showing | You're in the built-in demo: all mail is fictional. Tap **Exit** on the bar, or **Settings → Exit demo**. In releases after 0.5.0, the app reopens the archive you had open before the demo; otherwise it returns to setup. |
 | Try the demo button is missing | It's hidden while the demo is already open, for example on Connection settings opened from the demo. Exit the demo first. |
 | Could not open the demo | The bundled sample data could not be read. Try again; if it keeps failing, report the app version and device. |
 | My saved server is gone after the demo | The demo never changes a saved connection. On setup, use **Retry saved connection**, or reopen the app to restore it. |
@@ -114,6 +114,6 @@ A direct Gradle release after tests can fail on missing IntegrationTestPlugin be
 
 A local diagnostic build can add `--dart-define=MAILSHELF_FILE_DIAGNOSTICS=true`. Default builds do not enable this tracing. Native events use only fixed MailShelfFiles categories for grant retention, saved-reference registration, release and the Open outcome; never add URIs, file names, provider exception messages, attachment bytes, server settings or keys. This is local logcat output, not an analytics upload. Read only the MailShelfFiles tag and do not share broad device logs.
 
-While an archive is opening, Cancel is unavailable during the secure-storage commit and once the archive is open. Before that commit, cancelling returns to setup without activating the abandoned attempt; Retry starts another attempt.
+While an archive is opening, Cancel is unavailable during the secure-storage commit and once the archive is open. Before that commit, cancelling never activates the abandoned attempt. In releases after 0.5.0,, cancelling a switch reopens the archive you had open before it; cancelling at startup, or again while that archive reopens, returns to setup, where Retry starts another attempt.
 
 Reader cancellation fix: Back during a message load cancels that reader’s network calls rather than only hiding the result. Build 26 predates this fix; its successful navigation checks do not establish that its transport stopped. Validate a newer fixed APK separately, with its own source/hash and cancellation evidence.

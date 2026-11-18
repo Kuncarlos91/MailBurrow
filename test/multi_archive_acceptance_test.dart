@@ -377,7 +377,7 @@ void main() {
     expect(await storage.readAll(), before);
   });
 
-  test('cancelling a switch returns at once and nothing opens later', () async {
+  test('cancelling a switch reopens the previous archive and nothing opens later', () async {
     await addBoth();
     final gate = servers[hostA]!.holdAccounts = Completer<void>();
     final a = archiveAt(session, hostA);
@@ -386,23 +386,82 @@ void main() {
     expect(session.canCancelOpening, isTrue);
     final candidate = clients.last;
     await session.cancelOpening();
+    expect(candidate.closed, isTrue);
     expect(session.switchingArchive, isNull);
-    expect(session.setup, isTrue);
+    expect(session.setup, isFalse);
     expect(session.busy, isFalse);
     expect(session.error, isNull);
+    expect(session.activeArchive?.label, hostB, reason: 'back where the user was');
+    expect(subject(session), '$hostB 1');
     expect(session.archives, hasLength(2));
-    expect(candidate.closed, isTrue);
     gate.complete();
     await switching;
     await pumpEventQueue();
-    expect(session.api, isNull, reason: 'the abandoned attempt is not adopted');
+    expect(session.activeArchive?.label, hostB, reason: 'the abandoned attempt is not adopted');
+    expect(subject(session), '$hostB 1');
     expect(session.error, isNull);
-    expect(session.setup, isTrue);
     expect((await store.read())?.server, 'https://$hostB', reason: 'nothing activated');
-    // Retry and the saved list still work.
+    // The saved list still works.
     servers[hostA]!.holdAccounts = null;
-    await session.retrySaved();
+    await session.switchArchive(a.id);
     expect(subject(session), '$hostA 1');
+  });
+
+  test('Cancel while reopening the previous archive goes to setup', () async {
+    await addBoth();
+    final gateA = servers[hostA]!.holdAccounts = Completer<void>();
+    final switching = session.switchArchive(archiveAt(session, hostA).id);
+    await pumpEventQueue();
+    final gateB = servers[hostB]!.holdAccounts = Completer<void>();
+    final cancelling = session.cancelOpening();
+    await pumpEventQueue();
+    expect(session.switchingArchive?.label, hostB);
+    expect(session.canCancelOpening, isTrue);
+    await session.cancelOpening();
+    expect(session.switchingArchive, isNull);
+    expect(session.api, isNull);
+    expect(session.setup, isTrue, reason: 'a second Cancel never loops');
+    expect(session.hasSavedConnection, isTrue);
+    gateA.complete();
+    gateB.complete();
+    await switching;
+    await cancelling;
+    await pumpEventQueue();
+    expect(session.api, isNull);
+    expect(session.setup, isTrue);
+    expect((await store.read())?.server, 'https://$hostB');
+  });
+
+  test('cancelling a switch from setup with nothing open stays on setup', () async {
+    await addBoth();
+    session.dispose();
+    session = newSession();
+    session.archives = (await store.overview()).profiles;
+    session.busy = false;
+    session.restoring = false;
+    session.setup = true;
+    final gate = servers[hostA]!.holdAccounts = Completer<void>();
+    final switching = session.switchArchive(archiveAt(session, hostA).id);
+    await pumpEventQueue();
+    await session.cancelOpening();
+    expect(session.api, isNull);
+    expect(session.setup, isTrue);
+    gate.complete();
+    await switching;
+  });
+
+  test('a cancelled switch does not reopen a previous archive forgotten meanwhile', () async {
+    await addBoth();
+    final b = session.activeArchiveId!;
+    final gate = servers[hostA]!.holdAccounts = Completer<void>();
+    final switching = session.switchArchive(archiveAt(session, hostA).id);
+    await pumpEventQueue();
+    await store.forget(b);
+    await session.cancelOpening();
+    expect(session.api, isNull);
+    expect(session.setup, isTrue);
+    gate.complete();
+    await switching;
   });
 
   test('cancelling startup restoration returns to setup with Retry', () async {
@@ -675,11 +734,13 @@ void main() {
       await tester.tap(find.text('Cancel'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
+      await tester.pumpAndSettle();
       expect(find.text('Opening $hostA…'), findsNothing);
-      expect(find.text('Saved archives'), findsOneWidget);
+      expect(find.text('$hostB 1'), findsOneWidget, reason: 'previous archive reopened');
       gate.complete();
       await tester.pumpAndSettle();
-      expect(find.text('Saved archives'), findsOneWidget);
+      expect(find.text('$hostB 1'), findsOneWidget);
+      expect(find.text('$hostA 1'), findsNothing);
     });
 
     testWidgets('setup offers a new key when the saved one is refused', (tester) async {
