@@ -13,6 +13,12 @@ class SetupView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final busy = session.busy;
+    // Use the same source as the selector so adding a backend cannot leave
+    // this introduction advertising an incomplete list.
+    final labels = ArchiveServerType.values.map((type) => type.label).toList();
+    final serverNames = labels.length == 1
+        ? labels.single
+        : '${labels.take(labels.length - 1).join(', ')} or ${labels.last}';
     final type = session.setupServerType;
     final openArchiver = type == ArchiveServerType.openArchiver;
     final bichon = type == ArchiveServerType.bichon;
@@ -183,8 +189,9 @@ class SetupView extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 16),
-        const Text(
-          'Read archived mail from your own Mail-Archiver, Open Archiver or Bichon server over HTTPS. MailBurrow never guesses the server type. It does not provide server hosting or accounts.',
+        Text(
+          'Read archived mail from your own $serverNames server over HTTPS. MailBurrow never guesses the server type. It does not provide server hosting or accounts.',
+          key: const ValueKey('setup-introduction'),
         ),
         const SizedBox(height: 8),
         const Text(
