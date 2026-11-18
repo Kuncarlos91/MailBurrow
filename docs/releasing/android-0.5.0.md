@@ -59,7 +59,7 @@ Full list: [CHANGELOG](../../CHANGELOG.md).
   - the largest text in landscape;
   - the license screen offline;
   - Cancel on a link prompt.
-- **Memory:** opening an 8 MB Bichon message stayed within the approved peak-memory budget, and repeated opens kept no extra memory.
+- **Memory:** for the recorded warmed Bichon run, peak growth was bounded at about 44.3 MiB (within 64 MiB); after three further open/close cycles, settled RSS was 3.9 MiB below the baseline. This short run does not establish absence of retained objects or long-term growth.
 
 ## Release decisions
 
@@ -68,7 +68,7 @@ Full list: [CHANGELOG](../../CHANGELOG.md).
   - **Oversized or malformed folder responses** are covered by automated tests only. No server sent one to the phone.
   - **Open Archiver Preserve Original File** refusal was not retested on build 31. It passed on 0.4.0, and that code is unchanged.
 - **Cancellation timing:** cancellation was shown to stop transfers. On the release APK, the exact delay and the bytes read after Back were not measured for message, search or attachment requests. The maintainer accepted this on the combined evidence of a phone probe, the visible stops on build 31 and the automated tests.
-- **Retention:** a phone probe found memory rose once and then stayed flat when it opened the large message in a separate isolate. The maintainer accepted that pattern as an exception. On build 31, repeated opens kept no extra memory.
+- **Retention:** a separate profile-mode phone probe exceeded the 2 MiB retention criterion. A diagnostic follow-up suggested an early rise and a variable plateau; the cause was not proven. The maintainer accepted that observed pattern as an exception. The warmed build-31 sequence ended below its baseline; it does not prove long-term leak freedom or resolve the probe's cause.
 - **Expired Open Archiver keys:** still untested, carried over from 0.4.0. The check can run from 2026-12-12.
 - **Server versions:** only the versions under [tested servers](../testing/status.md#tested-servers) were tested. Bichon Pro and Enterprise are untested.
 - **iOS / iPadOS:** source-only, with 0.5.0 behavior on iOS unverified.
@@ -81,7 +81,7 @@ A read-only mobile viewer for your own Mail-Archiver, Open Archiver or Bichon se
 
 - **Bichon 2.4.2 Community:** choose **Bichon** in setup and enter an access token for a read-only user (Member, with Account viewer on the accounts you need). Browse accounts and folders, search, read messages with remote content blocked, and save attachments. Folder lists show no counts. Search treats your text literally. A Bichon server may record searches; see the [privacy notice](https://mailburrow.pages.dev/privacy.html).
 - **Same rows everywhere:** Mail, Search and Settings show the archive and account at the top; tap either to switch. In **Settings → Archives**, tap an archive to open it.
-- **Large folder trees:** up to 2,000 folders and 32 levels; larger or malformed lists are refused instead of freezing the app.
+- **Large folder trees:** up to 2,000 folders and depth 32 (root depth zero); larger or malformed lists are refused instead of freezing the app.
 - **Recovery:** retrying after a connection drop now also reloads failed folders.
 
 **Tested with** Mail-Archiver 2611.2, Open Archiver 0.6.2 and Bichon 2.4.2 Community on Android 17.
@@ -90,6 +90,9 @@ A read-only mobile viewer for your own Mail-Archiver, Open Archiver or Bichon se
 - **Bichon:** Pro/Enterprise and other versions are untested.
 - **Open Archiver:** expired-key handling is untested.
 - **Accessibility:** TalkBack was not tested on this build.
+- **Folder robustness:** oversized/malformed folder responses have host-test coverage, but were not exercised on the release device.
+- **Open Archiver preserve-original sources:** refusal was not retested on build 31; the earlier 0.4.0 check is historical.
+- **Cancellation evidence:** attachment interruption/recovery was observed, but exact client timing/post-cancel bytes and release-APK message/search cancellation remain unmeasured under the maintainer's accepted exception.
 - **Mail and attachments:** complex mail may use a simplified layout. Links and attachments are not malware-scanned. Attachment downloads are limited to 50 MiB and two minutes.
 - **Not included:** sending or deleting mail, an offline mail cache, analytics and crash-report upload.
 - **Devices:** the APK is for 64-bit ARM (arm64-v8a) Android devices only. There's no iOS download, and 0.5.0 behavior on iOS/iPadOS is unverified.
