@@ -125,6 +125,8 @@ class _ArchiveHomeState extends State<ArchiveHome> {
 
   Future<void> chooseFolder() async {
     if (!session.capabilities.folders) return;
+    // Keep the builder count and rows on the same snapshot during refresh.
+    final folders = session.folders;
     final choice = await showModalBottomSheet<ArchiveFolder>(
       context: context,
       showDragHandle: true,
@@ -132,41 +134,49 @@ class _ArchiveHomeState extends State<ArchiveHome> {
       builder: (context) => SafeArea(
         child: SizedBox(
           height: MediaQuery.sizeOf(context).height * .6,
-          child: ListView(
-            children: [
-              ListTile(
-                title: const Text(
-                  'Folders',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-              ListTile(
-                leading: const Icon(Icons.all_inbox_outlined),
-                title: const Text('All archived mail'),
-                selected: session.selectedFolder == null,
-                onTap: () => Navigator.pop(
-                  context,
-                  const ArchiveFolder('All archived mail', '', 0, 0),
-                ),
-              ),
-              if (session.folders.isEmpty)
-                const ListTile(title: Text('No archived folders available.')),
-              for (final folder in session.folders)
-                ListTile(
-                  contentPadding: EdgeInsets.only(
-                    left: 16 + folder.depth.clamp(0, 8) * 16.0,
-                    right: 20,
+          child: ListView.builder(
+            itemCount: 2 + (folders.isEmpty ? 1 : folders.length),
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return ListTile(
+                  title: const Text(
+                    'Folders',
+                    style: TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  leading: const Icon(Icons.folder_outlined),
-                  title: Text(folder.name),
-                  subtitle: folder.depth > 0 ? Text(folder.path) : null,
-                  trailing: session.capabilities.folderCounts
-                      ? Text('${folder.count}')
-                      : null,
-                  selected: session.selectedFolder == folder.path,
-                  onTap: () => Navigator.pop(context, folder),
+                );
+              }
+              if (index == 1) {
+                return ListTile(
+                  leading: const Icon(Icons.all_inbox_outlined),
+                  title: const Text('All archived mail'),
+                  selected: session.selectedFolder == null,
+                  onTap: () => Navigator.pop(
+                    context,
+                    const ArchiveFolder('All archived mail', '', 0, 0),
+                  ),
+                );
+              }
+              if (folders.isEmpty) {
+                return const ListTile(
+                  title: Text('No archived folders available.'),
+                );
+              }
+              final folder = folders[index - 2];
+              return ListTile(
+                contentPadding: EdgeInsets.only(
+                  left: 16 + folder.depth.clamp(0, 8) * 16.0,
+                  right: 20,
                 ),
-            ],
+                leading: const Icon(Icons.folder_outlined),
+                title: Text(folder.name),
+                subtitle: folder.depth > 0 ? Text(folder.path) : null,
+                trailing: session.capabilities.folderCounts
+                    ? Text('${folder.count}')
+                    : null,
+                selected: session.selectedFolder == folder.path,
+                onTap: () => Navigator.pop(context, folder),
+              );
+            },
           ),
         ),
       ),

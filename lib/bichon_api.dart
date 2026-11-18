@@ -211,7 +211,9 @@ class BichonApi extends ArchiveApi {
       if (status == 'fetching' || status == 'error') {
         throw ArchiveFoldersUnavailable(loading: status == 'fetching');
       }
-      if (status != 'ready' || mailboxes is! List) {
+      if (status != 'ready' ||
+          mailboxes is! List ||
+          mailboxes.length > maxArchiveFolders) {
         throw const FormatException('Invalid Bichon mailbox list');
       }
       final ids = <String, int>{};
@@ -224,11 +226,18 @@ class BichonApi extends ArchiveApi {
         if (mailbox['account_id'] != account ||
             path == null ||
             path.isEmpty ||
+            path.length > maxArchiveFolderTextLength ||
+            delimiter.length > maxArchiveFolderTextLength ||
             ids.containsKey(path)) {
           throw const FormatException('Invalid Bichon mailbox');
         }
         ids[path] = id;
         final parts = delimiter.isEmpty ? [path] : path.split(delimiter);
+        if (parts.length - 1 > maxArchiveFolderDepth) {
+          throw const FormatException(
+            'Mailbox response exceeds supported limits',
+          );
+        }
         folders.add(
           ArchiveFolder(
             parts.last.isEmpty ? path : parts.last,

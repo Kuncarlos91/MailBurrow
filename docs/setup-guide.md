@@ -11,7 +11,7 @@ MailBurrow is a phone app for reading the mail you already archive with [Mail-Ar
 
 **App version:** Open Archiver, the server-type choice and several saved archives need MailBurrow 0.4.0 or later. Bichon is available in development builds on `feature/bichon` for the intended 0.5.0 release; the published 0.4.0 APK does not support it.
 
-The [published website guide](https://mailburrow.pages.dev/setup.html) covers the released app. Bichon instructions here describe development builds; website updates are deferred to release review.
+The [published website guide](https://mailburrow.pages.dev/setup.html) covers the released app. Bichon instructions here describe development builds; the website templates now include the same candidate-labelled Bichon instructions. Deployment and the released-support transition remain separate release steps.
 
 To see what the app looks like before setting anything up, tap **Try the demo** on the setup screen: it opens fictional sample mail built into the app, with no server needed.
 
@@ -204,6 +204,8 @@ If you already run a reverse proxy such as Caddy, Nginx Proxy Manager or Traefik
 5. Tap **Connect to archive**.
 
 If the key can see more than one mail account or source, switch between them from the account row or in Settings. **Disconnect and forget connection** in Settings removes the open archive's address and key from the phone; it doesn't revoke the key on the server.
+
+Folder responses are limited to 2,000 folders and nesting depth 32 (root depth zero). Excessive or malformed lists are refused; the app keeps mail browsing separate and offers folder Retry. Use your archive website if its folder structure exceeds these limits.
 
 ## Several archives
 

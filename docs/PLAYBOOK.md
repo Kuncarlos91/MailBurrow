@@ -10,6 +10,8 @@ MailBurrow is an independent, read-only Flutter client for a Mail-Archiver serve
 
 This describes the current source. Update it with implementation changes; release history is in the [changelog](../CHANGELOG.md).
 
+Folder decoding is bounded independently of the API byte limit: at most 2,000 folders and depth 32 (root zero), with iterative Mail-Archiver traversal, validated names/paths (at most 8,192 characters each), non-negative counts and unique paths. Bichon mailbox lists share the count/depth limits. The folder picker creates visible rows lazily; an excessive or malformed response fails without publishing a partial list.
+
 ## Navigation and connection
 
 Mail, Search and Settings share one configured server/key. All three show the same current-archive and account rows at the top (`CurrentArchiveRows` in [current_archive_rows.dart](../lib/widgets/current_archive_rows.dart)); the archive row opens the archive picker and switches through the same `switchArchive` path from any tab. The Switch account app-bar button, the account row and the account rows in Settings' archive information open an account picker. It fetches the accounts endpoint with the configured key and offers only returned entries.

@@ -185,6 +185,7 @@ class PagingApi extends LandscapeApi {
 class SectionRecoveryApi extends PagingApi {
   bool networkOffline = false;
   bool foldersOffline = false;
+  List<ArchiveFolder> folderItems = [];
   bool mailDenied = false;
   @override
   Future<MailPage> emails(
@@ -206,7 +207,7 @@ class SectionRecoveryApi extends PagingApi {
     if (networkOffline || foldersOffline) {
       throw const SocketException('private detail');
     }
-    return [];
+    return folderItems;
   }
 
   @override
@@ -550,6 +551,25 @@ void main() {
       },
     );
   }
+
+  testWidgets('large folder picker builds visible rows and still selects a folder', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({
+      'connection': jsonEncode({'server': 'https://example.com', 'key': 'test-only'}),
+    });
+    final api = SectionRecoveryApi()
+      ..folderItems = List.generate(2000, (i) => ArchiveFolder('Folder $i', 'path/$i', 0, 0));
+    await tester.pumpWidget(MaterialApp(home: ArchiveHome(apiFactory: (_, _) => api)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('All archived mail ▾'));
+    await tester.pumpAndSettle();
+    expect(find.text('Folder 0'), findsOneWidget);
+    expect(find.text('Folder 1999'), findsNothing);
+    expect(find.byType(ListTile).evaluate().length, lessThan(30));
+    await tester.tap(find.text('Folder 0'));
+    await tester.pumpAndSettle();
+    expect(find.text('path/0 ▾'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   for (final stillOffline in [false, true]) {
     testWidgets(
