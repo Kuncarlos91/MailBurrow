@@ -179,16 +179,30 @@ void main() {
     expect(session.account!.id, '2');
     expect(session.messages, isNotEmpty);
     await session.applyFilters(const SearchFilters(direction: 'outgoing'));
-    session.exitDemo();
-
-    expect(store.calls, isEmpty, reason: 'no secure-storage call');
+    expect(store.calls, isEmpty, reason: 'the demo makes no secure-storage call');
     expect(await savedRaw(), before);
-    expect(session.setup, isTrue);
+    await session.exitDemo();
+
+    // The archive open when the demo started is reopened from its saved
+    // details; nothing new is added.
+    expect(store.calls, isNot(contains('add')));
     expect(session.demo, isFalse);
-    expect(session.api, isNull);
+    expect(session.setup, isFalse);
+    expect(session.api, isNotNull);
+    expect(session.api!.server.host, 'archive.example.com');
     expect(session.hasSavedConnection, isTrue);
-    expect(session.server.text, 'https://archive.example.com');
     await expectLater(demos.single.accounts(), throwsA(isA<StateError>()));
+  });
+
+  test('exiting a demo started from setup with nothing open stays on setup',
+      () async {
+    FlutterSecureStorage.setMockInitialValues({'connection': savedJson});
+    await session.startDemo();
+    await session.exitDemo();
+    expect(store.calls, isEmpty, reason: 'nothing reopened or contacted');
+    expect(session.demo, isFalse);
+    expect(session.setup, isTrue);
+    expect(session.api, isNull);
   });
 
   test('forget during the demo exits without deleting the saved connection',

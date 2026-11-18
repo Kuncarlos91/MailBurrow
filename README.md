@@ -55,6 +55,7 @@ The setup screen has a **Try the demo** button. It opens a small archive of made
 
 - A **Demo · sample mail** bar stays on every screen. Tap its **Exit** button, or **Settings → Exit demo**, to leave. Closing the app also leaves the demo.
 - The demo connects to no server, sends nothing over the network and never saves or changes a connection, so a real connection you saved earlier is kept.
+- **Development builds:** leaving a demo started from an open real archive reconnects to that archive, using saved credentials and the normal Opening/Cancel flow. That reconnection contacts its server and may update its saved selection; it adds no archive. Published 0.5.0 returns to setup instead.
 - Saving a demo attachment still uses the normal save dialog, and confirmed links still open in your browser, just as with a real archive.
 
 Android in dark mode, using fictional demo mail: **browse mail** (first), then **read a message** (second).

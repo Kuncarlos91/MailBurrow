@@ -151,6 +151,15 @@ class ArchiveSession extends ChangeNotifier {
   ArchiveBackend? _pendingCandidate;
   int? _committingConnectToken;
 
+  // The saved archive that was open when the current switch began, reopened
+  // if that switch is cancelled. Null when nothing was open, so a Cancel
+  // while reopening it goes to setup instead of looping.
+  String? _switchReturnId;
+
+  // The saved archive that was open when the demo started, reopened when
+  // the demo is exited. Null when the demo started from setup.
+  String? _demoReturnId;
+
   /// True while the saved archive is being opened at startup or from the
   /// picker, so the progress screen can offer Cancel.
   bool get canCancelOpening =>
@@ -160,13 +169,18 @@ class ArchiveSession extends ChangeNotifier {
       (restoring || switchingArchive != null);
 
   /// Stops opening an archive at startup or from the picker without waiting
-  /// for the server to answer or time out, and returns to setup with the
-  /// saved archives and Retry. The abandoned attempt's client is closed and
-  /// its late result is ignored; nothing is saved or activated.
+  /// for the server to answer or time out. The abandoned attempt's client is
+  /// closed and its late result is ignored; nothing is saved or activated.
+  ///
+  /// A cancelled switch reopens the archive that was open before it, if it
+  /// is still saved. Otherwise, and at startup, setup is shown with the
+  /// saved archives and Retry.
   Future<void> cancelOpening() async {
     // Once the destination has been adopted, it is open: nothing to cancel.
     if (!canCancelOpening || _disposed || api != null) return;
     final switching = switchingArchive != null;
+    final returnId = switching ? _switchReturnId : null;
+    _switchReturnId = null;
     _openingToken++;
     _connectToken++;
     _pendingCandidate?.close();
@@ -180,8 +194,23 @@ class ArchiveSession extends ChangeNotifier {
     error = null;
     server.clear();
     keyInput.clear();
+    final token = _openingToken;
+    final connectToken = _connectToken;
+    bool current() => !_disposed && token == _openingToken && connectToken == _connectToken;
     _notify();
-    await _refreshArchives();
+    await _refreshArchives(isCurrent: current);
+    await _reopen(returnId, current);
+  }
+
+  /// Reopens the saved archive [id] after a cancelled switch or the demo,
+  /// unless [id] is null or no longer saved, or [stillCurrent] reports that
+  /// the user has started something else meanwhile.
+  Future<void> _reopen(String? id, bool Function() stillCurrent) async {
+    if (id == null || _disposed || !stillCurrent()) return;
+    if (api != null || !setup || !archives.any((item) => item.id == id)) {
+      return;
+    }
+    await switchArchive(id);
   }
 
   /// The archive [reconnectArchiveId] names, if it is still saved.
@@ -355,6 +384,8 @@ class ArchiveSession extends ChangeNotifier {
     final profile = archives.where((item) => item.id == id).firstOrNull;
     if (profile == null) return;
     if (!setup && api != null && id == activeArchiveId) return;
+    final previous = !demo && api != null ? activeArchiveId : null;
+    _switchReturnId = previous == id ? null : previous;
     reconfiguring = null;
     api?.close();
     _invalidateRequests();
@@ -936,7 +967,7 @@ class ArchiveSession extends ChangeNotifier {
 
   Future<void> forgetConnection() async {
     if (demo) {
-      exitDemo();
+      await exitDemo();
       return;
     }
     try {
@@ -979,6 +1010,7 @@ class ArchiveSession extends ChangeNotifier {
   /// the saved connection and the setup fields are left as they are.
   Future<void> startDemo() async {
     if (demo && !setup) return;
+    if (!demo) _demoReturnId = api != null ? activeArchiveId : null;
     mailRequestFailed = false;
     accountSwitchGeneration++;
     accountLoading = false;
@@ -1022,13 +1054,17 @@ class ArchiveSession extends ChangeNotifier {
     }
   }
 
-  /// Leaves the demo and returns to setup.
+  /// Leaves the demo. If a saved archive was open when the demo started, it
+  /// is reopened (with the Opening screen and Cancel); otherwise setup is
+  /// shown.
   ///
   /// Stops demo requests and attachment copies in progress; their late
-  /// results are ignored. The saved connection is not touched, so
+  /// results are ignored. The demo itself saves nothing, so
   /// "Retry saved connection" still works afterwards.
-  void exitDemo() {
+  Future<void> exitDemo() async {
     if (!demo) return;
+    final returnId = _demoReturnId;
+    _demoReturnId = null;
     api?.close();
     _invalidateRequests();
     _clearBrowsing();
@@ -1048,6 +1084,9 @@ class ArchiveSession extends ChangeNotifier {
     setup = true;
     busy = false;
     error = null;
+    final token = _openingToken;
+    final connectToken = _connectToken;
     _notify();
+    await _reopen(returnId, () => token == _openingToken && connectToken == _connectToken && !demo);
   }
 }

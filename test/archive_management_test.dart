@@ -555,17 +555,9 @@ void main() {
       pending!.ready.complete();
       await tester.pumpAndSettle();
       expect(find.text('a.example mail'), findsNothing);
-      await tester.scrollUntilVisible(
-        find.text('Retry saved connection'),
-        200,
-        scrollable: find
-            .descendant(
-              of: find.byType(SetupView),
-              matching: find.byType(Scrollable),
-            )
-            .first,
-      );
-      expect(find.text('Retry saved connection'), findsOneWidget);
+      await tester.tap(find.text('Mail'));
+      await tester.pumpAndSettle();
+      expect(find.text('b.example mail'), findsOneWidget, reason: 'previous archive reopened');
       await tester.runAsync(() async {
         final saved = await store.read();
         expect(saved?.server, second);
