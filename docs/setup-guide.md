@@ -15,6 +15,8 @@ The [website guide](https://mailburrow.pages.dev/setup.html) covers the same ste
 
 To see what the app looks like before setting anything up, tap **Try the demo** on the setup screen: it opens fictional sample mail built into the app, with no server needed.
 
+**Development behavior, not in published 0.5.0:** exiting a demo or cancelling an archive switch can reopen the real archive that was open before it. Reopening contacts that server using its saved credential, and shows Opening with Cancel. Startup Cancel or cancelling again during this return stops at setup; a forgotten archive is not reopened. No new archive is added, but normal reopening may update the saved selection. The website describes the released behavior until its next reviewed update.
+
 Checked against Mail-Archiver's [REST API guide](https://github.com/s1t5/mail-archiver/blob/main/doc/API.md), Open Archiver 0.6.2, Bichon 2.4.2 Community, the TrueNAS Mail Archiver, Open Archiver and Tailscale apps, and Tailscale's HTTPS and Serve documentation, as of November 2026. Menu names can change between versions.
 
 **iOS source identity:** development source uses `com.kuncarlos91.mailburrow`. Earlier TestFlight builds used `com.kuncarlos91.mailshelf`; the new identity installs separately and does not automatically migrate saved connections/Keychain entries. Keep the earlier app intact and enter credentials again in the new app. This source change does not establish a new TestFlight build or an iOS device pass.

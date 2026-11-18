@@ -194,10 +194,12 @@ class ArchiveSession extends ChangeNotifier {
     error = null;
     server.clear();
     keyInput.clear();
-    _notify();
     final token = _openingToken;
-    await _refreshArchives();
-    await _reopen(returnId, () => token == _openingToken);
+    final connectToken = _connectToken;
+    bool current() => !_disposed && token == _openingToken && connectToken == _connectToken;
+    _notify();
+    await _refreshArchives(isCurrent: current);
+    await _reopen(returnId, current);
   }
 
   /// Reopens the saved archive [id] after a cancelled switch or the demo,
@@ -1082,8 +1084,9 @@ class ArchiveSession extends ChangeNotifier {
     setup = true;
     busy = false;
     error = null;
-    _notify();
     final token = _openingToken;
-    await _reopen(returnId, () => token == _openingToken && !demo);
+    final connectToken = _connectToken;
+    _notify();
+    await _reopen(returnId, () => token == _openingToken && connectToken == _connectToken && !demo);
   }
 }

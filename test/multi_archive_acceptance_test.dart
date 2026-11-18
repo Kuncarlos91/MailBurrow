@@ -107,8 +107,19 @@ class LabClient extends FakeArchiveBackend {
   void close() => closed = true;
 }
 
-ArchiveSession newSession() =>
-    ArchiveSession(backendFactory: (type, server, key) => LabClient(server, key));
+class HeldOverviewStore extends ConnectionStore {
+  Completer<SavedArchives>? nextOverview;
+  @override
+  Future<SavedArchives> overview() {
+    final next = nextOverview;
+    nextOverview = null;
+    return next?.future ?? super.overview();
+  }
+}
+
+ArchiveSession newSession({ConnectionStore? connectionStore}) =>
+    ArchiveSession(store: connectionStore ?? store,
+      backendFactory: (type, server, key) => LabClient(server, key));
 
 Future<void> addArchive(
   ArchiveSession session,
@@ -405,6 +416,36 @@ void main() {
     servers[hostA]!.holdAccounts = null;
     await session.switchArchive(a.id);
     expect(subject(session), '$hostA 1');
+  });
+
+  test('a late Cancel overview cannot reopen after a newer connection attempt', () async {
+    await addBoth();
+    session.dispose();
+    final heldStore = HeldOverviewStore();
+    session = newSession(connectionStore: heldStore);
+    await session.restore();
+    final gate = servers[hostA]!.holdAccounts = Completer<void>();
+    final switching = session.switchArchive(archiveAt(session, hostA).id);
+    await pumpEventQueue();
+    final oldOverview = await store.overview();
+    final overviewGate = heldStore.nextOverview = Completer<SavedArchives>();
+    final cancelling = session.cancelOpening();
+    await pumpEventQueue();
+    // A new manual attempt, even one refused locally, supersedes auto-return.
+    session.server.text = 'http://invalid.example';
+    await session.connect();
+    final newError = session.error;
+    expect(newError, isNotNull);
+    final openedClients = clients.length;
+    overviewGate.complete(oldOverview);
+    await cancelling;
+    expect(session.setup, isTrue);
+    expect(session.api, isNull);
+    expect(session.error, newError);
+    expect(clients.length, openedClients, reason: 'no unexpected reconnect');
+    gate.complete();
+    await switching;
+    expect(session.api, isNull);
   });
 
   test('Cancel while reopening the previous archive goes to setup', () async {
