@@ -2,7 +2,7 @@
 
 All notable changes to MailBurrow are recorded here. Versions follow the app version shown in Settings.
 
-## 0.5.0 (build31) - 2026-11-18
+## 0.5.0 (build31) - 2026-11-17
 
 Published as the latest [GitHub release](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.5.0) from tag `v0.5.0`. APK `MailBurrow-0.5.0-build31.apk`, 20,336,658 bytes, SHA-256 `3688b9e2c17056ca247317f28628f9478980e7971b8ef4e2ace25a305a0646c7`. Release page and limits: [Android 0.5.0](docs/releasing/android-0.5.0.md).
 

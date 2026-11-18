@@ -14,7 +14,7 @@ MailBurrow is an early preview. The signed Android release [0.5.0](https://githu
 
 ## Tested servers
 
-These are reviewed release facts recorded for the November 18, 2026 release (0.5.0) and the November 14, 2026 release (0.4.0), not live backend monitoring. Other server versions are unverified.
+These are reviewed release facts recorded for the November 17, 2026 release (0.5.0) and the November 14, 2026 release (0.4.0), not live backend monitoring. Other server versions are unverified.
 
 | Android app | Server tested | Scope and limits |
 | --- | --- | --- |

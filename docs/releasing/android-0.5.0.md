@@ -4,7 +4,7 @@
 
 ## Status and identity
 
-**Released 2026-11-18** as the latest GitHub release, tag `v0.5.0`. The maintainer reports that build 31 from `d56777fb3476e458e5300458bc59c0075a71721b` passed the artifact and device checks below. The app inputs at the tagged `main` commit must be identical to that commit; otherwise this APK is not the one tested. This page summarizes the release. Detailed measurements and build records stay in the maintainer's private release records. Never record keys, certificate fields, private hosts, server addresses or raw logs here.
+**Released 2026-11-17** as the latest GitHub release, tag `v0.5.0`. The maintainer reports that build 31 from `d56777fb3476e458e5300458bc59c0075a71721b` passed the artifact and device checks below. The app inputs at the tagged `main` commit must be identical to that commit; otherwise this APK is not the one tested. This page summarizes the release. Detailed measurements and build records stay in the maintainer's private release records. Never record keys, certificate fields, private hosts, server addresses or raw logs here.
 
 | Item | Value |
 | --- | --- |
