@@ -9,9 +9,9 @@ MailBurrow is a phone app for reading the mail you already archive with [Mail-Ar
 - **Bichon:** follow [Bichon steps 1 and 2](#bichon-step-1-create-a-read-only-user), then steps 3 and 4.
 - **More than one:** set up one, then add the others in the app. See [several archives](#several-archives).
 
-**App version:** Open Archiver, the server-type choice and several saved archives need MailBurrow 0.4.0 or later. Bichon is available in development builds on `feature/bichon` for the intended 0.5.0 release; the published 0.4.0 APK does not support it.
+**App version:** Open Archiver, the server-type choice and several saved archives need MailBurrow 0.4.0 or later. Bichon needs MailBurrow 0.5.0 or later.
 
-The [published website guide](https://mailburrow.pages.dev/setup.html) covers the released app. Bichon instructions here describe development builds; the website templates now include the same candidate-labelled Bichon instructions. Deployment and the released-support transition remain separate release steps.
+The [website guide](https://mailburrow.pages.dev/setup.html) covers the same steps.
 
 To see what the app looks like before setting anything up, tap **Try the demo** on the setup screen: it opens fictional sample mail built into the app, with no server needed.
 
@@ -36,7 +36,7 @@ flowchart LR
 
 | Piece | Required? | What it does |
 | --- | --- | --- |
-| [Mail-Archiver](https://github.com/s1t5/mail-archiver), release **2607.3 or later**, or [Open Archiver](https://github.com/LogicLabs-OU/OpenArchiver) **0.6.2**; development builds also support [Bichon](https://github.com/rustmailer/bichon) **2.4.2 Community** | Yes, at least one | Archives your mail and provides the API. Mail-Archiver's API is **off by default**. Other Open Archiver/Bichon versions are unverified for this build. Bichon is not in the published 0.4.0 APK. |
+| [Mail-Archiver](https://github.com/s1t5/mail-archiver), release **2607.3 or later**, or [Open Archiver](https://github.com/LogicLabs-OU/OpenArchiver) **0.6.2**, or [Bichon](https://github.com/rustmailer/bichon) **2.4.2 Community** | Yes, at least one | Archives your mail and provides the API. Mail-Archiver's API is **off by default**. Other Open Archiver and Bichon versions, and Bichon Pro/Enterprise, are unverified. Bichon needs MailBurrow 0.5.0 or later. |
 | An API key or Bichon access token for that server | Yes | Lets the app read the archive with its user's permissions. |
 | An HTTPS address with a **trusted certificate** | Yes | For example `https://archive.example.ts.net`. Self-signed certificates don't work. |
 | [Tailscale](https://tailscale.com/) on the server and the phone | Recommended | Private access from anywhere, plus a free trusted certificate through Tailscale Serve. |
@@ -209,7 +209,7 @@ Folder responses are limited to 2,000 folders and nesting depth 32 (root depth z
 
 ## Several archives
 
-The shared archive/account rows on all three tabs and opening an archive by tapping it in **Settings → Archives** are development-build features. In the published 0.4.0 APK, open the archive-name picker from Mail or Search; Settings has its older account card.
+From 0.5.0, the archive and account rows are the same on Mail, Search and Settings, and tapping an archive in **Settings → Archives** opens it. In 0.4.0, open the archive-name picker from Mail or Search; Settings has an older account card.
 
 MailBurrow can keep up to 20 archives, for example a Mail-Archiver and an Open Archiver server, and switch between them without entering keys again.
 
