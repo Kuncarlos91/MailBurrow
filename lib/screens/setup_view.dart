@@ -184,7 +184,7 @@ class SetupView extends StatelessWidget {
         ],
         const SizedBox(height: 16),
         const Text(
-          'Read archived mail from your own Mail-Archiver or Open Archiver server over HTTPS. MailBurrow never guesses the server type. It does not provide server hosting or accounts.',
+          'Read archived mail from your own Mail-Archiver, Open Archiver or Bichon server over HTTPS. MailBurrow never guesses the server type. It does not provide server hosting or accounts.',
         ),
         const SizedBox(height: 8),
         const Text(

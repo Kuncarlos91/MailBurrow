@@ -348,6 +348,13 @@ void main() {
     );
     expect(find.text('Bichon'), findsOneWidget);
     expect(find.text('Access token'), findsNothing);
+    // The general introduction names every supported server type.
+    expect(
+      find.textContaining(
+        'your own Mail-Archiver, Open Archiver or Bichon server',
+      ),
+      findsOneWidget,
+    );
     await tester.tap(find.text('Bichon'));
     await tester.pumpAndSettle();
     expect(value.setupServerType, ArchiveServerType.bichon);

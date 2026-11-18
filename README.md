@@ -88,7 +88,7 @@ If MailBurrow is useful to you, you can [star the project](https://github.com/Ku
 
 The setup screen in dark mode: choose the server type, then enter the server address and API key.
 
-<img src="docs/images/setup-screen.jpg" alt="MailBurrow setup in dark mode: a Mail-Archiver or Open Archiver server-type choice, empty server address and API key fields, Connect to archive, Try the demo, Support and Privacy notice" width="270">
+<img src="docs/images/setup-screen.jpg" alt="MailBurrow setup in dark mode: a Mail-Archiver, Open Archiver or Bichon server-type choice, empty server address and API key fields, Connect to archive, Try the demo, Support and Privacy notice" width="270">
 
 Your server address and key are saved in the device's secure storage. Never send them to app support. If the connection fails, see the [setup guide's checks](docs/setup-guide.md#if-something-goes-wrong) and [troubleshooting](docs/troubleshooting/README.md).
 
