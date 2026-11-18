@@ -2,7 +2,7 @@ blank_issues_enabled: false
 contact_links:
   - name: Setup guide
     url: https://github.com/Kuncarlos91/MailBurrow/blob/main/docs/setup-guide.md
-    about: Step-by-step settings for Mail-Archiver, Open Archiver, TrueNAS and Tailscale.
+    about: Step-by-step settings for Mail-Archiver, Open Archiver, Bichon, TrueNAS and Tailscale.
   - name: Report a security problem privately
     url: https://github.com/Kuncarlos91/MailBurrow/security/advisories/new
     about: Please don't open public issues for security problems.
@@ -12,3 +12,6 @@ contact_links:
   - name: Open Archiver server issues
     url: https://github.com/LogicLabs-OU/OpenArchiver/issues
     about: Problems with ingestion, the web interface or the server itself belong upstream.
+  - name: Bichon server issues
+    url: https://github.com/rustmailer/bichon/issues
+    about: Problems with syncing, the web interface or the server itself belong upstream.
