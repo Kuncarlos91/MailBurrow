@@ -18,7 +18,7 @@
 
 A read-only Android and iOS app for browsing your own [Mail-Archiver](https://github.com/s1t5/mail-archiver), [Open Archiver](https://github.com/LogicLabs-OU/OpenArchiver) or [Bichon](https://github.com/rustmailer/bichon) server. Browse and search archived mail, filter by date and supported folder options, read messages in a simplified view, and save attachments when you choose to.
 
-MailBurrow is an early preview. A signed Android release, [0.5.0](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.5.0), is available for 64-bit ARM phones. iOS 0.5.0 has passed internal TestFlight testing on an iPad but is not published, so iPhone/iPad users build from source. See [project status](docs/testing/status.md).
+MailBurrow is an early preview. A signed Android release, [0.5.0](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.5.0), is available for 64-bit ARM phones. iOS 0.5.0 has passed maintainer-reported internal TestFlight checks on an iPad but is not published, so iPhone/iPad users build from source. See [project status](docs/testing/status.md).
 
 **New here?** Install the Android APK and tap **Try the demo** for fictional mail with no server or network needed. The demo is inside the app. To connect your own archive, follow the [setup guide](docs/setup-guide.md).
 
