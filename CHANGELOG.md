@@ -8,6 +8,7 @@ All notable changes to MailBurrow are recorded here. Versions follow the app ver
 - **Fixed:** the setup screen's introduction now names Bichon alongside Mail-Archiver and Open Archiver. In 0.5.0 it listed only the first two, though choosing Bichon worked. The introduction now derives its backend names from the selector's shared server-type list, with a regression covering every entry.
 - **Changed:** exiting the demo reopens the archive that was open when the demo started, and Cancel on the Opening screen during an archive switch reopens the archive that was open before it. In 0.5.0 both returned to setup. Cancel at startup, or again while the previous archive reopens, still returns to setup, so Cancel never loops; a previous archive forgotten in the meantime is not reopened.
 - **Community:** GitHub Discussions for questions, ideas and working setups, linked from the README and the issue chooser. Bugs still go through the issue forms.
+- **Docs:** README and project status say iOS 0.5.0 passed internal TestFlight testing on an iPad but is not published on the App Store or public TestFlight.
 - README: setup screenshot updated to the 0.5.0 screen with three server types.
 
 ## 0.5.0 (build31) - 2026-11-17
