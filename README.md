@@ -18,7 +18,7 @@
 
 A read-only Android and iOS app for browsing your own [Mail-Archiver](https://github.com/s1t5/mail-archiver), [Open Archiver](https://github.com/LogicLabs-OU/OpenArchiver) or [Bichon](https://github.com/rustmailer/bichon) server. Browse and search archived mail, filter by date and supported folder options, read messages in a simplified view, and save attachments when you choose to.
 
-MailBurrow is an early preview. A signed Android release, [0.5.0](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.5.0), is available for 64-bit ARM phones; iPhone/iPad builds are source-only. See [project status](docs/testing/status.md).
+MailBurrow is an early preview. A signed Android release, [0.5.0](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.5.0), is available for 64-bit ARM phones. iOS 0.5.0 has passed internal TestFlight testing on an iPad but is not published, so iPhone/iPad users build from source. See [project status](docs/testing/status.md).
 
 **New here?** Install the Android APK and tap **Try the demo** for fictional mail with no server or network needed. The demo is inside the app. To connect your own archive, follow the [setup guide](docs/setup-guide.md).
 
@@ -68,7 +68,7 @@ MailBurrow is not in the app stores. To try it:
 
 - **Before installing,** set up your server with the [setup guide](docs/setup-guide.md); the app needs it to connect.
 - **Android:** download `MailBurrow-0.5.0-build31.apk` from the [0.5.0 release](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.5.0) and compare its SHA-256 with the one in the release notes. It is for 64-bit ARM (arm64-v8a) devices; 32-bit-only phones cannot install it. Not ready to connect a server? Tap **Try the demo** on setup. You can also build it from source (see [Building from source](#building-from-source)): `flutter build apk --debug --target-platform android-arm64` produces a debug APK that installs as **MailBurrow Preview**, separately from the signed release.
-- **iPhone and iPad:** build and run from source on a Mac with Xcode.
+- **iPhone and iPad:** build and run from source on a Mac with Xcode. There is no App Store or public TestFlight build yet.
 
 Signed releases are published on the [Releases page](https://github.com/Kuncarlos91/MailBurrow/releases) and install over each other without losing your saved connection.
 
