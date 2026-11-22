@@ -325,16 +325,37 @@ class AppLockController extends ChangeNotifier with WidgetsBindingObserver {
     _notify();
     try {
       final result = await _platform.authenticate(reason);
-      // A result delivered while genuinely away cannot authorize a future
-      // return. Prompt-induced inactivity may settle before the callback;
-      // only accept success when the app is foreground again.
-      return result == AppLockAuthResult.success && !_resumed
-          ? AppLockAuthResult.canceled
-          : result;
+      if (result != AppLockAuthResult.success || _resumed) return result;
+      return await _acceptOnPromptReturn();
     } finally {
       _promptInFlight = false;
       _notify();
     }
+  }
+
+  // How soon the app must return to the foreground after a success that
+  // arrived while it was away. The system PIN/pattern screen (Android) and
+  // Face ID (iOS) routinely deliver success just before the app resumes; a
+  // later return is a genuine leave and the success cannot authorize it.
+  static const promptReturnWindow = Duration(seconds: 3);
+
+  Completer<void>? _foreground;
+
+  Future<AppLockAuthResult> _acceptOnPromptReturn() async {
+    final deliveredAt = await _platform.elapsedMillis();
+    if (deliveredAt == null || _disposed) return AppLockAuthResult.canceled;
+    if (!_resumed) {
+      final foreground = _foreground = Completer<void>();
+      await foreground.future;
+      if (identical(_foreground, foreground)) _foreground = null;
+      if (_disposed) return AppLockAuthResult.canceled;
+    }
+    final now = await _platform.elapsedMillis();
+    final prompt =
+        now != null &&
+        now >= deliveredAt &&
+        now - deliveredAt <= promptReturnWindow.inMilliseconds;
+    return prompt ? AppLockAuthResult.success : AppLockAuthResult.canceled;
   }
 
   // Called after any prompt ends. A successful prompt proves the user is
@@ -366,6 +387,11 @@ class AppLockController extends ChangeNotifier with WidgetsBindingObserver {
           _promptOnResume = true;
         }
       case AppLifecycleState.resumed:
+        final foreground = _foreground;
+        if (foreground != null && !foreground.isCompleted) {
+          foreground.complete();
+          return;
+        }
         _onResumed();
       case AppLifecycleState.detached:
         break;
@@ -458,6 +484,8 @@ class AppLockController extends ChangeNotifier with WidgetsBindingObserver {
   void dispose() {
     _disposed = true;
     _generation++;
+    final foreground = _foreground;
+    if (foreground != null && !foreground.isCompleted) foreground.complete();
     if (_observing) WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }

@@ -32,10 +32,11 @@ void main() {
     lock.didChangeAppLifecycleState(AppLifecycleState.hidden);
     lock.didChangeAppLifecycleState(AppLifecycleState.paused);
     platform.answer(AppLockAuthResult.success);
-    await unlocking;
+    await Future<void>.delayed(Duration.zero);
     platform.now = platform.now! + 600000;
     lifecycle = AppLifecycleState.resumed;
     lock.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await unlocking;
     await Future<void>.delayed(Duration.zero);
     expect(
       lock.contentVisible,

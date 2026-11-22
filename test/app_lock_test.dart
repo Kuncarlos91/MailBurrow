@@ -283,16 +283,62 @@ void main() {
       lock = make(); // for tearDown
     });
 
-    test('success delivered while away is rejected on return', () async {
+    test(
+      'success delivered while away and a late return stays locked',
+      () async {
+        final unlocking = lock.unlock();
+        lifecycle = AppLifecycleState.paused;
+        lock.didChangeAppLifecycleState(AppLifecycleState.paused);
+        platform.answer(AppLockAuthResult.success);
+        await settle();
+        expect(lock.contentVisible, isFalse);
+        platform.now = platform.now! + 4000;
+        await returnToApp();
+        await unlocking;
+        expect(lock.phase, AppLockPhase.locked);
+        expect(lock.contentVisible, isFalse, reason: 'late return is a leave');
+        expect(platform.prompts, hasLength(1), reason: 'no automatic retry');
+      },
+    );
+
+    test('PIN or pattern screen: success just before resume unlocks', () async {
+      final unlocking = lock.unlock();
+      lifecycle = AppLifecycleState.paused;
+      lock.didChangeAppLifecycleState(AppLifecycleState.hidden);
+      lock.didChangeAppLifecycleState(AppLifecycleState.paused);
+      platform.answer(AppLockAuthResult.success);
+      await settle();
+      platform.now = platform.now! + 300;
+      await returnToApp();
+      await unlocking;
+      await settle();
+      expect(lock.phase, AppLockPhase.unlocked);
+      expect(lock.contentVisible, isTrue);
+    });
+
+    test('Face ID: success while inactive unlocks on prompt return', () async {
+      final unlocking = lock.unlock();
+      lifecycle = AppLifecycleState.inactive;
+      lock.didChangeAppLifecycleState(AppLifecycleState.inactive);
+      platform.answer(AppLockAuthResult.success);
+      await settle();
+      await returnToApp();
+      await unlocking;
+      await settle();
+      expect(lock.phase, AppLockPhase.unlocked);
+      expect(lock.contentVisible, isTrue);
+    });
+
+    test('a pending background success is dropped on dispose', () async {
       final unlocking = lock.unlock();
       lifecycle = AppLifecycleState.paused;
       lock.didChangeAppLifecycleState(AppLifecycleState.paused);
       platform.answer(AppLockAuthResult.success);
+      await settle();
+      lock.dispose();
       await unlocking;
-      expect(lock.phase, AppLockPhase.locked);
       expect(lock.contentVisible, isFalse);
-      await returnToApp();
-      expect(lock.contentVisible, isFalse, reason: 'background result did not unlock');
+      lock = make();
     });
   });
 
