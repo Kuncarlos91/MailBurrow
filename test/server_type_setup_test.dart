@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mailburrow/archive_api.dart';
 import 'package:mailburrow/archive_server_type.dart';
 import 'package:mailburrow/bichon_api.dart';
+import 'package:mailburrow/build_information.dart';
 import 'package:mailburrow/open_archiver_api.dart';
 import 'package:mailburrow/screens/setup_view.dart';
 import 'package:mailburrow/search_filters.dart';
@@ -79,6 +80,49 @@ void main() {
     created = [];
     failTypes = {};
   });
+
+  for (final brightness in Brightness.values) {
+    for (final size in [const Size(320, 640), const Size(640, 320)]) {
+      testWidgets(
+        'setup version is reachable without connecting: $brightness $size',
+        (tester) async {
+          tester.view.physicalSize = size;
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          final value = session();
+          addTearDown(value.dispose);
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: ThemeData(brightness: brightness),
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(textScaler: const TextScaler.linear(2)),
+                child: child!,
+              ),
+              home: Scaffold(body: SetupView(session: value)),
+            ),
+          );
+          final footer = find.text(buildInformation);
+          await tester.scrollUntilVisible(
+            footer,
+            180,
+            scrollable: find.byType(Scrollable).first,
+          );
+          await tester.pumpAndSettle();
+          expect(footer, findsOneWidget);
+          expect(tester.getRect(footer).overlaps(Offset.zero & size), isTrue);
+          expect(tester.takeException(), isNull);
+          expect(
+            created,
+            isEmpty,
+            reason: 'version needs no server connection',
+          );
+          expect(value.api, isNull);
+        },
+      );
+    }
+  }
 
   test('each server type has its own client and stored name', () {
     final server = Uri.parse('https://archive.example');
