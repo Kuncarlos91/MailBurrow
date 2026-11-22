@@ -4,6 +4,7 @@ All notable changes to MailBurrow are recorded here. Versions follow the app ver
 
 ## Unreleased
 
+- **Changed:** setup now shows the app version and build, using the same build information as Settings, before connecting to a server.
 - **iOS:** the bundle ID is now `com.kuncarlos91.mailburrow`, matching Android, and the bundle name is MailBurrow. Earlier TestFlight builds used `com.kuncarlos91.mailshelf`; the new ID installs as a separate app, so saved connections are entered again once.
 - **Fixed:** the setup screen's introduction now names Bichon alongside Mail-Archiver and Open Archiver. In 0.5.0 it listed only the first two, though choosing Bichon worked. The introduction now derives its backend names from the selector's shared server-type list, with a regression covering every entry.
 - **Changed:** exiting the demo reopens the archive that was open when the demo started, and Cancel on the Opening screen during an archive switch reopens the archive that was open before it. In 0.5.0 both returned to setup. Cancel at startup, or again while the previous archive reopens, still returns to setup, so Cancel never loops; a previous archive forgotten in the meantime is not reopened.

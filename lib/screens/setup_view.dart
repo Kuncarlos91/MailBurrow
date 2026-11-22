@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../archive_picker.dart';
 import '../archive_server_type.dart';
+import '../build_information.dart';
 import '../public_information.dart';
 import '../state/archive_session.dart';
 
@@ -198,6 +199,10 @@ class SetupView extends StatelessWidget {
           'Configure your own server and private-network access. If your server uses Tailscale, connect its app first. Connection details are saved securely on this device.',
         ),
         const PublicInformationLinks(),
+        const ListTile(
+          title: Text('MailBurrow'),
+          subtitle: Text(buildInformation),
+        ),
         if (session.api != null || changing != null)
           TextButton(
             onPressed: busy ? null : session.cancelSetup,
