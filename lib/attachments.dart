@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'archive_errors.dart';
+import 'app_lock/app_lock_gate.dart';
 import 'archive_backend.dart';
 import 'archive_models.dart';
 import 'content_safety.dart';
@@ -85,7 +86,7 @@ class _MessageAttachmentsState extends State<MessageAttachments> {
         ],
       ),
     );
-    if (approved != true || !mounted || opening) return;
+    if (approved != true || !mounted || opening || !_canUseFiles) return;
     setState(() => opening = true);
     try {
       final outcome = await openSavedFile(location);
@@ -130,7 +131,7 @@ class _MessageAttachmentsState extends State<MessageAttachments> {
   }
 
   Future<void> reconnectSavedFile(MailAttachment attachment) async {
-    if (saving || opening) return;
+    if (saving || opening || !_canUseFiles) return;
     setState(() {
       saving = true;
       choosingDestination = true;
@@ -173,8 +174,17 @@ class _MessageAttachmentsState extends State<MessageAttachments> {
     }
   }
 
+  // Native file dialogs sit outside the Flutter cover. Recheck visibility
+  // after every asynchronous preparation before starting a new handoff.
+  bool get _canUseFiles =>
+      context
+          .getInheritedWidgetOfExactType<AppLockScope>()
+          ?.notifier
+          ?.contentVisible ??
+      true;
+
   Future<void> save(MailAttachment attachment) async {
-    if (saving || opening) return;
+    if (saving || opening || !_canUseFiles) return;
     if (attachment.size > maxAttachmentDownloadBytes) {
       setState(
         () => status =
@@ -228,7 +238,7 @@ class _MessageAttachmentsState extends State<MessageAttachments> {
         ],
       ),
     );
-    if (confirmed != true || !mounted || saving) return;
+    if (confirmed != true || !mounted || saving || !_canUseFiles) return;
     final active = AttachmentDownload();
     final progressClock = Stopwatch()..start();
     var lastProgress = Duration.zero;
@@ -248,6 +258,7 @@ class _MessageAttachmentsState extends State<MessageAttachments> {
       final file = File(
         '${temporary.path}/${safeAttachmentName(attachment.name)}',
       );
+      if (!mounted || !_canUseFiles) throw const AttachmentDownloadCancelled();
       phase = 'download';
       await widget.api.downloadAttachment(
         widget.emailId,
@@ -270,6 +281,13 @@ class _MessageAttachmentsState extends State<MessageAttachments> {
       );
       active.throwIfStopped();
       if (!mounted) return;
+      if (!_canUseFiles) {
+        setState(
+          () => status =
+              'App locked before saving. Unlock, then save the attachment again.',
+        );
+        return;
+      }
       setState(() {
         choosingDestination = true;
         status = 'Choose where to save the attachment.';

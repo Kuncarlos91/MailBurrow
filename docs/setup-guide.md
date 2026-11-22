@@ -258,3 +258,5 @@ More detail is in [troubleshooting](troubleshooting/README.md). When asking for 
 - MailBurrow downloads an attachment only when you choose to, and saves it where you pick.
 - Turn on [app lock](#app-lock) if others use your phone.
 - Report security problems privately, as described in [SECURITY.md](../SECURITY.md).
+
+For app lock in development builds, an authentication result received while the app is away is rejected; return and use Unlock again. If an attachment finishes downloading while the reader is covered, unlock and save it again. The recovery screen scrolls to keep its controls reachable with large text.

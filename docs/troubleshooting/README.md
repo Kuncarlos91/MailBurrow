@@ -129,3 +129,7 @@ A local diagnostic build can add `--dart-define=MAILSHELF_FILE_DIAGNOSTICS=true`
 While an archive is opening, Cancel is unavailable during the secure-storage commit and once the archive is open. Before that commit, cancelling never activates the abandoned attempt. In releases after 0.5.0,, cancelling a switch reopens the archive you had open before it; cancelling at startup, or again while that archive reopens, returns to setup, where Retry starts another attempt.
 
 Reader cancellation fix: Back during a message load cancels that reader’s network calls rather than only hiding the result. Build 26 predates this fix; its successful navigation checks do not establish that its transport stopped. Validate a newer fixed APK separately, with its own source/hash and cancellation evidence.
+
+### Attachment finished downloading while app lock was covering the reader
+
+No new save dialog opens over the lock screen. Unlock and choose Save again; the unexported temporary download is removed. If a system picker was already open, use that picker's own save/cancel controls. App lock does not revoke files already saved or opened in another app.

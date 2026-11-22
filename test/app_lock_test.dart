@@ -283,16 +283,16 @@ void main() {
       lock = make(); // for tearDown
     });
 
-    test('success while the app is away stays covered until return', () async {
+    test('success delivered while away is rejected on return', () async {
       final unlocking = lock.unlock();
       lifecycle = AppLifecycleState.paused;
       lock.didChangeAppLifecycleState(AppLifecycleState.paused);
       platform.answer(AppLockAuthResult.success);
       await unlocking;
-      expect(lock.phase, AppLockPhase.unlocked);
+      expect(lock.phase, AppLockPhase.locked);
       expect(lock.contentVisible, isFalse);
       await returnToApp();
-      expect(lock.contentVisible, isTrue, reason: 'fresh unlock, not a leave');
+      expect(lock.contentVisible, isFalse, reason: 'background result did not unlock');
     });
   });
 

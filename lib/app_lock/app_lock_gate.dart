@@ -63,7 +63,7 @@ class _LockSurface extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final phase = controller.phase;
-    final prompting = controller.prompting;
+    final prompting = controller.prompting || controller.busy;
     final message = controller.message;
     final interactive =
         phase == AppLockPhase.locked ||
@@ -74,7 +74,7 @@ class _LockSurface extends StatelessWidget {
       color: theme.colorScheme.surface,
       child: SafeArea(
         child: Center(
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(32),
             child: Column(
               mainAxisSize: MainAxisSize.min,

@@ -190,7 +190,7 @@ class AppLockController extends ChangeNotifier with WidgetsBindingObserver {
   /// Recovers from an unreadable setting: after a fresh unlock, saves app
   /// lock as on with the default timing and unlocks. Never turns it off.
   Future<void> unlockAndRepair() async {
-    if (_phase != AppLockPhase.error || _promptInFlight) return;
+    if (_phase != AppLockPhase.error || _promptInFlight || _busy) return;
     final generation = ++_generation;
     _message = null;
     _notify();
@@ -207,6 +207,9 @@ class AppLockController extends ChangeNotifier with WidgetsBindingObserver {
       enabled: true,
       relockAfter: AppLockSettings.defaultRelock,
     );
+    _leftAt = null;
+    _busy = true;
+    _notify();
     try {
       await _store.write(repaired);
     } on Object {
@@ -214,16 +217,22 @@ class AppLockController extends ChangeNotifier with WidgetsBindingObserver {
       _message = 'App lock settings could not be saved. Try again.';
       _notify();
       return;
+    } finally {
+      _busy = false;
+      _notify();
     }
     if (_stale(generation)) return;
     _settings = repaired;
     _phase = AppLockPhase.unlocked;
     _revealed = true;
-    _leftAt = null;
-    _covered = !_resumed;
+    _covered = !_resumed || _leftAt != null;
+    if (!_resumed) {
+      _phase = AppLockPhase.locked;
+      _promptOnResume = true;
+    }
     _notify();
     await _platform.setPrivacyProtection(true);
-    _settleAfterPrompt();
+    _settleAfterPrompt(succeeded: false);
   }
 
   /// Turns app lock on after a successful prompt. Returns a message for the
@@ -272,7 +281,6 @@ class AppLockController extends ChangeNotifier with WidgetsBindingObserver {
     _busy = true;
     _notify();
     final generation = ++_generation;
-    var promptSucceeded = false;
     try {
       if (checkDevice && !await _platform.canAuthenticate()) {
         return _noScreenLockMessage;
@@ -281,7 +289,9 @@ class AppLockController extends ChangeNotifier with WidgetsBindingObserver {
       final result = await _prompt(reason);
       if (_stale(generation) || _phase != allowedFrom) return null;
       if (result != AppLockAuthResult.success) return _messageFor(result);
-      promptSucceeded = true;
+      // The successful foreground prompt settles its own lifecycle events,
+      // but any leave during the following storage write is a new leave.
+      _leftAt = null;
       try {
         await _store.write(next);
       } on Object {
@@ -290,14 +300,22 @@ class AppLockController extends ChangeNotifier with WidgetsBindingObserver {
       if (_stale(generation)) return null;
       _settings = next;
       _phase = next.enabled ? AppLockPhase.unlocked : AppLockPhase.off;
-      if (!next.enabled) _covered = false;
+      if (!next.enabled) {
+        _covered = false;
+      } else if (!_resumed) {
+        _phase = AppLockPhase.locked;
+        _covered = true;
+        _promptOnResume = true;
+      } else if (_leftAt != null) {
+        _covered = true;
+      }
       await _platform.setPrivacyProtection(next.enabled);
       return null;
     } finally {
       _busy = false;
       if (!_disposed) {
         _notify();
-        _settleAfterPrompt(succeeded: promptSucceeded);
+        _settleAfterPrompt(succeeded: false);
       }
     }
   }
@@ -306,7 +324,13 @@ class AppLockController extends ChangeNotifier with WidgetsBindingObserver {
     _promptInFlight = true;
     _notify();
     try {
-      return await _platform.authenticate(reason);
+      final result = await _platform.authenticate(reason);
+      // A result delivered while genuinely away cannot authorize a future
+      // return. Prompt-induced inactivity may settle before the callback;
+      // only accept success when the app is foreground again.
+      return result == AppLockAuthResult.success && !_resumed
+          ? AppLockAuthResult.canceled
+          : result;
     } finally {
       _promptInFlight = false;
       _notify();
@@ -333,8 +357,8 @@ class AppLockController extends ChangeNotifier with WidgetsBindingObserver {
         }
       case AppLifecycleState.hidden:
       case AppLifecycleState.paused:
-        if (!enabled) return;
-        if (_phase == AppLockPhase.unlocked) {
+        if (!enabled && !_busy) return;
+        if (_phase == AppLockPhase.unlocked || (_busy && !_promptInFlight)) {
           _covered = true;
           _leftAt ??= _platform.elapsedMillis();
           _notify();
