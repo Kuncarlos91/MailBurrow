@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../app_lock_spike.dart';
 import '../archive_information.dart';
 import '../build_information.dart';
 import '../public_information.dart';
@@ -95,6 +96,7 @@ class SettingsView extends StatelessWidget {
           ),
         const PublicInformationLinks(),
         const ThirdPartyLicensesTile(),
+        const AppLockSpikeTile(), // SPIKE: app lock P1, not for merge
         const ListTile(
           title: Text('MailBurrow'),
           subtitle: Text(buildInformation),

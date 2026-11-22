@@ -1,6 +1,6 @@
 package com.kuncarlos91.mailburrow
 
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import android.app.Activity
@@ -10,7 +10,8 @@ import android.content.ActivityNotFoundException
 import android.net.Uri
 import java.io.File
 
-class MainActivity : FlutterActivity() {
+// local_auth requires a FragmentActivity for the system biometric prompt.
+class MainActivity : FlutterFragmentActivity() {
     private var pendingSave: MethodChannel.Result? = null
     private var pendingSource: File? = null
     private var pendingMimeType: String? = null
@@ -69,6 +70,23 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        // SPIKE (app lock P1): toggle the recents snapshot without FLAG_SECURE,
+        // so screenshots stay allowed. Not for merge.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "mailburrow/app_lock_spike").setMethodCallHandler { call, result ->
+            when (call.method) {
+                "sdk" -> result.success(android.os.Build.VERSION.SDK_INT)
+                "hideRecents" -> {
+                    val hide = call.argument<Boolean>("hide") == true
+                    if (android.os.Build.VERSION.SDK_INT >= 33) {
+                        setRecentsScreenshotEnabled(!hide)
+                        result.success(true)
+                    } else {
+                        result.success(false)
+                    }
+                }
+                else -> result.notImplemented()
+            }
+        }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "mailshelf/saved_files").setMethodCallHandler { call, result ->
             if (call.argument<Boolean>("diagnostics") == true) diagnosticsEnabled = true
             when (call.method) {
