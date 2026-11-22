@@ -223,6 +223,17 @@ MailBurrow can keep up to 20 archives, for example a Mail-Archiver and an Open A
 
 Only one archive is open at a time. There's no combined inbox or search across archives.
 
+## App lock
+
+Available after 0.5.0. Off until you turn it on.
+
+- **Turn it on:** **Settings → App lock**. Your phone asks for your fingerprint, face or screen-lock PIN, pattern or password once; the lock is saved only after that succeeds. The phone must have a screen lock.
+- **Lock after leaving:** choose **Immediately**, **After 1 minute** (the default) or **After 5 minutes**. MailBurrow always asks again after it is fully closed and reopened.
+- **While locked,** the app shows only a lock screen, and its preview in recent apps is blank. Screenshots are still allowed.
+- **Turn it off or change the timing:** use the same settings; each change asks you to unlock first.
+
+App lock only controls opening the app on your phone. It doesn't encrypt anything, protect files you've saved, or stop someone who knows your device's screen lock. If you forget your device's screen lock, MailBurrow can't bypass it; reset it through your phone's own recovery, and remember your mail stays on your server.
+
 ## If something goes wrong
 
 | Message in the app | Likely cause | What to do |
@@ -245,4 +256,5 @@ More detail is in [troubleshooting](troubleshooting/README.md). When asking for 
 - Treat the API key as read access to its user's archived mail. Use a regular user, not an administrator, with only the accounts or sources you need. For Open Archiver, use the read-only role from Open Archiver step 1.
 - Your server keeps its own access logs. Open Archiver records searches (including the query) and message opens in its audit log. MailBurrow has no analytics or crash reporting. See the [privacy notice](../PRIVACY.md).
 - MailBurrow downloads an attachment only when you choose to, and saves it where you pick.
+- Turn on [app lock](#app-lock) if others use your phone.
 - Report security problems privately, as described in [SECURITY.md](../SECURITY.md).

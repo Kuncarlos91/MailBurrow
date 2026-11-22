@@ -100,6 +100,7 @@ Your server address and key are saved in the device's secure storage. Never send
 - **Bounded downloads:** response sizes, attachment sizes and request times are capped.
 - **Careful with content:** remote images don't load automatically, links ask before opening, and risky attachment types get a warning.
 - **No analytics or crash reporting.** Your server may still keep its own access logs.
+- **Optional app lock** (after 0.5.0): ask for your fingerprint, face or device screen lock to open the app, and hide it in the recent-apps screen. It controls access to the app on your phone; it doesn't encrypt anything or block screenshots.
 
 Details are in the [privacy notice](PRIVACY.md). To report a security problem privately, see [SECURITY.md](SECURITY.md). For app help, use the [support and privacy contact](docs/security/public-contacts.md#support-and-privacy).
 

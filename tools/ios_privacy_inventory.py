@@ -7,7 +7,7 @@ import plistlib
 import re
 import zipfile
 
-COMPONENTS = ('Flutter', 'App', 'flutter_secure_storage_darwin', 'url_launcher_ios', 'path_provider_foundation', 'flutter_file_dialog', 'open_filex')
+COMPONENTS = ('Flutter', 'App', 'flutter_secure_storage_darwin', 'url_launcher_ios', 'path_provider_foundation', 'flutter_file_dialog', 'open_filex', 'local_auth_darwin')
 
 
 def inventory(path):

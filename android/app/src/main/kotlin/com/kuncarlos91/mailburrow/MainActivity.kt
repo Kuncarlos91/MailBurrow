@@ -1,6 +1,6 @@
 package com.kuncarlos91.mailburrow
 
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import android.app.Activity
@@ -8,9 +8,26 @@ import android.content.Intent
 import android.content.ClipData
 import android.content.ActivityNotFoundException
 import android.net.Uri
+import android.os.Build
+import android.os.SystemClock
 import java.io.File
 
-class MainActivity : FlutterActivity() {
+// local_auth needs a FragmentActivity for the system authentication prompt.
+class MainActivity : FlutterFragmentActivity() {
+    // App lock privacy: hide the recent-apps preview while app lock is on.
+    // Kept on the instance and reapplied on resume, because the activity can
+    // be recreated. Screenshots stay allowed: FLAG_SECURE is never used.
+    private var recentsHidden = false
+
+    private fun applyRecentsPrivacy() {
+        if (Build.VERSION.SDK_INT >= 33) setRecentsScreenshotEnabled(!recentsHidden)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        applyRecentsPrivacy()
+    }
+
     private var pendingSave: MethodChannel.Result? = null
     private var pendingSource: File? = null
     private var pendingMimeType: String? = null
@@ -69,6 +86,19 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "mailburrow/app_lock").setMethodCallHandler { call, result ->
+            when (call.method) {
+                // Monotonic, includes deep sleep; never the wall clock.
+                "elapsedRealtime" -> result.success(SystemClock.elapsedRealtime())
+                "setPrivacyProtection" -> {
+                    recentsHidden = call.argument<Boolean>("enabled") == true
+                    applyRecentsPrivacy()
+                    // True only where the recents snapshot is really controlled.
+                    result.success(Build.VERSION.SDK_INT >= 33)
+                }
+                else -> result.notImplemented()
+            }
+        }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "mailshelf/saved_files").setMethodCallHandler { call, result ->
             if (call.argument<Boolean>("diagnostics") == true) diagnosticsEnabled = true
             when (call.method) {

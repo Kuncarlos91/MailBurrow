@@ -22,6 +22,62 @@ import UIKit
       guard let self = self else { return result("unavailable") }
       self.savedFiles.handle(call, result: result)
     }
+    let lockChannel = FlutterMethodChannel(
+      name: "mailburrow/app_lock",
+      binaryMessenger: engineBridge.applicationRegistrar.messenger()
+    )
+    lockChannel.setMethodCallHandler { call, result in
+      switch call.method {
+      case "elapsedRealtime":
+        // CLOCK_MONOTONIC keeps counting while the device sleeps.
+        result(Int(clock_gettime_nsec_np(CLOCK_MONOTONIC) / 1_000_000))
+      case "setPrivacyProtection":
+        let args = call.arguments as? [String: Any]
+        AppLockPrivacyCover.shared.enabled = (args?["enabled"] as? Bool) == true
+        result(true)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+    AppLockPrivacyCover.shared.observe()
+  }
+}
+
+// App lock privacy: cover the window before iOS takes the app-switcher
+// snapshot. Native, because a Flutter frame can arrive too late. Screenshots
+// are not blocked.
+private final class AppLockPrivacyCover {
+  static let shared = AppLockPrivacyCover()
+  var enabled = false
+  private var covers: [UIView] = []
+  private var observing = false
+
+  func observe() {
+    guard !observing else { return }
+    observing = true
+    let center = NotificationCenter.default
+    center.addObserver(
+      forName: UIScene.willDeactivateNotification, object: nil, queue: .main
+    ) { [weak self] note in self?.cover(note.object as? UIWindowScene) }
+    center.addObserver(
+      forName: UIScene.didActivateNotification, object: nil, queue: .main
+    ) { [weak self] _ in self?.uncover() }
+  }
+
+  private func cover(_ scene: UIWindowScene?) {
+    guard enabled, covers.isEmpty, let scene = scene else { return }
+    for window in scene.windows {
+      let view = UIView(frame: window.bounds)
+      view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+      view.backgroundColor = .systemBackground
+      window.addSubview(view)
+      covers.append(view)
+    }
+  }
+
+  private func uncover() {
+    covers.forEach { $0.removeFromSuperview() }
+    covers.removeAll()
   }
 }
 

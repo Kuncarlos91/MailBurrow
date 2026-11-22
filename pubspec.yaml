@@ -11,6 +11,7 @@ dependencies:
   flutter_secure_storage: ^11.2.0
   flutter_widget_from_html_core: ^0.17.4
   html: ^0.15.7
+  local_auth: ^3.0.2
   open_filex: ^5.0.0
   path_provider: ^2.1.6
   url_launcher: ^6.3.3
