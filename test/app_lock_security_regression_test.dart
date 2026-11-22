@@ -14,6 +14,45 @@ import 'app_lock_test.dart' as support;
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test(
+    'leaving again during the prompt-return clock check stays locked',
+    () async {
+      final platform = HeldReturnClock();
+      final entries = support.MemoryEntries({
+        AppLockStore.entry: support.stored(true, 0),
+      });
+      var lifecycle = AppLifecycleState.resumed;
+      final lock = AppLockController(
+        store: AppLockStore(entries: entries),
+        platform: platform,
+        lifecycleState: () => lifecycle,
+      );
+      addTearDown(lock.dispose);
+      await lock.start();
+      final unlocking = lock.unlock();
+      lifecycle = AppLifecycleState.paused;
+      lock.didChangeAppLifecycleState(AppLifecycleState.paused);
+      platform.answer(AppLockAuthResult.success);
+      await Future<void>.delayed(Duration.zero);
+      lifecycle = AppLifecycleState.resumed;
+      lock.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      await platform.checkStarted.future;
+      lifecycle = AppLifecycleState.paused;
+      lock.didChangeAppLifecycleState(AppLifecycleState.hidden);
+      lock.didChangeAppLifecycleState(AppLifecycleState.paused);
+      platform.check.complete(platform.now);
+      await unlocking;
+      platform.now = platform.now! + 600000;
+      lifecycle = AppLifecycleState.resumed;
+      lock.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        lock.contentVisible,
+        isFalse,
+        reason: 'a second leave supersedes pending acceptance',
+      );
+    },
+  );
   test('background success cannot authorize a much later return', () async {
     final entries = support.MemoryEntries({
       AppLockStore.entry: support.stored(true, 0),
@@ -237,5 +276,19 @@ class HeldWriteEntries extends support.MemoryEntries {
     started.complete();
     await finish.future;
     await super.write(key: key, value: value);
+  }
+}
+
+class HeldReturnClock extends support.FakePlatform {
+  int calls = 0;
+  final checkStarted = Completer<void>();
+  final check = Completer<int?>();
+  @override
+  Future<int?> elapsedMillis() {
+    if (++calls == 2) {
+      checkStarted.complete();
+      return check.future;
+    }
+    return super.elapsedMillis();
   }
 }

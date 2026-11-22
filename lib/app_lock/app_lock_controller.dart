@@ -65,6 +65,8 @@ class AppLockController extends ChangeNotifier with WidgetsBindingObserver {
 
   // Incremented whenever an in-flight result must be ignored.
   int _generation = 0;
+  // Detect a new leave while an asynchronous foreground check is pending.
+  int _leaveGeneration = 0;
   // A prompt (unlock or settings) is showing; lifecycle changes it causes
   // are settled when it ends.
   bool _promptInFlight = false;
@@ -350,8 +352,12 @@ class AppLockController extends ChangeNotifier with WidgetsBindingObserver {
       if (identical(_foreground, foreground)) _foreground = null;
       if (_disposed) return AppLockAuthResult.canceled;
     }
+    final leaveGeneration = _leaveGeneration;
     final now = await _platform.elapsedMillis();
     final prompt =
+        !_disposed &&
+        _resumed &&
+        leaveGeneration == _leaveGeneration &&
         now != null &&
         now >= deliveredAt &&
         now - deliveredAt <= promptReturnWindow.inMilliseconds;
@@ -378,6 +384,7 @@ class AppLockController extends ChangeNotifier with WidgetsBindingObserver {
         }
       case AppLifecycleState.hidden:
       case AppLifecycleState.paused:
+        _leaveGeneration++;
         if (!enabled && !_busy) return;
         if (_phase == AppLockPhase.unlocked || (_busy && !_promptInFlight)) {
           _covered = true;
