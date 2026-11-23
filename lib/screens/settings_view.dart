@@ -1,3 +1,4 @@
+import '../spike/private_ca_matrix_page.dart';
 import 'package:flutter/material.dart';
 
 import '../app_lock/app_lock_gate.dart';
@@ -96,6 +97,7 @@ class SettingsView extends StatelessWidget {
           ),
         const PublicInformationLinks(),
         const AppLockSettingsTiles(),
+        const PrivateCaMatrixTile(),
         const ThirdPartyLicensesTile(),
         const ListTile(
           title: Text('MailBurrow'),
