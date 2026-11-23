@@ -53,6 +53,12 @@ jobs:
           path: dist/
           retention-days: 3
           if-no-files-found: error
+      # The output of this step is only the link, ready to copy in the
+      # GitHub mobile app, which does not show the Summary page.
+      - name: Download link
+        env:
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+        run: printf '%s\n' "$ARTIFACT_URL"
       # Puts the download link on the run's Summary page and in a notice
       # annotation, where it can be tapped or copied without log prefixes. GitHub sign-in is still
       # required to download; the link stops working when the artifact expires.
