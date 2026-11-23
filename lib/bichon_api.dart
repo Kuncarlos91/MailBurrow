@@ -143,6 +143,7 @@ class BichonApi extends ArchiveApi {
     super.attachmentDeadline,
     super.attachmentIdleTimeout,
     super.responseTimeout,
+    super.trust,
   });
 
   @override

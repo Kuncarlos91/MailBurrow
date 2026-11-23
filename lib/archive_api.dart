@@ -7,6 +7,7 @@ import 'archive_backend.dart';
 import 'archive_capabilities.dart';
 import 'archive_models.dart';
 import 'archive_errors.dart';
+import 'archive_trust.dart';
 import 'search_filters.dart';
 import 'attachment_download.dart';
 import 'message_load.dart';
@@ -95,12 +96,20 @@ class ArchiveApi implements ArchiveBackend, CancellableMessageBackend {
     this.attachmentDeadline = attachmentDownloadDeadline,
     this.attachmentIdleTimeout = attachmentDownloadIdleTimeout,
     this.responseTimeout = const Duration(seconds: 30),
+    this.trust,
   });
   final int attachmentByteLimit;
   final Duration attachmentDeadline, attachmentIdleTimeout;
 
   /// Time allowed to read and decode an API response body after headers.
   final Duration responseTimeout;
+
+  /// This archive's own certificate, if the user imported one. Every client
+  /// for this connection trusts it in addition to the public roots.
+  final ArchiveTrust? trust;
+
+  // Built once per connection and shared by its API and attachment clients.
+  late final SecurityContext? _context = trust?.createContext();
   @override
   final Uri server;
   @override
@@ -192,8 +201,7 @@ class ArchiveApi implements ArchiveBackend, CancellableMessageBackend {
     final load = MessageLoad.current;
     load?.throwIfCancelled();
     validateServer(server.toString());
-    final client = _apiClient ??= HttpClient()
-      ..connectionTimeout = archiveConnectTimeout;
+    final client = _apiClient ??= createArchiveHttpClient(_context);
     final call = _ApiCall(isMail: isMailRequest(path));
     _calls.add(call);
     load?.addCancelListener(call.cancel);
@@ -341,8 +349,7 @@ class ArchiveApi implements ArchiveBackend, CancellableMessageBackend {
     }
     final active = transfer ?? AttachmentDownload();
     active.throwIfStopped();
-    final client = HttpClient()
-      ..connectionTimeout = archiveConnectTimeout;
+    final client = createArchiveHttpClient(_context);
     _clients.add(client);
     void stopClient() => client.close(force: true);
     active.addStopListener(stopClient);

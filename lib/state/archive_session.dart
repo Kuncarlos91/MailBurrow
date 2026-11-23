@@ -6,6 +6,7 @@ import '../archive_api.dart' show ArchiveApi, validateServer;
 import '../archive_models.dart';
 import '../archive_errors.dart';
 import '../archive_backend.dart';
+import '../archive_trust.dart';
 import '../demo/demo_archive.dart';
 import '../archive_capabilities.dart';
 import '../search_filters.dart';
@@ -24,14 +25,18 @@ typedef ArchiveBackendFactory =
 
 /// The real backend for each server type. There is no fallback: a type is
 /// only ever connected with its own client.
+///
+/// [trust] is the archive's own certificate, if it has one; every backend
+/// uses it for all of its requests.
 ArchiveBackend createArchiveBackend(
   ArchiveServerType type,
   Uri server,
-  String key,
-) => switch (type) {
-  ArchiveServerType.mailArchiver => ArchiveApi(server, key),
-  ArchiveServerType.openArchiver => OpenArchiverApi(server, key),
-  ArchiveServerType.bichon => BichonApi(server, key),
+  String key, {
+  ArchiveTrust? trust,
+}) => switch (type) {
+  ArchiveServerType.mailArchiver => ArchiveApi(server, key, trust: trust),
+  ArchiveServerType.openArchiver => OpenArchiverApi(server, key, trust: trust),
+  ArchiveServerType.bichon => BichonApi(server, key, trust: trust),
 };
 
 /// Opens the built-in demo archive.
