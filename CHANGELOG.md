@@ -4,6 +4,7 @@ All notable changes to MailBurrow are recorded here. Versions follow the app ver
 
 ## Unreleased
 
+- **Version:** the next release is 0.6.0 (Android build 32). The heading below becomes the 0.6.0 entry when it is released.
 - **Added:** optional app lock in **Settings → App lock**. It asks for your fingerprint or face, with your device PIN, pattern or password as the backup, and relocks immediately, after 1 minute (default) or after 5 minutes away. While locked, archive content is hidden, untouchable and blank in recent apps; screenshots stay allowed. Startup stays covered until the setting is read, and a damaged setting never turns the lock off. Turning it off or changing the timing needs a fresh unlock. A successful unlock that arrives while the app is away counts only if the app returns within a few seconds (as with the device PIN/pattern screen or Face ID), time away during a settings save still counts, no new attachment-save dialog opens while locked, and the lock screen scrolls at large text sizes. Android now uses `FlutterFragmentActivity` and an AppCompat launch theme, as the new first-party `local_auth` dependency requires.
 - **Docs:** the public support, setup and privacy pages, the README, the setup guide and the device checklist describe app lock and its limits. The website pages go live with the release that includes app lock.
 - **Changed:** setup now shows the app version and build, using the same build information as Settings, before connecting to a server.
