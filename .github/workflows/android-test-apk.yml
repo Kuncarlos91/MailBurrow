@@ -53,13 +53,15 @@ jobs:
           path: dist/
           retention-days: 3
           if-no-files-found: error
-      # Puts the download link on the run's Summary page, where it can be
-      # tapped or copied without log prefixes. GitHub sign-in is still
+      # Puts the download link on the run's Summary page and in a notice
+      # annotation, where it can be tapped or copied without log prefixes. GitHub sign-in is still
       # required to download; the link stops working when the artifact expires.
       - name: Show download link
         env:
           ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
         run: |
+          # A notice annotation shows on the run page without log prefixes.
+          echo "::notice title=Test APK download link::${ARTIFACT_URL}"
           {
             echo "## Test APK"
             echo
