@@ -43,7 +43,8 @@ class ArchiveTrust {
 ///
 /// With no [context] the client uses the platform's default trust. Pass the
 /// context from [ArchiveTrust.createContext] for an archive with its own
-/// certificate. This is the only place archive clients are created; a test
-/// keeps it that way, so no request can bypass the archive's trust policy.
+/// certificate. This is the only place archive clients are created. A source guard detects
+/// additional constructors; TLS regressions separately check that callers
+/// supply the correct context and do not share trust between profiles.
 HttpClient createArchiveHttpClient(SecurityContext? context) =>
     HttpClient(context: context)..connectionTimeout = archiveConnectTimeout;

@@ -21,8 +21,8 @@ List<int> derOf(LabCert cert) {
 }
 
 /// A local HTTPS server presenting [server]'s certificate. It counts every
-/// HTTP request it receives, so tests can prove a refused handshake sent
-/// nothing (no API key) to the server.
+/// HTTP request it receives. A zero count on a refused handshake records no
+/// HTTP/auth receipt at this fixture, not an absence of TLS network traffic.
 class LabServer {
   LabServer._(this._server);
   final HttpServer _server;
@@ -186,6 +186,59 @@ void main() {
       await expectLater(api.accounts(), throwsA(isA<HandshakeException>()));
       expect(lab.requests, 0);
     });
+
+    test(
+      'all backend transports use trust without leaking it to another profile',
+      () async {
+        final lab = await LabServer.start(leaf);
+        final dir = await Directory.systemTemp.createTemp('backend-trust-test');
+        final clients = <ArchiveApi>[];
+        addTearDown(() async {
+          for (final client in clients) {
+            client.close();
+          }
+          await lab.close();
+          await dir.delete(recursive: true);
+        });
+        for (final type in ArchiveServerType.values) {
+          final trusted =
+              createArchiveBackend(
+                    type,
+                    lab.address,
+                    'synthetic-test-only',
+                    trust: ArchiveTrust(derOf(ca)),
+                  )
+                  as ArchiveApi;
+          final ordinary =
+              createArchiveBackend(type, lab.address, 'synthetic-test-only')
+                  as ArchiveApi;
+          clients.addAll([trusted, ordinary]);
+          expect(await trusted.get('accounts'), isEmpty);
+          final url = lab.address.resolve('/synthetic-download');
+          final file = File('${dir.path}/${type.name}.bin');
+          await trusted.downloadTo(url, file);
+          expect(await file.length(), 5);
+          final before = lab.requests;
+          await expectLater(
+            ordinary.get('accounts'),
+            throwsA(isA<HandshakeException>()),
+          );
+          await expectLater(
+            ordinary.downloadTo(
+              url,
+              File('${dir.path}/refused-${type.name}.bin'),
+            ),
+            throwsA(isA<HandshakeException>()),
+          );
+          expect(
+            lab.requests,
+            before,
+            reason: 'default-trust profile must not inherit ${type.name} trust',
+          );
+        }
+        expect(lab.requests, ArchiveServerType.values.length * 2);
+      },
+    );
 
     test('every backend passes its trust to its clients', () {
       final trust = ArchiveTrust(derOf(ca));
