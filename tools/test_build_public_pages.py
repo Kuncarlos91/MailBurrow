@@ -21,6 +21,16 @@ class PublicPagesTests(unittest.TestCase):
             self.assertNotRegex(result, r"(?i)(?:src|href)=[\"']https?://[^\"']+\.(?:css|js)")
             self.assertIn('href="styles.css"', result)
 
+    def test_app_lock_is_described_on_every_page_with_its_limits(self):
+        files = public_files(self.contact)
+        for name in ("index.html", "setup.html", "privacy.html"):
+            page = files[name]
+            self.assertIn('id="app-lock"', page)
+            self.assertIn("versions after 0.5.0", page)
+        self.assertIn("never biometric data or your device credential", files["privacy.html"])
+        self.assertIn("block screenshots", files["index.html"])
+        self.assertIn("doesn't encrypt anything", files["setup.html"])
+
     def test_bichon_setup_and_privacy_state_the_release_boundary(self):
         files = public_files(self.contact)
         setup, privacy = files["setup.html"], files["privacy.html"]
