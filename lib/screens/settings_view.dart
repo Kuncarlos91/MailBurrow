@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../app_lock/app_lock_gate.dart';
 import '../archive_information.dart';
 import '../build_information.dart';
 import '../public_information.dart';
@@ -94,6 +95,7 @@ class SettingsView extends StatelessWidget {
             credential: session.serverType.credential,
           ),
         const PublicInformationLinks(),
+        const AppLockSettingsTiles(),
         const ThirdPartyLicensesTile(),
         const ListTile(
           title: Text('MailBurrow'),

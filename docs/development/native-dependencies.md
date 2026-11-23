@@ -4,6 +4,8 @@
 
 Refreshed November 6, 2026 from offline releaseRuntimeClasspath resolution for the current locked project. Includes resolved external Android runtime coordinates, not Gradle build tools or a complete iOS/native binary inventory. POM license names are declarations, not a completed compliance determination.
 
+**Pending refresh (app lock, unreleased):** `local_auth_android` 2.3.0 adds `androidx.biometric:biometric` 1.1.0 and requests `androidx.core:core` 1.18.0 and `androidx.fragment:fragment` 1.8.9 (all Apache-2.0 per their POMs, to be confirmed). Regenerate this table with an Android build before the next release.
+
 Flutter/Dart notices remain in the unchanged root THIRD_PARTY_NOTICES.md. The offline in-app license page displays the Flutter-bundled registry; this inventory does not prove every native notice is bundled. Missing POM declarations require provenance review.
 
 | Coordinate | Selected version | Cached POM license declaration |

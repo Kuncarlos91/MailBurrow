@@ -73,6 +73,18 @@ Open is separately confirmed. Handles last only for the current reader session. 
 
 Saving/opening successfully does not make a file safe. See [privacy](../PRIVACY.md) and [troubleshooting](troubleshooting/README.md).
 
+### App lock
+
+Optional and off by default (decisions AL01–AL04). [AppLockController](../lib/app_lock/app_lock_controller.dart) owns the state; [AppLockGate](../lib/app_lock/app_lock_gate.dart) wraps the whole navigator through `MaterialApp.builder`.
+
+- **States:** loading, error, off, locked, authenticating, unlocked. Content is shown only when off, or unlocked and not covered. Before the first unlock (or before the setting is known to be off) the navigator isn't built, so no archive is restored or contacted behind a startup lock. Later locks keep the navigator alive but offstage, excluded from focus, semantics and tickers, and Back is consumed, so in-flight requests finish in memory and nothing is refetched on unlock.
+- **Setting:** `app_lock` in secure storage, separate from the `connection*` entries: `{version: 1, enabled, relockSeconds ∈ {0, 60, 300}}`. A missing entry means off; a read failure or damaged value is the error state (covered, with Try again or "Unlock and keep app lock on"), never off. Enabling, disabling and timing changes need a successful prompt first and apply only after the write succeeds.
+- **Prompts:** `local_auth` 3.x with device-credential fallback and `persistAcrossBackgrounding: false`. Only the result of the current generation can change state; disposal, a newer prompt or a settings change makes older results stale. Cancel and failure never retry automatically; a prompt starts automatically only on startup, after a relock, or on returning to a locked app.
+- **Timing:** time away starts at `hidden`/`paused` while unlocked and is measured on a monotonic clock that includes sleep (Android `SystemClock.elapsedRealtime`, iOS `CLOCK_MONOTONIC`) through the `mailburrow/app_lock` channel. An unknown or backwards clock counts as expired. `inactive` alone only covers. A successful prompt delivered while the app is foreground is accepted. A success delivered while the app is away (the Android PIN/pattern screen and iOS Face ID do this just before resume) is held and accepted only if the app returns within `promptReturnWindow` (3 s) on the monotonic clock; a later return is a genuine leave and stays locked. The prompt itself may settle its lifecycle events, but a later leave during a settings/repair write is preserved and checked before content is revealed. Time in the system save screen counts. A download that completes while covered does not open a new native save picker: its temporary file is cleaned and the user saves again after unlocking. Already-open native pickers retain their normal cancellation behavior. The lock/recovery surface scrolls at large text sizes.
+- **Prompt-return race:** after a background success resumes, the monotonic acceptance check also verifies that the app is still foreground and no newer leave occurred while the clock result was pending. A second leave invalidates that acceptance; it cannot authorize a later return.
+- **App switcher:** Android 13+ uses `setRecentsScreenshotEnabled(false)` while app lock is on, reapplied on resume; `FLAG_SECURE` is never used, so screenshots stay allowed. Older Android relies on the Flutter cover shown on `inactive` (best effort). iOS adds a native cover on `UIScene.willDeactivateNotification`.
+- **Limits:** a UI access control, not encryption. It doesn't protect saved files, the clipboard, screenshots, rooted or jailbroken devices, or someone who knows the device credential. Reinstalling isn't a guaranteed reset (iOS Keychain can survive uninstall).
+
 ## Architecture and source map
 
 ```text
@@ -104,6 +116,7 @@ Flutter UI → ArchiveBackend (implemented by ArchiveApi) → configured HTTPS M
 | Attachments | [attachments.dart](../lib/attachments.dart), [attachment_download.dart](../lib/attachment_download.dart), [saved_files.dart](../lib/saved_files.dart), [Android bridge](../android/app/src/main/kotlin/com/kuncarlos91/mailburrow/MainActivity.kt), [session MIME policy](../android/app/src/main/kotlin/com/kuncarlos91/mailburrow/SavedAttachmentTypes.kt), [iOS bridge](../ios/Runner/AppDelegate.swift). |
 | Filters/dates/pages | [search_filters.dart](../lib/search_filters.dart), [message_date.dart](../lib/message_date.dart), [pagination.dart](../lib/pagination.dart). |
 | Settings | [archive_information.dart](../lib/archive_information.dart), [build_information.dart](../lib/build_information.dart). |
+| App lock | [app_lock_controller.dart](../lib/app_lock/app_lock_controller.dart) (state, timing, settings changes), [app_lock_gate.dart](../lib/app_lock/app_lock_gate.dart) (gate, lock screen, Settings rows), [app_lock_settings.dart](../lib/app_lock/app_lock_settings.dart), [app_lock_platform.dart](../lib/app_lock/app_lock_platform.dart) (`local_auth` and the `mailburrow/app_lock` channel in `MainActivity.kt` and `AppDelegate.swift`). |
 | Validation | [Flutter tests](../test), [helpers](../tools), [CI/setup](development/setup-and-ci.md). |
 
 ## API contract currently consumed
@@ -172,6 +185,7 @@ The Open Archiver lab checker validates Phase 3 list/search/detail field contrac
 | 2026-11-01 | Explicit account switching | Switching resets account-scoped state, persists only the allowed ID with encrypted connection settings and invalidates old requests; selection/race/storage tests. |
 | 2026-11-01 | README is the main index; one rolling playbook plus guides | Discoverable current behavior without stale instructions. |
 | 2026-11-09 | Built-in demo mode with fictional data | Lets people and app reviewers try the app without a server. The demo uses the normal `ArchiveBackend` path, is always labelled, never stored and makes no network requests; storage, exit and no-network tests. |
+| 2026-11-22 | Optional app lock: opt-in; biometrics with device-credential fallback; relock immediately, 1 or 5 minutes (default 1); hide the recent-apps preview without blocking screenshots | Privacy for a phone others may use, without a separate app PIN or capture blocking. Fails closed on unknown settings and clocks; host tests in `test/app_lock_test.dart`, device checks pending. |
 | 2026-11-06 | No offline or local mail cache; mail is fetched only when the user asks to view it | Decision to limit privacy risk: no message lists, bodies or attachments are kept on the device between views. Offline reading is out of scope; do not add a cache, prefetching or a local mail database without a new maintainer decision. |
 
 Update affected behavior and decisions with future changes. See [maintenance rules](development/documentation.md).

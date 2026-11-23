@@ -81,6 +81,18 @@ Totals cover all accounts accessible to the key, not only the selected account. 
 
 Updates installed over the existing app keep your saved connection. Disconnect and forget removes saved settings without revoking the server key. If startup restore fails, it can be retried.
 
+### App lock
+
+| Symptom | Checks/recovery |
+| --- | --- |
+| The App lock switch explains that a screen lock is needed | The phone has no PIN, pattern, password, fingerprint or face set up. Set one up in the phone's settings, then try again. |
+| Turning app lock on or off, or changing its timing, did nothing | The phone's prompt was cancelled or failed; the setting changes only after a successful unlock and a successful save. A message says when saving failed. |
+| "Too many attempts" on the lock screen | The phone is temporarily locking out biometrics. Wait, then unlock with the device PIN, pattern or password. |
+| "This device has no screen lock" on the lock screen | The screen lock was removed after app lock was turned on. Set a screen lock up again, then unlock. MailBurrow can't bypass it. |
+| "App lock settings could not be read" | Secure storage couldn't be read or the setting is damaged. **Try again**; if it persists, **Unlock and keep app lock on** saves a fresh setting (lock on, 1 minute) after unlocking. The lock is never turned off by an error. |
+| It asks to unlock every time I come back | The timing is **Immediately**, or more time passed than the chosen timing. Change it in **Settings → Lock after leaving**. Fully closing the app always locks it. Time spent in the system save screen counts as time away. |
+| The recent-apps preview still shows content (Android 12 or older) | Hiding the preview without blocking screenshots needs Android 13 or later. Older Android versions get a best-effort cover only. |
+
 ## Account selector
 
 - Use Switch account in the app bar, tap the current account, or select an accessible account in Settings. Only accounts the server returns for the current key are offered; missing accounts need permission/sync checks on the server.
@@ -117,3 +129,7 @@ A local diagnostic build can add `--dart-define=MAILSHELF_FILE_DIAGNOSTICS=true`
 While an archive is opening, Cancel is unavailable during the secure-storage commit and once the archive is open. Before that commit, cancelling never activates the abandoned attempt. In releases after 0.5.0,, cancelling a switch reopens the archive you had open before it; cancelling at startup, or again while that archive reopens, returns to setup, where Retry starts another attempt.
 
 Reader cancellation fix: Back during a message load cancels that reader’s network calls rather than only hiding the result. Build 26 predates this fix; its successful navigation checks do not establish that its transport stopped. Validate a newer fixed APK separately, with its own source/hash and cancellation evidence.
+
+### Attachment finished downloading while app lock was covering the reader
+
+No new save dialog opens over the lock screen. Unlock and choose Save again; the unexported temporary download is removed. If a system picker was already open, use that picker's own save/cancel controls. App lock does not revoke files already saved or opened in another app.

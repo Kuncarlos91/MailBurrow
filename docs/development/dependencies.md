@@ -1,8 +1,10 @@
 # Dependency license inventory
 
+[Main index](../../README.md)
+
 Generated from the installed packages and committed lockfile. Includes direct, transitive, development, and SDK packages; not every listed package ships on Android or iOS.
 
-License-family labels are text classifications, not legal conclusions. Full unmodified license wording is retained in THIRD_PARTY_NOTICES.md; inventory hashes refer to normalized license text, not package archives.
+License-family labels are text classifications, not legal conclusions. Full unmodified license wording is retained in [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md); inventory hashes refer to normalized license text, not package archives.
 
 MailBurrow's own code is licensed under the MIT License (see [LICENSE](../../LICENSE)). Android runtime license declarations are inventoried in [native-dependencies.md](native-dependencies.md).
 
@@ -25,6 +27,7 @@ MailBurrow's own code is licensed under the MIT License (see [LICENSE](../../LIC
 | flutter_driver | 0.0.0 | transitive | BSD-style text | a598db94b6290ffbe10b5ecf911057b6a943351c727fdda9e5f2891d68700a20 |
 | flutter_file_dialog | 3.3.3 | direct main | BSD-style text | 126e13d6180acc8c56e2eddb4361b683d556f16b6b1e6e6d680dbd53bb70d50f |
 | flutter_lints | 6.0.0 | direct dev | BSD-style text | 89519eca6f7b9529b35bdddd623a58c3af06a88c458dbd6531ddb4675acf75a9 |
+| flutter_plugin_android_lifecycle | 2.0.35 | transitive | BSD-style text | 420f7739f169097f0aad1242045169cd643c8f1d94e62866fad265ae4c369b7d |
 | flutter_secure_storage | 11.2.0 | direct main | BSD-style text | 4bfaf7f94b452692e83ee34eca0cdd7045764187412dcce32efb8c9342c35c6c |
 | flutter_secure_storage_darwin | 0.4.3 | transitive | BSD-style text | 17aed4c26ead9daf7d682aae49b0ceec36d7b40d5e99c8b310163fa300bb1fb2 |
 | flutter_secure_storage_linux | 3.0.3 | transitive | BSD-style text | 4bfaf7f94b452692e83ee34eca0cdd7045764187412dcce32efb8c9342c35c6c |
@@ -38,6 +41,7 @@ MailBurrow's own code is licensed under the MIT License (see [LICENSE](../../LIC
 | hooks | 2.0.2 | transitive | BSD-style text | 21ae23b0b9ff67a2dc75ab085d1e8db8ac548c5faf370af17f28dd2ef3b52b7b |
 | html | 0.15.7 | direct main | MIT text | 6ed8a26ed0f30589422f86356eed53bb6dacffc3e2fd4feddc944c4331945151 |
 | integration_test | 0.0.0 | direct dev | BSD-style text | a598db94b6290ffbe10b5ecf911057b6a943351c727fdda9e5f2891d68700a20 |
+| intl | 0.20.3 | transitive | BSD-style text | 7e124af6a556f045cb3a20cafbdaa31602ac2c82cbcb3c3b15faaaf514b06028 |
 | jni | 1.1.0 | transitive | BSD-style text | 08a004aa8956c3cf3b24f7f69c966247233953e18e6afaa61191ea47b7eb70f6 |
 | jni_flutter | 1.0.4+1 | transitive | BSD-style text | b1fcb475d67817411f335ac92872507011e574c4cb29cfdaaf7707b75641932c |
 | jni_util | 1.0.0 | transitive | BSD-style text | b1fcb475d67817411f335ac92872507011e574c4cb29cfdaaf7707b75641932c |
@@ -45,6 +49,11 @@ MailBurrow's own code is licensed under the MIT License (see [LICENSE](../../LIC
 | leak_tracker_flutter_testing | 3.0.10 | transitive | BSD-style text | 08a004aa8956c3cf3b24f7f69c966247233953e18e6afaa61191ea47b7eb70f6 |
 | leak_tracker_testing | 3.0.2 | transitive | BSD-style text | 08a004aa8956c3cf3b24f7f69c966247233953e18e6afaa61191ea47b7eb70f6 |
 | lints | 6.1.0 | transitive | BSD-style text | 421fe78c3b5df297f8b4ab2c74f2450a274ee6d245a113091f6b9f90570af193 |
+| local_auth | 3.0.2 | direct main | BSD-style text | 420f7739f169097f0aad1242045169cd643c8f1d94e62866fad265ae4c369b7d |
+| local_auth_android | 2.3.0 | transitive | BSD-style text | 420f7739f169097f0aad1242045169cd643c8f1d94e62866fad265ae4c369b7d |
+| local_auth_darwin | 2.0.5 | transitive | BSD-style text | 420f7739f169097f0aad1242045169cd643c8f1d94e62866fad265ae4c369b7d |
+| local_auth_platform_interface | 1.1.0 | transitive | BSD-style text | 420f7739f169097f0aad1242045169cd643c8f1d94e62866fad265ae4c369b7d |
+| local_auth_windows | 2.0.2 | transitive | BSD-style text | 420f7739f169097f0aad1242045169cd643c8f1d94e62866fad265ae4c369b7d |
 | logging | 1.3.0 | transitive | BSD-style text | 7e124af6a556f045cb3a20cafbdaa31602ac2c82cbcb3c3b15faaaf514b06028 |
 | matcher | 0.12.20 | transitive | BSD-style text | ff0b91d4f3c32b25cb6ec84985e8da89b0ba2a2b2f7eef353cda5e5423a20390 |
 | material_color_utilities | 0.13.0 | transitive | Apache text | 0a04a64d74de964f3b60e22529f1462c0994a436c56158de5d94366187a3dc3b |
@@ -90,12 +99,3 @@ MailBurrow's own code is licensed under the MIT License (see [LICENSE](../../LIC
 | yaml | 3.1.4 | transitive | MIT text | d47b93335401b052d79a2f5a3710e4cf7b5aed782faedf84d40fbdd6eb934ec7 |
 
 Regenerate with python tools/dependency_notices.py after flutter pub get --enforce-lockfile. No package-cache paths or account identifiers are included.
-
-
-[Main documentation index](../../README.md)
-
-## Read-only verification - November 7, 2026
-
-`python tools/dependency_notices.py --check` verified all **80 installed package rows** and **30 distinct retained license texts** against the committed inventory/root notices, without writes. Includes direct, transitive, development and SDK packages; this is not a claim that all 80 ship on mobile. The lockfile and root THIRD_PARTY_NOTICES.md are unchanged. Use --check for routine validation; do not regenerate/overwrite the protected root notice file as incidental cleanup.
-
-The locally implemented Settings Open source licenses entry uses Flutter's bundled LicenseRegistry/LicensePage offline. It does not independently establish complete native notices or license permissions for original code. See [screen and coverage limits](third-party-notices.md) and the refreshed [Android runtime inventory](native-dependencies.md).

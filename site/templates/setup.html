@@ -204,6 +204,17 @@
     <p>Only one archive is open at a time. There's no combined inbox or search across archives.</p>
   </section>
 
+  <section id="app-lock"><h2>App lock</h2>
+    <p>In versions after 0.5.0. Off until you turn it on.</p>
+    <ul>
+      <li><strong>Turn it on:</strong> <strong>Settings &rarr; App lock</strong>. Your phone asks for your fingerprint, face or screen-lock PIN, pattern or password once; the lock is saved only after that succeeds. The phone must have a screen lock.</li>
+      <li><strong>Lock after leaving:</strong> choose <strong>Immediately</strong>, <strong>After 1 minute</strong> (the default) or <strong>After 5 minutes</strong>. MailBurrow always asks again after it is fully closed and reopened.</li>
+      <li><strong>While locked,</strong> the app shows only a lock screen. Android 13+ hides its preview in recent apps; older Android uses a best-effort cover. iOS uses a native privacy cover that needs platform/device verification. Screenshots are still allowed.</li>
+      <li><strong>Turn it off or change the timing:</strong> each change asks you to unlock first.</li>
+    </ul>
+    <p>App lock only controls opening the app on your phone. It doesn't encrypt anything, protect saved files, or stop someone who knows your device's screen lock.</p>
+  </section>
+
   <section id="problems"><h2>If something goes wrong</h2>
     <div class="table"><table>
       <thead><tr><th scope="col">Message in the app</th><th scope="col">Likely cause</th><th scope="col">What to do</th></tr></thead>
@@ -227,6 +238,7 @@
       <li>Treat the API key as read access to its user's archived mail. Use a regular user, not an administrator, with only the accounts or sources you need. For Open Archiver, use the read-only role from Open Archiver step 1.</li>
       <li>Your server keeps its own access logs. Open Archiver records searches (including the query) and message opens in its audit log. Bichon deployments may record search text and user names, as described above. MailBurrow has no analytics or crash reporting. See the <a href="privacy.html">privacy notice</a>.</li>
       <li>MailBurrow downloads an attachment only when you choose to, and saves it where you pick.</li>
+      <li>Turn on <a href="#app-lock">app lock</a> if others use your phone.</li>
       <li>Report security problems privately through <a href="https://github.com/Kuncarlos91/MailBurrow/security">the repository's Security tab</a>.</li>
     </ul>
     <p>MailBurrow is independent and is not the official Mail-Archiver or Tailscale app.</p>
