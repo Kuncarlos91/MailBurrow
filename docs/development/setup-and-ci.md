@@ -34,7 +34,7 @@ There is no hosted iOS workflow in this repository. Build and run iOS locally on
 
 ## Manual Android test APK
 
-`.github/workflows/android-test-apk.yml` runs only on request: push a commit whose message contains `[build apk]`, or start it from Actions, Android test APK, Run workflow. On other pushes the job is skipped and uses no minutes. It builds a debug APK for 64-bit phones on Linux and uploads it with a SHA-256 checksum as the `mailburrow-test-apk` artifact, kept for 3 days. It uses no signing secrets and creates no tag or release.
+`.github/workflows/android-test-apk.yml` runs only on request: push a commit whose message contains `[build apk]`, or start it from Actions, Android test APK, Run workflow. On other pushes the job is skipped and uses no minutes. It builds a debug APK for 64-bit phones on Linux and uploads it with a SHA-256 checksum as the `mailburrow-test-apk` artifact, kept for 3 days. The run's **Summary** page shows a download link and the same link as plain text to copy, plus the checksum; downloading still needs a GitHub sign-in. It uses no signing secrets and creates no tag or release.
 
 The APK is debug-signed and installs as MailBurrow Preview (`com.kuncarlos91.mailburrow.debug`). Every run signs with a fresh throwaway debug key, so remove any earlier debug install first; otherwise Android reports "App not installed".
 

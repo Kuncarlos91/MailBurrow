@@ -46,9 +46,36 @@ jobs:
           cp build/app/outputs/flutter-apk/app-debug.apk "dist/mailburrow-debug-${GITHUB_SHA::7}.apk"
           cd dist && sha256sum ./*.apk > SHA256SUMS.txt
       - name: Upload test APK
+        id: upload
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: mailburrow-test-apk
           path: dist/
           retention-days: 3
           if-no-files-found: error
+      # Puts the download link on the run's Summary page, where it can be
+      # tapped or copied without log prefixes. GitHub sign-in is still
+      # required to download; the link stops working when the artifact expires.
+      - name: Show download link
+        env:
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+        run: |
+          {
+            echo "## Test APK"
+            echo
+            echo "[Download mailburrow-test-apk (zip)](${ARTIFACT_URL})"
+            echo
+            echo "Link to copy:"
+            echo
+            echo '```'
+            echo "${ARTIFACT_URL}"
+            echo '```'
+            echo
+            echo "SHA-256 of the APK inside:"
+            echo
+            echo '```'
+            cat dist/SHA256SUMS.txt
+            echo '```'
+            echo
+            echo "Kept for 3 days. Installs as MailBurrow Preview."
+          } >> "$GITHUB_STEP_SUMMARY"
