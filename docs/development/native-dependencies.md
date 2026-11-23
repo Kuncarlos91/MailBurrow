@@ -74,3 +74,7 @@ Flutter/Dart notices are in [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.m
 | org.jspecify:jspecify | 1.0.0 | The Apache License, Version 2.0 |
 
 Regenerate using tools/native_dependency_inventory.py with a successful releaseRuntimeClasspath report. Keep raw reports outside Git if they contain local paths.
+
+## Direct-POM declaration follow-up
+
+The five missing direct declarations have source/SDK provenance in the [Android native license review](android-native-license-review.md). This table preserves the observed cached POM declarations rather than treating those omissions as licence-free artifacts. Guava attribution and Flutter/engine notice inputs are retained; exact next-release APK packaging and device notice verification remain required. The earlier 63-coordinate graph match is historical and does not verify the refreshed 64-coordinate graph or a new signed artifact. The refreshed report is maintainer-generated evidence at `ec6ab9d`; it was not independently rerun in this documentation review.
