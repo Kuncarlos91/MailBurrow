@@ -1,30 +1,63 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:pointycastle/digests/sha256.dart';
 
+import '../certificate_import.dart' show certificateImportByteLimit;
 import '../archive_server_type.dart';
 
 /// A saved archive connection.
 ///
 /// [accountId] is text for every server type: Mail-Archiver's numeric IDs are
 /// stored as their decimal string, and other servers use text IDs.
+/// [certificate] is the archive's own certificate (DER), trusted for this
+/// archive in addition to the public roots, or null for default trust.
 typedef SavedConnection = ({
   ArchiveServerType serverType,
   String server,
   String key,
   String? accountId,
+  List<int>? certificate,
 });
 
 /// One saved archive in the connection index, without its key.
+/// [ownCertificate] is true when it trusts a certificate of its own.
 typedef ConnectionProfile = ({
   String id,
   String label,
   ArchiveServerType serverType,
   String server,
   String? accountId,
+  bool ownCertificate,
 });
+
+/// A saved archive claims its own certificate, but this build can't use the
+/// saved record: it is missing, damaged, bound to another address, or from a
+/// newer version. The archive must not connect with default trust instead;
+/// the record is left as it is.
+class SavedCertificateUnavailable extends FormatException {
+  const SavedCertificateUnavailable(super.message);
+}
+
+/// How saving a connection changes its own certificate.
+class CertificateChange {
+  /// Keep the current certificate when the server type and address stay the
+  /// same; a changed type or address never inherits it.
+  const CertificateChange.keep() : der = null, remove = false;
+
+  /// Trust [der] (one certificate, already checked on import).
+  const CertificateChange.set(List<int> this.der) : remove = false;
+
+  /// Go back to default trust.
+  const CertificateChange.remove() : der = null, remove = true;
+
+  final List<int>? der;
+  final bool remove;
+  bool get keep => der == null && !remove;
+}
 
 /// Saving would exceed [ConnectionStore.maxProfiles].
 class TooManySavedArchives extends StateError {
@@ -54,6 +87,16 @@ typedef SavedArchives = ({
 /// new or changed key is written under a fresh ID before the index points to
 /// it, and an old key entry is deleted only after the index stops pointing to
 /// it. Key entries the index does not reference are removed when it is read.
+///
+/// An archive with its own certificate is marked `"ownCertificate": true` in
+/// the index (the key is omitted otherwise) and has one more entry,
+/// `connection.trust.` plus its ID: `{"version": 1, "serverType", "server",
+/// "der": base64, "sha256": hex}`. The record names the destination it was
+/// trusted for and is used only when both still match; its fingerprint is
+/// checked on every read. It is staged with the key: a changed certificate
+/// gets a fresh profile ID like a changed key. Builds before this format
+/// ignore the flag and connect with default trust, which the server's
+/// certificate then fails closed.
 ///
 /// Older builds kept one record under `connection`. Version 2 is
 /// `{"version": 2, "serverType", "server", "key", "accountId": "7" | null}`;
@@ -94,6 +137,8 @@ class ConnectionStore {
   static const _legacyEntry = 'connection';
   static const _indexEntry = 'connections';
   static const _keyPrefix = 'connection.key.';
+  static const _trustPrefix = 'connection.trust.';
+  static const trustVersion = 1;
   static const legacyVersion = 2;
   static const currentVersion = 3;
   static const maxProfiles = 20;
@@ -159,6 +204,7 @@ class ConnectionStore {
       server: profile.server,
       key: key,
       accountId: profile.accountId,
+      certificate: await _certificateFor(profile),
     );
   }
 
@@ -168,12 +214,15 @@ class ConnectionStore {
   /// staged under a fresh profile ID, so the previous one stays intact if any
   /// write fails. Returns the profile's ID after the write. Throws
   /// [SavedArchiveMissing] when [profileId] is no longer saved.
+  /// [certificate] changes the archive's own certificate; a changed one is
+  /// staged like a changed key.
   Future<String> write({
     required ArchiveServerType serverType,
     required String server,
     required String key,
     required String? accountId,
     String? profileId,
+    CertificateChange certificate = const CertificateChange.keep(),
   }) => _serialized(
     () => _write(
       serverType: serverType,
@@ -181,8 +230,38 @@ class ConnectionStore {
       key: key,
       accountId: accountId,
       profileId: profileId,
+      certificate: certificate,
     ),
   );
+
+  /// Trusts [der] for the readable profile [id], or goes back to default
+  /// trust when [der] is null. The certificate is staged under a fresh
+  /// profile ID, so the previous record keeps working if any write fails.
+  /// Returns the profile's new ID. Throws [SavedArchiveMissing] when [id] is
+  /// not saved.
+  Future<String> setCertificate(String id, List<int>? der) =>
+      _serialized(() async {
+        final index = await _readIndex();
+        final profile = index?.profiles
+            .where((item) => item.id == id)
+            .firstOrNull;
+        if (profile == null) throw SavedArchiveMissing();
+        final key = await _storage.read(key: '$_keyPrefix${profile.id}');
+        if (key == null || key.isEmpty) {
+          throw const FormatException('Saved connection key is missing.');
+        }
+        return _write(
+          serverType: profile.serverType,
+          server: profile.server,
+          key: key,
+          accountId: profile.accountId,
+          profileId: id,
+          certificate: der == null
+              ? const CertificateChange.remove()
+              : CertificateChange.set(der),
+          keepActive: true,
+        );
+      });
 
   /// Saves a connection entered in setup and makes it active. A readable
   /// profile with the same server type and address is updated in place
@@ -195,6 +274,7 @@ class ConnectionStore {
     required String server,
     required String key,
     required String? accountId,
+    CertificateChange certificate = const CertificateChange.keep(),
   }) => _serialized(() async {
     var existing = await _readIndex();
     if (existing == null) {
@@ -217,19 +297,22 @@ class ConnectionStore {
         key: key,
         accountId: accountId,
         profileId: match.id,
+        certificate: certificate,
       );
     }
     if (index.profiles.length + index.unreadable.length >= maxProfiles) {
       throw TooManySavedArchives();
     }
+    final der = certificate.der;
     final profile = (
       id: newProfileId(),
       label: defaultLabel(server),
       serverType: serverType,
       server: server,
       accountId: accountId,
+      ownCertificate: der != null,
     );
-    await _storage.write(key: '$_keyPrefix${profile.id}', value: key);
+    await _stage(profile, key, der);
     try {
       await _writeIndex(
         profile.id,
@@ -237,7 +320,7 @@ class ConnectionStore {
         index.unreadable,
       );
     } catch (_) {
-      await _deleteQuietly('$_keyPrefix${profile.id}');
+      await _unstage(profile.id);
       rethrow;
     }
     await _removeLegacy();
@@ -250,6 +333,8 @@ class ConnectionStore {
     required String key,
     required String? accountId,
     String? profileId,
+    CertificateChange certificate = const CertificateChange.keep(),
+    bool keepActive = false,
   }) async {
     // Absent and unreadable are distinct: never overwrite an unknown store.
     final index = await _readIndex() ?? ConnectionIndex.empty;
@@ -260,9 +345,13 @@ class ConnectionStore {
       throw SavedArchiveMissing();
     }
     final current = at < 0 ? null : profiles[at];
-    if (current != null &&
+    final sameDestination =
+        current != null &&
         current.serverType == serverType &&
-        current.server == server &&
+        current.server == server;
+    String? active(String id) => keepActive ? index.active : id;
+    if (sameDestination &&
+        certificate.keep &&
         await _storage.read(key: '$_keyPrefix${current.id}') == key) {
       profiles[at] = (
         id: current.id,
@@ -270,36 +359,90 @@ class ConnectionStore {
         serverType: serverType,
         server: server,
         accountId: accountId,
+        ownCertificate: current.ownCertificate,
       );
-      await _writeIndex(current.id, profiles, index.unreadable);
+      await _writeIndex(active(current.id), profiles, index.unreadable);
       return current.id;
     }
     if (current == null &&
         profiles.length + index.unreadable.length >= maxProfiles) {
       throw TooManySavedArchives();
     }
+    // A kept certificate moves with the profile only to the same
+    // destination; a changed type or address starts from default trust.
+    // A damaged record that should be kept stops the write instead.
+    final der = certificate.keep
+        ? (sameDestination ? await _certificateFor(current) : null)
+        : certificate.der;
     final profile = (
       id: newProfileId(),
       label: current?.label ?? defaultLabel(server),
       serverType: serverType,
       server: server,
       accountId: accountId,
+      ownCertificate: der != null,
     );
-    await _storage.write(key: '$_keyPrefix${profile.id}', value: key);
+    await _stage(profile, key, der);
     if (at < 0) {
       profiles.add(profile);
     } else {
       profiles[at] = profile;
     }
+    final wasActive = index.active == current?.id;
     try {
-      await _writeIndex(profile.id, profiles, index.unreadable);
+      await _writeIndex(
+        keepActive && !wasActive ? index.active : profile.id,
+        profiles,
+        index.unreadable,
+      );
     } catch (_) {
-      await _deleteQuietly('$_keyPrefix${profile.id}');
+      await _unstage(profile.id);
       rethrow;
     }
-    if (current != null) await _deleteQuietly('$_keyPrefix${current.id}');
+    if (current != null) await _unstage(current.id);
     await _removeLegacy();
     return profile.id;
+  }
+
+  /// Writes a new profile's key and, when given, its certificate record.
+  /// On failure nothing staged is left behind.
+  Future<void> _stage(ConnectionProfile profile, String key, List<int>? der) async {
+    await _storage.write(key: '$_keyPrefix${profile.id}', value: key);
+    if (der == null) return;
+    try {
+      await _storage.write(
+        key: '$_trustPrefix${profile.id}',
+        value: encodeCertificate(
+          serverType: profile.serverType,
+          server: profile.server,
+          der: der,
+        ),
+      );
+    } catch (_) {
+      await _unstage(profile.id);
+      rethrow;
+    }
+  }
+
+  /// Removes a profile's key and certificate entries, quietly.
+  Future<void> _unstage(String id) async {
+    await _deleteQuietly('$_keyPrefix$id');
+    await _deleteQuietly('$_trustPrefix$id');
+  }
+
+  /// The profile's own certificate, or null when it has none. Throws
+  /// [SavedCertificateUnavailable] when it claims one this build can't use.
+  Future<List<int>?> _certificateFor(ConnectionProfile profile) async {
+    if (!profile.ownCertificate) return null;
+    final text = await _storage.read(key: '$_trustPrefix${profile.id}');
+    if (text == null) {
+      throw const SavedCertificateUnavailable('Saved certificate is missing.');
+    }
+    return decodeCertificate(
+      text,
+      serverType: profile.serverType,
+      server: profile.server,
+    );
   }
 
   /// The saved connection of the readable profile [id], with its key, without
@@ -320,6 +463,7 @@ class ConnectionStore {
       server: profile.server,
       key: key,
       accountId: profile.accountId,
+      certificate: await _certificateFor(profile),
     );
   });
 
@@ -347,15 +491,17 @@ class ConnectionStore {
     }
   });
 
-  /// The explicit all-archives reset: removes the index, every key entry and
-  /// any legacy record from this device. It never contacts a server. If the
+  /// The explicit all-archives reset: removes the index, every key and
+  /// certificate entry and any legacy record from this device. It never contacts a server. If the
   /// stored entries cannot be listed, nothing is removed and this throws.
   Future<void> reset() => _serialized(() async {
     final all = await _storage.readAll();
     // Keep the index until all credentials are removed. On failure, setup
     // can still offer a retry instead of claiming every key was forgotten.
     for (final name in [...all.keys]) {
-      if (name.startsWith(_keyPrefix)) await _storage.delete(key: name);
+      if (name.startsWith(_keyPrefix) || name.startsWith(_trustPrefix)) {
+        await _storage.delete(key: name);
+      }
     }
     await _storage.delete(key: _legacyEntry);
     await _storage.delete(key: _indexEntry);
@@ -376,11 +522,13 @@ class ConnectionStore {
       serverType: current.serverType,
       server: current.server,
       accountId: current.accountId,
+      ownCertificate: current.ownCertificate,
     );
     await _writeIndex(index.active, profiles, index.unreadable);
   });
 
-  /// Forgets the readable profile [id] and its key; other profiles are kept.
+  /// Forgets the readable profile [id], its key and its own certificate;
+  /// other profiles are kept.
   /// Forgetting the active profile leaves none active. Server mail and keys
   /// on the server are not touched. Throws [SavedArchiveMissing] when [id] is
   /// not saved and [FormatException] when the index cannot be read.
@@ -397,7 +545,7 @@ class ConnectionStore {
       ],
       index.unreadable,
     );
-    await _deleteQuietly('$_keyPrefix$id');
+    await _unstage(id);
   });
 
   /// A label as saved: control characters become spaces, surrounding space
@@ -437,7 +585,7 @@ class ConnectionStore {
         if (active == null || item is! Map || item['id'] != active) item,
     ];
     await _writeIndex(null, profiles, unreadable);
-    if (active != null) await _deleteQuietly('$_keyPrefix$active');
+    if (active != null) await _unstage(active);
     await _removeLegacy();
   }
 
@@ -452,6 +600,7 @@ class ConnectionStore {
       serverType: saved.serverType,
       server: saved.server,
       accountId: saved.accountId,
+      ownCertificate: false,
     );
     await _storage.write(key: '$_keyPrefix${profile.id}', value: saved.key);
     try {
@@ -472,11 +621,20 @@ class ConnectionStore {
     } catch (_) {
       return;
     }
-    // IDs of unreadable profiles count too, so their keys survive for a
-    // build that can read them.
-    final known = {for (final id in index.referencedIds) '$_keyPrefix$id'};
+    // IDs of unreadable profiles count too, so their keys and certificates
+    // survive for a build that can read them. A readable profile keeps a
+    // certificate entry only while the index says it has one.
+    final readable = {for (final p in index.profiles) p.id};
+    final known = {
+      for (final id in index.referencedIds) '$_keyPrefix$id',
+      for (final p in index.profiles)
+        if (p.ownCertificate) '$_trustPrefix${p.id}',
+      for (final id in index.referencedIds)
+        if (!readable.contains(id)) '$_trustPrefix$id',
+    };
     for (final name in [...all.keys]) {
-      if (name.startsWith(_keyPrefix) && !known.contains(name)) {
+      if ((name.startsWith(_keyPrefix) || name.startsWith(_trustPrefix)) &&
+          !known.contains(name)) {
         await _deleteQuietly(name);
       }
     }
@@ -551,6 +709,14 @@ class ConnectionStore {
     final type = ArchiveServerType.fromId(value['serverType']);
     final server = value['server'];
     final account = value['accountId'];
+    // Absent means default trust; any value but true is from a format this
+    // build doesn't know, so the profile is kept aside unchanged.
+    final own = value.containsKey('ownCertificate')
+        ? value['ownCertificate']
+        : false;
+    if (own is! bool || (value.containsKey('ownCertificate') && !own)) {
+      return null;
+    }
     if (id is! String ||
         !_idPattern.hasMatch(id) ||
         label is! String ||
@@ -567,6 +733,7 @@ class ConnectionStore {
       serverType: type,
       server: server,
       accountId: account as String?,
+      ownCertificate: own,
     );
   }
 
@@ -586,6 +753,7 @@ class ConnectionStore {
           'serverType': item.serverType.id,
           'server': item.server,
           'accountId': item.accountId,
+          if (item.ownCertificate) 'ownCertificate': true,
         },
       ...unreadable,
     ],
@@ -613,6 +781,7 @@ class ConnectionStore {
         server: server,
         key: key,
         accountId: id is int ? '$id' : null,
+        certificate: null,
       );
     }
     if (version != legacyVersion) {
@@ -631,8 +800,75 @@ class ConnectionStore {
       server: server,
       key: key,
       accountId: id as String?,
+      certificate: null,
     );
   }
+
+  /// Encodes an archive's own certificate record for [serverType] and
+  /// [server].
+  static String encodeCertificate({
+    required ArchiveServerType serverType,
+    required String server,
+    required List<int> der,
+  }) {
+    if (der.isEmpty || der.length > certificateImportByteLimit) {
+      throw ArgumentError('Certificate size is out of range.');
+    }
+    return jsonEncode({
+      'version': trustVersion,
+      'serverType': serverType.id,
+      'server': server,
+      'der': base64.encode(der),
+      'sha256': _sha256Hex(der),
+    });
+  }
+
+  /// Decodes a certificate record and checks it belongs to [serverType] and
+  /// [server] and still matches its fingerprint. Throws
+  /// [SavedCertificateUnavailable] otherwise; never returns default trust.
+  static List<int> decodeCertificate(
+    String text, {
+    required ArchiveServerType serverType,
+    required String server,
+  }) {
+    const damaged = SavedCertificateUnavailable('Saved certificate is damaged.');
+    final Object? data;
+    try {
+      data = jsonDecode(text);
+    } on FormatException {
+      throw damaged;
+    }
+    if (data is! Map<String, dynamic>) throw damaged;
+    if (data['version'] != trustVersion) {
+      throw const SavedCertificateUnavailable(
+        'Saved certificate needs a newer version of MailBurrow.',
+      );
+    }
+    if (data['serverType'] != serverType.id || data['server'] != server) {
+      throw const SavedCertificateUnavailable(
+        'Saved certificate belongs to a different server.',
+      );
+    }
+    final encoded = data['der'], sha256 = data['sha256'];
+    if (encoded is! String || sha256 is! String) throw damaged;
+    final List<int> der;
+    try {
+      der = base64.decode(encoded);
+    } on FormatException {
+      throw damaged;
+    }
+    if (der.isEmpty ||
+        der.length > certificateImportByteLimit ||
+        _sha256Hex(der) != sha256) {
+      throw damaged;
+    }
+    return List.unmodifiable(der);
+  }
+
+  static String _sha256Hex(List<int> der) => SHA256Digest()
+      .process(Uint8List.fromList(der))
+      .map((b) => b.toRadixString(16).padLeft(2, '0'))
+      .join();
 
   /// Encodes a connection as a legacy version 2 record. Used to describe a
   /// connection in tests and diagnostics; the app no longer writes it.

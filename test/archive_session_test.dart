@@ -153,6 +153,7 @@ class FailingStore extends ConnectionStore {
     required String key,
     required String? accountId,
     String? profileId,
+    CertificateChange certificate = const CertificateChange.keep(),
   }) async => throw Exception('storage unavailable');
 
   @override
@@ -161,6 +162,7 @@ class FailingStore extends ConnectionStore {
     required String server,
     required String key,
     required String? accountId,
+    CertificateChange certificate = const CertificateChange.keep(),
   }) async => throw Exception('storage unavailable');
 }
 
