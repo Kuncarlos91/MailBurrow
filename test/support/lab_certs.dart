@@ -146,7 +146,7 @@ class LabKey {
     return LabKey._(pair, spki, _pem('EC PRIVATE KEY', sec1));
   }
 
-  static LabKey rsa(int bits) {
+  static LabKey rsa(int bits, {BigInt? publicExponentOverride}) {
     final gen = RSAKeyGenerator()
       ..init(
         ParametersWithRandom(
@@ -159,7 +159,12 @@ class LabKey {
     final priv = pair.privateKey;
     final spki = _seq([
       _seq([_oid('1.2.840.113549.1.1.1'), _null]),
-      _bits(_seq([_int(pub.modulus!), _int(pub.exponent!)])),
+      _bits(
+        _seq([
+          _int(pub.modulus!),
+          _int(publicExponentOverride ?? pub.exponent!),
+        ]),
+      ),
     ]);
     final p = priv.p!, q = priv.q!, d = priv.privateExponent!;
     final pkcs1 = _seq([
@@ -190,7 +195,9 @@ class LabCert {
   List<int> get keyBytes => utf8.encode(key.privatePem);
 }
 
-/// Builds and signs a certificate. Issuers are always EC keys.
+/// Builds and signs a certificate with an EC (ECDSA) or RSA (PKCS#1 v1.5,
+/// SHA-256) issuer key. [keyUsageByte] overrides a CA's key usage bits;
+/// [extraExtensions] are (oid, DER value, critical) triples added as-is.
 LabCert labCert({
   required String cn,
   required LabKey key,
@@ -206,12 +213,15 @@ LabCert labCert({
   Duration notBefore = const Duration(days: -1),
   Duration notAfter = const Duration(days: 365),
   bool sha1 = false,
+  int keyUsageByte = 0x06,
+  List<(String, List<int>, bool)> extraExtensions = const [],
 }) {
   final signer = issuerKey ?? key;
   final now = DateTime.now().toUtc();
-  final sigAlg = _seq([
-    _oid(sha1 ? '1.2.840.10045.4.1' : '1.2.840.10045.4.3.2'),
-  ]);
+  final rsaSigner = signer.pair.privateKey is RSAPrivateKey;
+  final sigAlg = rsaSigner
+      ? _seq([_oid('1.2.840.113549.1.1.11'), _null])
+      : _seq([_oid(sha1 ? '1.2.840.10045.4.1' : '1.2.840.10045.4.3.2')]);
   final exts = <Uint8List>[
     if (ca != null)
       _ext(
@@ -220,7 +230,7 @@ LabCert labCert({
         critical: true,
       ),
     if (ca == true && keyUsage)
-      _ext('2.5.29.15', _bits([0x06], 1), critical: true),
+      _ext('2.5.29.15', _bits([keyUsageByte], 1), critical: true),
     if (san ?? ca != true)
       _ext(
         '2.5.29.17',
@@ -230,6 +240,8 @@ LabCert labCert({
         ]),
       ),
     if (ca == false) _ext('2.5.29.37', _seq([_oid('1.3.6.1.5.5.7.3.1')])),
+    for (final (oid, value, critical) in extraExtensions)
+      _ext(oid, value, critical: critical),
   ];
   final serial = BigInt.parse(
     List.generate(
@@ -248,6 +260,21 @@ LabCert labCert({
     key.spki,
     if (exts.isNotEmpty) _ctx(3, _seq(exts)),
   ]);
+  if (rsaSigner) {
+    final rsa = RSASigner(SHA256Digest(), '0609608648016503040201')
+      ..init(
+        true,
+        PrivateKeyParameter<RSAPrivateKey>(
+          signer.pair.privateKey as RSAPrivateKey,
+        ),
+      );
+    final sig = rsa.generateSignature(tbs);
+    return LabCert._(
+      cn,
+      _pem('CERTIFICATE', _seq([tbs, sigAlg, _bits(sig.bytes)])),
+      key,
+    );
+  }
   final ecdsa = ECDSASigner(sha1 ? SHA1Digest() : SHA256Digest())
     ..init(
       true,
@@ -266,3 +293,15 @@ LabCert labCert({
   ]);
   return LabCert._(cn, _pem('CERTIFICATE', cert), key);
 }
+
+/// DER helpers for tests that build extension values or malformed input.
+Uint8List derSequence(List<List<int>> items) => _seq(items);
+Uint8List derOid(String dotted) => _oid(dotted);
+
+/// The single certificate in [cert]'s PEM, as DER bytes.
+Uint8List labDer(LabCert cert) => base64.decode(
+  cert.pem
+      .split('\n')
+      .where((l) => l.isNotEmpty && !l.startsWith('-----'))
+      .join(),
+);
