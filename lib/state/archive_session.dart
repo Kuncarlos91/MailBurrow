@@ -212,7 +212,8 @@ class ArchiveSession extends ChangeNotifier {
     _pendingCertificate = null;
     final token = _openingToken;
     final connectToken = _connectToken;
-    bool current() => !_disposed && token == _openingToken && connectToken == _connectToken;
+    bool current() =>
+        !_disposed && token == _openingToken && connectToken == _connectToken;
     _notify();
     await _refreshArchives(isCurrent: current);
     await _reopen(returnId, current);
@@ -238,8 +239,7 @@ class ArchiveSession extends ChangeNotifier {
   /// server type and address shown at that moment. Only the next setup
   /// connection to exactly that destination uses it, and saves it with the
   /// archive; it is cleared with the unsaved key.
-  ({List<int> der, ArchiveServerType type, String server})?
-  _pendingCertificate;
+  ({List<int> der, ArchiveServerType type, String server})? _pendingCertificate;
 
   /// The certificate confirmed in setup and not yet saved, if any.
   List<int>? get pendingCertificate => _pendingCertificate?.der;
@@ -248,14 +248,23 @@ class ArchiveSession extends ChangeNotifier {
   /// type entered now. Returns false, keeping nothing, when the address is
   /// not a valid HTTPS server address.
   bool setPendingCertificate(List<int> der) {
+    final hadPending = _pendingCertificate != null;
+    _pendingCertificate = null;
+    if (_disposed || demo || busy) {
+      if (hadPending) _notify();
+      return false;
+    }
     final Uri uri;
+    final List<int> snapshot;
     try {
       uri = validateServer(server.text);
-    } on FormatException {
+      snapshot = CertificateChange.set(der).der!;
+    } catch (_) {
+      if (hadPending) _notify();
       return false;
     }
     _pendingCertificate = (
-      der: List<int>.unmodifiable(der),
+      der: snapshot,
       type: setupServerType,
       server: uri.toString(),
     );
@@ -270,9 +279,9 @@ class ArchiveSession extends ChangeNotifier {
     _notify();
   }
 
-  /// True when the last connection attempt failed because the server's
-  /// certificate could not be verified, so setup can offer to use the
-  /// archive's own certificate. No request reached the server.
+  /// A TLS-handshake failure hint, not proof of its specific cause or that
+  /// earlier requests in this connection attempt sent no credentials.
+  /// UI must use generic verification/recovery wording, not diagnose a CA.
   bool get certificateNotVerified => _lastConnectFailure is HandshakeException;
 
   bool get _keyRefused {
@@ -349,10 +358,12 @@ class ArchiveSession extends ChangeNotifier {
     tab = 0;
   }
 
-  bool get canSwitchAccount => !accountSwitching && (!busy || mailLoading);
+  bool get canSwitchAccount =>
+      !_changingCertificate && !accountSwitching && (!busy || mailLoading);
 
   /// True when another saved archive can be opened now.
   bool get canSwitchArchive =>
+      !_changingCertificate &&
       !demo &&
       switchingArchive == null &&
       !accountSwitching &&
@@ -374,6 +385,7 @@ class ArchiveSession extends ChangeNotifier {
   }
 
   Future<void> restore() async {
+    if (_changingCertificate) return;
     final token = ++_openingToken;
     bool current() => !_disposed && token == _openingToken;
     reconfiguring = null;
@@ -552,6 +564,7 @@ class ArchiveSession extends ChangeNotifier {
     String? preferredAccountId,
     List<int>? savedCertificate,
   ]) {
+    if (_changingCertificate) return Future.value();
     final target = savedKey == null ? reconfiguring : null;
     return target == null
         ? _connect(savedKey, preferredAccountId, null, savedCertificate)
@@ -1034,26 +1047,70 @@ class ArchiveSession extends ChangeNotifier {
     _notify();
   }
 
+  bool _changingCertificate = false;
+
   /// Trusts [der] as the saved archive [id]'s own certificate, or goes back
-  /// to default trust when [der] is null. The change is staged in storage
-  /// first; if [id] is the open archive it is then reopened, so the next
+  /// to default trust when [der] is null. The affected open connection is closed before storage
+  /// changes; once saved it is reopened, so the next
   /// request uses the new trust and no old connection is reused. Returns
-  /// false, changing nothing, when the change could not be saved or the
-  /// open archive can't be reopened now.
+  /// false when the save fails or the session is not ready. Failed saves
+  /// preserve the previous saved record; the old connection stays closed for Retry.
+  /// True reports a saved change, not a successful subsequent TLS connection.
   Future<bool> setArchiveCertificate(String id, List<int>? der) async {
-    if (demo) return false;
-    final open = api != null && !setup && id == activeArchiveId;
-    if (open && !canSwitchArchive) return false;
-    final String newId;
+    if (_disposed || !canSwitchArchive) return false;
+    final open = api != null && id == activeArchiveId;
+    _changingCertificate = true;
+    if (open) {
+      // Stop old-trust requests before the first storage await. On a failed
+      // save, the old profile is still saved but must be explicitly retried.
+      api?.close();
+      _connectToken++;
+      _openingToken++;
+      _invalidateRequests();
+      _clearBrowsing();
+      api = null;
+      activeArchiveId = null;
+      account = null;
+      accountNotice = null;
+      messages = [];
+      setup = true;
+      reconfiguring = null;
+      keyInput.clear();
+      _pendingCertificate = null;
+      _retryArchiveId = id;
+    }
+    busy = true;
+    _notify();
+    String? newId;
     try {
       newId = await _store.setCertificate(id, der);
+      if (!_disposed) {
+        await _refreshArchives();
+        if (_retryArchiveId == id) _retryArchiveId = newId;
+        if (reconnectArchiveId == id) reconnectArchiveId = newId;
+        if (reconfiguring?.id == id) {
+          reconfiguring = archives
+              .where((profile) => profile.id == newId)
+              .firstOrNull;
+        }
+      }
     } catch (_) {
-      if (!_disposed) await _refreshArchives();
+      if (!_disposed) {
+        await _refreshArchives();
+        if (open) {
+          error =
+              'Certificate change could not be saved. Retry the saved archive.';
+        }
+      }
       return false;
+    } finally {
+      _changingCertificate = false;
+      if (!_disposed) {
+        busy = mailLoading;
+        _notify();
+      }
     }
-    if (_disposed) return true;
-    await _refreshArchives();
-    if (open) await switchArchive(newId, reopen: true);
+    if (!_disposed && open) await switchArchive(newId, reopen: true);
     return true;
   }
 
@@ -1160,6 +1217,7 @@ class ArchiveSession extends ChangeNotifier {
   /// Unlike [connect], nothing is validated, sent over the network or saved:
   /// the saved connection and the setup fields are left as they are.
   Future<void> startDemo() async {
+    if (_changingCertificate) return;
     if (demo && !setup) return;
     if (!demo) _demoReturnId = api != null ? activeArchiveId : null;
     mailRequestFailed = false;
@@ -1238,6 +1296,9 @@ class ArchiveSession extends ChangeNotifier {
     final token = _openingToken;
     final connectToken = _connectToken;
     _notify();
-    await _reopen(returnId, () => token == _openingToken && connectToken == _connectToken && !demo);
+    await _reopen(
+      returnId,
+      () => token == _openingToken && connectToken == _connectToken && !demo,
+    );
   }
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show HandshakeException;
 
@@ -30,6 +31,7 @@ class TrustBackend extends FakeArchiveBackend {
   TrustBackend(super.server, super.key, this.trust, {this.handshake = false});
   final ArchiveTrust? trust;
   final bool handshake;
+  bool closed = false;
 
   @override
   Future<List<ArchiveAccount>> accounts() async {
@@ -52,7 +54,9 @@ class TrustBackend extends FakeArchiveBackend {
   Future<List<ArchiveFolder>> folders(String accountId) async => const [];
 
   @override
-  void close() {}
+  void close() {
+    closed = true;
+  }
 }
 
 const server = 'https://archive.example';
@@ -97,6 +101,22 @@ void main() {
   });
 
   group('setup', () {
+    test(
+      'invalid pending input clears prior trust and cannot exceed the cap',
+      () {
+        final s = session();
+        addTearDown(s.dispose);
+        s.server.text = server;
+        expect(s.setPendingCertificate(certA), isTrue);
+        s.server.text = 'http://invalid.example';
+        expect(s.setPendingCertificate(certB), isFalse);
+        expect(s.pendingCertificate, isNull);
+        s.server.text = server;
+        expect(s.setPendingCertificate(List.filled(65537, 1)), isFalse);
+        expect(s.pendingCertificate, isNull);
+      },
+    );
+
     test(
       'a confirmed certificate is used and saved with the archive',
       () async {
@@ -233,6 +253,96 @@ void main() {
   });
 
   group('replace and remove from settings', () {
+    test('Retry follows the new profile ID after a failed opening', () async {
+      final id = await saved(server, certA);
+      await saved(other, null);
+      final s = session();
+      addTearDown(s.dispose);
+      await s.restore();
+      handshakeFails = true;
+      await s.switchArchive(id);
+      expect(s.api, isNull);
+      expect(await s.setArchiveCertificate(id, certB), isTrue);
+      handshakeFails = false;
+      await s.retrySaved();
+      expect(s.api!.server.toString(), server);
+      expect(lastTrust(), certB);
+    });
+
+    test(
+      'old trust closes before storage and navigation waits for the change',
+      () async {
+        final id = await saved(server, certA);
+        final otherId = await saved(other, null);
+        final held = HeldCertificateStore(entries);
+        store = held;
+        final s = session();
+        addTearDown(s.dispose);
+        await s.restore();
+        await s.switchArchive(id);
+        final previous = created.last;
+        final changing = s.setArchiveCertificate(id, certB);
+        await held.started.future;
+        expect(previous.closed, isTrue);
+        expect(s.api, isNull);
+        expect(s.canSwitchArchive, isFalse);
+        expect(s.canSwitchAccount, isFalse);
+        await s.switchArchive(otherId);
+        await s.startDemo();
+        expect(s.demo, isFalse);
+        held.finish.complete();
+        expect(await changing, isTrue);
+        expect(lastTrust(), certB);
+        expect(s.api!.server.toString(), server);
+      },
+    );
+
+    test(
+      'failed replacement keeps saved trust but requires reconnect',
+      () async {
+        final id = await saved(server, certA);
+        final held = HeldCertificateStore(entries)..refuse = true;
+        store = held;
+        final s = session();
+        addTearDown(s.dispose);
+        await s.restore();
+        final before = Map.of(entries.values);
+        final previous = created.last;
+        final changing = s.setArchiveCertificate(id, certB);
+        await held.started.future;
+        held.finish.complete();
+        expect(await changing, isFalse);
+        expect(previous.closed, isTrue);
+        expect(s.api, isNull);
+        expect(entries.values, before);
+        await s.retrySaved();
+        expect(lastTrust(), certA);
+        expect(s.api, isNotNull);
+      },
+    );
+
+    test(
+      'inactive trust update does not reconnect the current archive',
+      () async {
+        final id = await saved(server, certA);
+        await saved(other, null);
+        final held = HeldCertificateStore(entries);
+        store = held;
+        final s = session();
+        addTearDown(s.dispose);
+        await s.restore();
+        final previous = created.last;
+        final changing = s.setArchiveCertificate(id, certB);
+        await held.started.future;
+        expect(await s.setArchiveCertificate(id, null), isFalse);
+        held.finish.complete();
+        expect(await changing, isTrue);
+        expect(s.api, same(previous));
+        expect(previous.closed, isFalse);
+        expect(s.api!.server.toString(), other);
+      },
+    );
+
     test('replacing the open archive\'s certificate reopens it', () async {
       await saved(server, certA);
       final s = session();
@@ -279,4 +389,18 @@ void main() {
     final index = jsonDecode(entries.values['connections']!) as Map;
     expect(index['version'], 3);
   });
+}
+
+class HeldCertificateStore extends ConnectionStore {
+  HeldCertificateStore(Entries entries) : super(entries: entries);
+  final started = Completer<void>();
+  final finish = Completer<void>();
+  bool refuse = false;
+  @override
+  Future<String> setCertificate(String id, List<int>? der) async {
+    started.complete();
+    await finish.future;
+    if (refuse) throw StateError('synthetic storage refusal');
+    return super.setCertificate(id, der);
+  }
 }
