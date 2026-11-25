@@ -71,7 +71,7 @@ MailBurrow's own code is licensed under the MIT License (see [LICENSE](../../LIC
 | path_provider_windows | 2.3.0 | transitive | BSD-style text | 89519eca6f7b9529b35bdddd623a58c3af06a88c458dbd6531ddb4675acf75a9 |
 | platform | 3.2.0 | transitive | BSD-style text | 143839f62c9b7f88143ea9f688361c27050888acde7696b34e04414bd254fafc |
 | plugin_platform_interface | 2.1.8 | transitive | BSD-style text | 89519eca6f7b9529b35bdddd623a58c3af06a88c458dbd6531ddb4675acf75a9 |
-| pointycastle | 4.0.0 | direct dev | MIT text | c170b3494db84c0f9a5b6e9ad79a365eae2cf90d16a660ed7cc478d037cee1e4 |
+| pointycastle | 4.0.0 | direct main | MIT text | c170b3494db84c0f9a5b6e9ad79a365eae2cf90d16a660ed7cc478d037cee1e4 |
 | process | 5.0.5 | transitive | BSD-style text | 7e124af6a556f045cb3a20cafbdaa31602ac2c82cbcb3c3b15faaaf514b06028 |
 | pub_semver | 2.2.1 | transitive | BSD-style text | ff0b91d4f3c32b25cb6ec84985e8da89b0ba2a2b2f7eef353cda5e5423a20390 |
 | record_use | 0.6.0 | transitive | BSD-style text | 1cda25a8de6880c5338de0b4a06ee89e8537c213eb1379c16a4c035bfd198b5c |
