@@ -89,8 +89,9 @@ typedef SavedArchives = ({
 
 /// Saved archive connections in platform secure storage.
 ///
-/// Format version 3 (current, provisional until the multi-archive prototype
-/// is reviewed) keeps an **index** under `connections`, holding the version,
+/// Format version 3 (version 4 when an archive has its own certificate, see
+/// below; provisional until the multi-archive prototype is reviewed) keeps
+/// an **index** under `connections`, holding the version,
 /// the active profile ID (or null) and, per profile, its `id`, `label`,
 /// `serverType`, `server` and `accountId`. The index holds no keys. There is
 /// **one key entry per profile**, named `connection.key.` plus its ID. Writes
@@ -105,9 +106,10 @@ typedef SavedArchives = ({
 /// "der": base64, "sha256": hex}`. The record names the destination it was
 /// trusted for and is used only when both still match; its fingerprint is
 /// checked on every read. It is staged with the key: a changed certificate
-/// gets a fresh profile ID like a changed key. Custom-trust indexes use
-/// version 4, which older builds refuse before connecting; ordinary profiles remain version 3. Removing all custom
-/// trust permits a version-3 index again.
+/// gets a fresh profile ID like a changed key. An index with any
+/// custom-trust marker is written as version 4, which older builds refuse
+/// before connecting or rewriting it; without markers it stays version 3.
+/// Removing every custom certificate returns the index to version 3.
 ///
 /// Older builds kept one record under `connection`. Version 2 is
 /// `{"version": 2, "serverType", "server", "key", "accountId": "7" | null}`;
@@ -526,8 +528,9 @@ class ConnectionStore {
   });
 
   /// The explicit all-archives reset: removes the index, every key and
-  /// certificate entry and any legacy record from this device. It never contacts a server. If the
-  /// stored entries cannot be listed, nothing is removed and this throws.
+  /// certificate entry and any legacy record from this device. It never
+  /// contacts a server. If the stored entries cannot be listed, nothing is
+  /// removed and this throws.
   Future<void> reset() => _serialized(() async {
     final all = await _storage.readAll();
     // Keep the index until all credentials are removed. On failure, setup
@@ -692,9 +695,10 @@ class ConnectionStore {
     value: encodeIndex(active, profiles, unreadable: unreadable),
   );
 
-  /// Decodes a v3 (default trust) or v4 (custom trust) index. Profiles that fail validation, or repeat an ID,
-  /// are kept aside unchanged in [ConnectionIndex.unreadable] and written
-  /// back as they were; an unknown version or shape throws
+  /// Decodes a v3 (default trust) or v4 (custom trust) index; a v3 index
+  /// that claims custom trust is refused. Profiles that fail validation, or
+  /// repeat an ID, are kept aside unchanged in [ConnectionIndex.unreadable]
+  /// and written back as they were; an unknown version or shape throws
   /// [FormatException].
   static ConnectionIndex decodeIndex(String text) {
     final data = jsonDecode(text);

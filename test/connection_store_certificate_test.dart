@@ -241,7 +241,11 @@ void main() {
       expect((await store.read())!.certificate, isNull);
       expect(entries.named('connection.trust.'), isEmpty);
       expect(entries.profiles.single.containsKey('ownCertificate'), isFalse);
-      expect(entries.index['version'], 3, reason: 'explicit removal restores default-trust format');
+      expect(
+        entries.index['version'],
+        3,
+        reason: 'explicit removal restores default-trust format',
+      );
       expect(await store.connection(removed), isNotNull);
     });
 
