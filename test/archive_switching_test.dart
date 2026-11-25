@@ -294,7 +294,7 @@ void main() {
     Completer<void>? hold;
 
     ArchiveSession newSession() => ArchiveSession(
-      backendFactory: (type, server, key) {
+      backendFactory: (type, server, key, {trust}) {
         final api = HostArchive(server, key)..holdAccounts = hold;
         created.add(api);
         return api;
@@ -373,7 +373,7 @@ void main() {
       final factory = created.length;
       session.dispose();
       session = ArchiveSession(
-        backendFactory: (type, server, key) {
+        backendFactory: (type, server, key, {trust}) {
           final api = HostArchive(server, key)..offline = server.host == 'b.example';
           created.add(api);
           return api;
@@ -421,7 +421,7 @@ void main() {
       await add(second, 'key-b');
       session.dispose();
       session = ArchiveSession(
-        backendFactory: (type, server, key) =>
+        backendFactory: (type, server, key, {trust}) =>
             throw StateError('no connection expected'),
         demoLoader: () async => HostArchive(Uri.parse('https://demo.example'), ''),
       );

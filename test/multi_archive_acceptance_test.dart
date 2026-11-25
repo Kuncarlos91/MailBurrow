@@ -119,7 +119,7 @@ class HeldOverviewStore extends ConnectionStore {
 
 ArchiveSession newSession({ConnectionStore? connectionStore}) =>
     ArchiveSession(store: connectionStore ?? store,
-      backendFactory: (type, server, key) => LabClient(server, key));
+      backendFactory: (type, server, key, {trust}) => LabClient(server, key));
 
 Future<void> addArchive(
   ArchiveSession session,
@@ -378,7 +378,7 @@ void main() {
     final before = await storage.readAll();
     session.dispose();
     session = ArchiveSession(
-      backendFactory: (type, server, key) => throw StateError('no connection'),
+      backendFactory: (type, server, key, {trust}) => throw StateError('no connection'),
       demoLoader: () async => LabClient(Uri.parse('https://c.example'), ''),
     );
     await session.startDemo();
@@ -536,7 +536,7 @@ void main() {
     session.dispose();
     final barrier = CommitBarrierStore();
     session = ArchiveSession(store: barrier,
-      backendFactory: (type, server, key) => LabClient(server, key));
+      backendFactory: (type, server, key, {trust}) => LabClient(server, key));
     // Populate the saved list without a connection or a store write.
     session.archives = (await store.overview()).profiles;
     session.busy = false;
@@ -557,7 +557,7 @@ void main() {
     session.dispose();
     final barrier = OverviewBarrierStore();
     session = ArchiveSession(store: barrier,
-      backendFactory: (type, server, key) => LabClient(server, key));
+      backendFactory: (type, server, key, {trust}) => LabClient(server, key));
     final oldRestore = session.restore();
     await barrier.entered.future;
     await session.cancelOpening();
@@ -577,7 +577,7 @@ void main() {
     session.dispose();
     final barrier = OverviewBarrierStore();
     session = ArchiveSession(store: barrier,
-      backendFactory: (type, server, key) => LabClient(server, key));
+      backendFactory: (type, server, key, {trust}) => LabClient(server, key));
     final oldRestore = session.restore();
     await barrier.entered.future;
     await session.cancelOpening();

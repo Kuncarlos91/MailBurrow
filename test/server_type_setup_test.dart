@@ -63,7 +63,7 @@ void main() {
 
   // Setup is idle, as after restore() finds no saved connection.
   ArchiveSession session() => ArchiveSession(
-    backendFactory: (type, server, key) {
+    backendFactory: (type, server, key, {trust}) {
       final backend = TypedBackend(
         type,
         server,
