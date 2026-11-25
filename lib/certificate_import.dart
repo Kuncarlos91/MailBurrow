@@ -308,10 +308,10 @@ String _oid(_Tlv t) {
   return [...head, ...parts.skip(1)].join('.');
 }
 
-BigInt _uint(_Tlv t) {
+BigInt _uint(_Tlv t, {int maxBytes = 1025}) {
   _expect(t, 0x02);
   final c = t.content;
-  if (c.isEmpty) throw _bad;
+  if (c.isEmpty || c.length > maxBytes) throw _bad;
   if (c.length > 1 && c[0] == 0 && c[1] & 0x80 == 0) throw _bad;
   if (c[0] & 0x80 != 0) throw _bad; // Negative.
   var v = BigInt.zero;
@@ -334,6 +334,10 @@ Uint8List _bitString(_Tlv t, {bool whole = true}) {
   final c = t.content;
   if (c.isEmpty || c[0] > 7) throw _bad;
   if (whole && c[0] != 0) throw _bad;
+  if ((c.length == 1 && c[0] != 0) ||
+      (c.length > 1 && c[0] != 0 && c.last & ((1 << c[0]) - 1) != 0)) {
+    throw _bad; // DER padding bits must be zero.
+  }
   return Uint8List.sublistView(c, 1);
 }
 
@@ -512,10 +516,15 @@ _Key _publicKey(_Tlv spki) {
     if (seq.end != keyBits.length) throw _bad;
     final parts = _expect(seq, 0x30).children();
     if (parts.length != 2) throw _bad;
-    final n = _uint(parts[0]), e = _uint(parts[1]);
+    final n = _uint(parts[0]);
+    // Bound public-exponent work before signature verification.
+    if (parts[1].content.length > 5) {
+      throw const _Reject(CertificateRejection.unsupportedAlgorithm);
+    }
+    final e = _uint(parts[1], maxBytes: 5);
     final bits = n.bitLength;
     if (bits < 2048) throw const _Reject(CertificateRejection.weakKey);
-    if (bits > 8192 || e < BigInt.from(3) || e.isEven) {
+    if (bits > 8192 || e.bitLength > 32 || e < BigInt.from(3) || e.isEven) {
       throw const _Reject(CertificateRejection.unsupportedAlgorithm);
     }
     return _Key('RSA $bits', RSAPublicKey(n, e), null);
@@ -578,7 +587,9 @@ const _understoodExtensions = {
   '1.3.6.1.4.1.11129.2.4.2', // certificate transparency SCTs
 };
 
-/// Critical extensions the TLS engine itself enforces; others are refused.
+/// Recognized critical-extension policy. Actual enforcement for imported
+/// trust anchors (rather than chain members) still needs platform evidence
+/// before this internal parser is exposed to users; others are refused.
 const _criticalAllowed = {
   '2.5.29.15',
   '2.5.29.17',
@@ -712,13 +723,13 @@ CertificateDetails _parse(Uint8List der, DateTime now) {
   }
 
   return CertificateDetails._(
-    der: Uint8List.fromList(der),
+    der: Uint8List.fromList(der).asUnmodifiableView(),
     kind: kind,
     subject: _displayName(subjectName),
     issuer: _displayName(issuerName),
     notBefore: notBefore,
     notAfter: notAfter,
-    sha256: SHA256Digest().process(der),
+    sha256: SHA256Digest().process(der).asUnmodifiableView(),
     dnsNames: List.unmodifiable(dns),
     ipAddresses: List.unmodifiable(ips),
     keyDescription: key.description,

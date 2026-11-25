@@ -118,7 +118,45 @@ void main() {
     });
   });
 
+  test('accepted bytes and fingerprint cannot change after validation', () {
+    final details = accepted(root.pemBytes);
+    final der = List<int>.of(details.der);
+    final fingerprint = details.fingerprint;
+    expect(() => details.der[0] ^= 1, throwsUnsupportedError);
+    expect(() => details.sha256[0] ^= 1, throwsUnsupportedError);
+    expect(details.der, der);
+    expect(details.fingerprint, fingerprint);
+  });
+
   group('rejected', () {
+    test('key usage cannot set an unused DER padding bit', () {
+      final cert = labCert(
+        cn: 'Lab CA',
+        key: rootKey,
+        ca: true,
+        keyUsageByte: 7,
+      );
+      expect(rejected(cert.pemBytes), CertificateRejection.notACertificate);
+    });
+
+    test('RSA public exponents have a bounded supported size', () {
+      final largeExponent = LabKey.rsa(
+        2048,
+        publicExponentOverride: (BigInt.one << 64) + BigInt.one,
+      );
+      final cert = labCert(
+        cn: 'Intermediate',
+        key: largeExponent,
+        issuerCn: root.cn,
+        issuerKey: rootKey,
+        ca: true,
+      );
+      expect(
+        rejected(cert.pemBytes),
+        CertificateRejection.unsupportedAlgorithm,
+      );
+    });
+
     test('a server certificate issued by a CA', () {
       expect(
         rejected(issued().pemBytes),

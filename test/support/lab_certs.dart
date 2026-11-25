@@ -146,7 +146,7 @@ class LabKey {
     return LabKey._(pair, spki, _pem('EC PRIVATE KEY', sec1));
   }
 
-  static LabKey rsa(int bits) {
+  static LabKey rsa(int bits, {BigInt? publicExponentOverride}) {
     final gen = RSAKeyGenerator()
       ..init(
         ParametersWithRandom(
@@ -159,7 +159,12 @@ class LabKey {
     final priv = pair.privateKey;
     final spki = _seq([
       _seq([_oid('1.2.840.113549.1.1.1'), _null]),
-      _bits(_seq([_int(pub.modulus!), _int(pub.exponent!)])),
+      _bits(
+        _seq([
+          _int(pub.modulus!),
+          _int(publicExponentOverride ?? pub.exponent!),
+        ]),
+      ),
     ]);
     final p = priv.p!, q = priv.q!, d = priv.privateExponent!;
     final pkcs1 = _seq([
