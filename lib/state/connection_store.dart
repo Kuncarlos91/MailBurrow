@@ -49,7 +49,18 @@ class CertificateChange {
   const CertificateChange.keep() : der = null, remove = false;
 
   /// Trust [der] (one certificate, already checked on import).
-  const CertificateChange.set(List<int> this.der) : remove = false;
+  CertificateChange.set(List<int> bytes)
+    : der = _snapshot(bytes),
+      remove = false;
+
+  static List<int> _snapshot(List<int> bytes) {
+    if (bytes.isEmpty ||
+        bytes.length > certificateImportByteLimit ||
+        bytes.any((byte) => byte < 0 || byte > 255)) {
+      throw ArgumentError('Certificate bytes are out of range.');
+    }
+    return List<int>.unmodifiable(bytes);
+  }
 
   /// Go back to default trust.
   const CertificateChange.remove() : der = null, remove = true;
@@ -94,9 +105,9 @@ typedef SavedArchives = ({
 /// "der": base64, "sha256": hex}`. The record names the destination it was
 /// trusted for and is used only when both still match; its fingerprint is
 /// checked on every read. It is staged with the key: a changed certificate
-/// gets a fresh profile ID like a changed key. Builds before this format
-/// ignore the flag and connect with default trust, which the server's
-/// certificate then fails closed.
+/// gets a fresh profile ID like a changed key. Custom-trust indexes use
+/// version 4, which older builds refuse before connecting; ordinary profiles remain version 3. Removing all custom
+/// trust permits a version-3 index again.
 ///
 /// Older builds kept one record under `connection`. Version 2 is
 /// `{"version": 2, "serverType", "server", "key", "accountId": "7" | null}`;
@@ -134,6 +145,7 @@ class ConnectionStore {
       done.complete();
     }
   }
+
   static const _legacyEntry = 'connection';
   static const _indexEntry = 'connections';
   static const _keyPrefix = 'connection.key.';
@@ -141,6 +153,7 @@ class ConnectionStore {
   static const trustVersion = 1;
   static const legacyVersion = 2;
   static const currentVersion = 3;
+  static const certificateIndexVersion = 4;
   static const maxProfiles = 20;
   static const maxLabelLength = 60;
 
@@ -239,29 +252,31 @@ class ConnectionStore {
   /// profile ID, so the previous record keeps working if any write fails.
   /// Returns the profile's new ID. Throws [SavedArchiveMissing] when [id] is
   /// not saved.
-  Future<String> setCertificate(String id, List<int>? der) =>
-      _serialized(() async {
-        final index = await _readIndex();
-        final profile = index?.profiles
-            .where((item) => item.id == id)
-            .firstOrNull;
-        if (profile == null) throw SavedArchiveMissing();
-        final key = await _storage.read(key: '$_keyPrefix${profile.id}');
-        if (key == null || key.isEmpty) {
-          throw const FormatException('Saved connection key is missing.');
-        }
-        return _write(
-          serverType: profile.serverType,
-          server: profile.server,
-          key: key,
-          accountId: profile.accountId,
-          profileId: id,
-          certificate: der == null
-              ? const CertificateChange.remove()
-              : CertificateChange.set(der),
-          keepActive: true,
-        );
-      });
+  Future<String> setCertificate(String id, List<int>? der) {
+    final change = der == null
+        ? const CertificateChange.remove()
+        : CertificateChange.set(der);
+    return _serialized(() async {
+      final index = await _readIndex();
+      final profile = index?.profiles
+          .where((item) => item.id == id)
+          .firstOrNull;
+      if (profile == null) throw SavedArchiveMissing();
+      final key = await _storage.read(key: '$_keyPrefix${profile.id}');
+      if (key == null || key.isEmpty) {
+        throw const FormatException('Saved connection key is missing.');
+      }
+      return _write(
+        serverType: profile.serverType,
+        server: profile.server,
+        key: key,
+        accountId: profile.accountId,
+        profileId: id,
+        certificate: change,
+        keepActive: true,
+      );
+    });
+  }
 
   /// Saves a connection entered in setup and makes it active. A readable
   /// profile with the same server type and address is updated in place
@@ -314,11 +329,10 @@ class ConnectionStore {
     );
     await _stage(profile, key, der);
     try {
-      await _writeIndex(
-        profile.id,
-        [...index.profiles, profile],
-        index.unreadable,
-      );
+      await _writeIndex(profile.id, [
+        ...index.profiles,
+        profile,
+      ], index.unreadable);
     } catch (_) {
       await _unstage(profile.id);
       rethrow;
@@ -405,11 +419,15 @@ class ConnectionStore {
   }
 
   /// Writes a new profile's key and, when given, its certificate record.
-  /// On failure nothing staged is left behind.
-  Future<void> _stage(ConnectionProfile profile, String key, List<int>? der) async {
-    await _storage.write(key: '$_keyPrefix${profile.id}', value: key);
-    if (der == null) return;
+  /// Failures attempt cleanup; a later read retries orphan cleanup.
+  Future<void> _stage(
+    ConnectionProfile profile,
+    String key,
+    List<int>? der,
+  ) async {
     try {
+      await _storage.write(key: '$_keyPrefix${profile.id}', value: key);
+      if (der == null) return;
       await _storage.write(
         key: '$_trustPrefix${profile.id}',
         value: encodeCertificate(
@@ -478,16 +496,32 @@ class ConnectionStore {
         try {
           decode(legacy);
         } on FormatException {
-          return (active: null, profiles: const <ConnectionProfile>[], unreadable: true);
+          return (
+            active: null,
+            profiles: const <ConnectionProfile>[],
+            unreadable: true,
+          );
         }
       }
-      return (active: null, profiles: const <ConnectionProfile>[], unreadable: false);
+      return (
+        active: null,
+        profiles: const <ConnectionProfile>[],
+        unreadable: false,
+      );
     }
     try {
       final index = decodeIndex(text);
-      return (active: index.active, profiles: index.profiles, unreadable: false);
+      return (
+        active: index.active,
+        profiles: index.profiles,
+        unreadable: false,
+      );
     } on FormatException {
-      return (active: null, profiles: const <ConnectionProfile>[], unreadable: true);
+      return (
+        active: null,
+        profiles: const <ConnectionProfile>[],
+        unreadable: true,
+      );
     }
   });
 
@@ -537,14 +571,10 @@ class ConnectionStore {
     if (index == null || !index.profiles.any((item) => item.id == id)) {
       throw SavedArchiveMissing();
     }
-    await _writeIndex(
-      index.active == id ? null : index.active,
-      [
-        for (final item in index.profiles)
-          if (item.id != id) item,
-      ],
-      index.unreadable,
-    );
+    await _writeIndex(index.active == id ? null : index.active, [
+      for (final item in index.profiles)
+        if (item.id != id) item,
+    ], index.unreadable);
     await _unstage(id);
   });
 
@@ -662,19 +692,27 @@ class ConnectionStore {
     value: encodeIndex(active, profiles, unreadable: unreadable),
   );
 
-  /// Decodes the v3 index. Profiles that fail validation, or repeat an ID,
+  /// Decodes a v3 (default trust) or v4 (custom trust) index. Profiles that fail validation, or repeat an ID,
   /// are kept aside unchanged in [ConnectionIndex.unreadable] and written
   /// back as they were; an unknown version or shape throws
   /// [FormatException].
   static ConnectionIndex decodeIndex(String text) {
     final data = jsonDecode(text);
-    if (data is! Map<String, dynamic> || data['version'] != currentVersion) {
+    if (data is! Map<String, dynamic> ||
+        (data['version'] != currentVersion &&
+            data['version'] != certificateIndexVersion)) {
       throw const FormatException('Saved archives version is unknown.');
     }
     final list = data['profiles'];
     final active = data['active'];
     if (list is! List<dynamic> || (active != null && active is! String)) {
       throw const FormatException('Saved archives are unreadable.');
+    }
+    if (data['version'] == currentVersion &&
+        list.any((item) => item is Map && item.containsKey('ownCertificate'))) {
+      throw const FormatException(
+        'Custom trust requires the newer index format.',
+      );
     }
     final profiles = <ConnectionProfile>[];
     final unreadable = <Object?>[];
@@ -737,13 +775,19 @@ class ConnectionStore {
     );
   }
 
-  /// Encodes the v3 index.
+  /// Encodes v4 when custom-trust markers exist; otherwise preserves v3.
   static String encodeIndex(
     String? active,
     List<ConnectionProfile> profiles, {
     List<Object?> unreadable = const [],
   }) => jsonEncode({
-    'version': currentVersion,
+    'version':
+        profiles.any((profile) => profile.ownCertificate) ||
+            unreadable.any(
+              (item) => item is Map && item.containsKey('ownCertificate'),
+            )
+        ? certificateIndexVersion
+        : currentVersion,
     'active': active,
     'profiles': [
       for (final item in profiles)
@@ -831,7 +875,10 @@ class ConnectionStore {
     required ArchiveServerType serverType,
     required String server,
   }) {
-    const damaged = SavedCertificateUnavailable('Saved certificate is damaged.');
+    const damaged = SavedCertificateUnavailable(
+      'Saved certificate is damaged.',
+    );
+    if (text.length > 128 * 1024) throw damaged;
     final Object? data;
     try {
       data = jsonDecode(text);
@@ -850,7 +897,12 @@ class ConnectionStore {
       );
     }
     final encoded = data['der'], sha256 = data['sha256'];
-    if (encoded is! String || sha256 is! String) throw damaged;
+    if (encoded is! String ||
+        sha256 is! String ||
+        encoded.length > ((certificateImportByteLimit + 2) ~/ 3) * 4 ||
+        !RegExp(r'^[0-9a-f]{64}$').hasMatch(sha256)) {
+      throw damaged;
+    }
     final List<int> der;
     try {
       der = base64.decode(encoded);

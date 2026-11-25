@@ -56,12 +56,76 @@ void main() {
         : CertificateChange.set(der),
   );
 
+  test(
+    'setCertificate snapshots the bytes before awaiting the queue',
+    () async {
+      final id = await addWith(null);
+      final mutable = List<int>.of(certA);
+      final saving = store.setCertificate(id, mutable);
+      mutable[0] ^= 1;
+      final newId = await saving;
+      expect((await store.connection(newId)).certificate, certA);
+    },
+  );
+
+  test('certificate changes are immutable snapshots', () {
+    final mutable = List<int>.of(certA);
+    final change = CertificateChange.set(mutable);
+    mutable[0] ^= 1;
+    expect(change.der, certA);
+    expect(() => change.der![0] ^= 1, throwsUnsupportedError);
+  });
+
+  test('oversized encoded storage is refused before decoding', () {
+    for (final text in [
+      ' ' * (128 * 1024 + 1),
+      jsonEncode({
+        'version': 1,
+        'serverType': mailArchiver.id,
+        'server': server,
+        'der': 'A' * 90000,
+        'sha256': '0' * 64,
+      }),
+    ]) {
+      expect(
+        () => ConnectionStore.decodeCertificate(
+          text,
+          serverType: mailArchiver,
+          server: server,
+        ),
+        throwsA(isA<SavedCertificateUnavailable>()),
+      );
+    }
+  });
+
+  test('a v3 index cannot claim custom trust', () async {
+    await addWith(certA);
+    final index = entries.index..['version'] = 3;
+    entries.values['connections'] = jsonEncode(index);
+    final before = Map<String, String>.of(entries.values);
+    await expectLater(store.read(), throwsFormatException);
+    expect(entries.values, before);
+  });
+
+  test('a key write that persists then throws is cleaned up', () async {
+    final partial = PersistThenFailEntries();
+    entries = partial;
+    store = ConnectionStore(entries: partial);
+    await expectLater(addWith(certA), throwsA(isA<StateError>()));
+    expect(entries.values, isEmpty);
+  });
+
   group('saving', () {
     test('an archive with a certificate stores and reads it back', () async {
       final id = await addWith(certA);
       expect((await store.read())!.certificate, certA);
       expect((await store.connection(id)).certificate, certA);
       expect(entries.profiles.single['ownCertificate'], isTrue);
+      expect(
+        entries.index['version'],
+        4,
+        reason: 'older v3 readers must refuse custom trust',
+      );
       final record =
           jsonDecode(entries.values['connection.trust.$id']!)
               as Map<String, dynamic>;
@@ -76,6 +140,7 @@ void main() {
     test('an archive without one keeps the existing format', () async {
       await addWith(null);
       expect((await store.read())!.certificate, isNull);
+      expect(entries.index['version'], 3);
       expect(entries.profiles.single.containsKey('ownCertificate'), isFalse);
       expect(entries.named('connection.trust.'), isEmpty);
     });
@@ -176,6 +241,7 @@ void main() {
       expect((await store.read())!.certificate, isNull);
       expect(entries.named('connection.trust.'), isEmpty);
       expect(entries.profiles.single.containsKey('ownCertificate'), isFalse);
+      expect(entries.index['version'], 3, reason: 'explicit removal restores default-trust format');
       expect(await store.connection(removed), isNotNull);
     });
 
@@ -335,6 +401,7 @@ void main() {
         // Writing another archive keeps it exactly as it was.
         expect(entries.profiles, contains(equals(profile)));
         expect(entries.profiles, hasLength(2));
+        expect(entries.index['version'], 4);
       },
     );
   });
@@ -357,4 +424,14 @@ void main() {
       throwsArgumentError,
     );
   });
+}
+
+class PersistThenFailEntries extends Entries {
+  @override
+  Future<void> write({required String key, required String value}) async {
+    await super.write(key: key, value: value);
+    if (key.startsWith('connection.key.')) {
+      throw StateError('synthetic partial failure');
+    }
+  }
 }
