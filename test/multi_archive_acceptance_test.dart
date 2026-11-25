@@ -146,11 +146,12 @@ class CommitBarrierStore extends ConnectionStore {
   @override
   Future<String> write({required ArchiveServerType serverType,
     required String server, required String key, required String? accountId,
-    String? profileId}) async {
+    String? profileId,
+    CertificateChange certificate = const CertificateChange.keep()}) async {
     entered.complete();
     await proceed.future;
     return super.write(serverType: serverType, server: server, key: key,
-      accountId: accountId, profileId: profileId);
+      accountId: accountId, profileId: profileId, certificate: certificate);
   }
 }
 

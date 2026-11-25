@@ -28,6 +28,7 @@ class RecordingStore extends ConnectionStore {
     required String key,
     required String? accountId,
     String? profileId,
+    CertificateChange certificate = const CertificateChange.keep(),
   }) {
     calls.add('write');
     return super.write(
@@ -36,6 +37,7 @@ class RecordingStore extends ConnectionStore {
       key: key,
       accountId: accountId,
       profileId: profileId,
+      certificate: certificate,
     );
   }
 
@@ -45,6 +47,7 @@ class RecordingStore extends ConnectionStore {
     required String server,
     required String key,
     required String? accountId,
+    CertificateChange certificate = const CertificateChange.keep(),
   }) {
     calls.add('add');
     return super.add(
@@ -52,6 +55,7 @@ class RecordingStore extends ConnectionStore {
       server: server,
       key: key,
       accountId: accountId,
+      certificate: certificate,
     );
   }
 
