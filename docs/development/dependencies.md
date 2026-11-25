@@ -17,6 +17,7 @@ MailBurrow's own code is licensed under the MIT License (see [LICENSE](../../LIC
 | clock | 1.1.3 | transitive | Apache text | 50e6751797c50dedd75ef1b8a0d9e42f5f8472e9fbce91f34718e9f97b0c780a |
 | code_assets | 1.2.1 | transitive | BSD-style text | 21ae23b0b9ff67a2dc75ab085d1e8db8ac548c5faf370af17f28dd2ef3b52b7b |
 | collection | 1.19.1 | transitive | BSD-style text | ad6a71997da90924b2cfb1fb47ec46537f70faf469efe016168794ae45ed6888 |
+| convert | 3.1.2 | transitive | BSD-style text | ad6a71997da90924b2cfb1fb47ec46537f70faf469efe016168794ae45ed6888 |
 | crypto | 3.0.7 | transitive | BSD-style text | ad6a71997da90924b2cfb1fb47ec46537f70faf469efe016168794ae45ed6888 |
 | csslib | 1.0.2 | transitive | BSD-style text | 7e124af6a556f045cb3a20cafbdaa31602ac2c82cbcb3c3b15faaaf514b06028 |
 | fake_async | 1.3.3 | transitive | Apache text | 50e6751797c50dedd75ef1b8a0d9e42f5f8472e9fbce91f34718e9f97b0c780a |
@@ -70,6 +71,7 @@ MailBurrow's own code is licensed under the MIT License (see [LICENSE](../../LIC
 | path_provider_windows | 2.3.0 | transitive | BSD-style text | 89519eca6f7b9529b35bdddd623a58c3af06a88c458dbd6531ddb4675acf75a9 |
 | platform | 3.2.0 | transitive | BSD-style text | 143839f62c9b7f88143ea9f688361c27050888acde7696b34e04414bd254fafc |
 | plugin_platform_interface | 2.1.8 | transitive | BSD-style text | 89519eca6f7b9529b35bdddd623a58c3af06a88c458dbd6531ddb4675acf75a9 |
+| pointycastle | 4.0.0 | direct dev | MIT text | c170b3494db84c0f9a5b6e9ad79a365eae2cf90d16a660ed7cc478d037cee1e4 |
 | process | 5.0.5 | transitive | BSD-style text | 7e124af6a556f045cb3a20cafbdaa31602ac2c82cbcb3c3b15faaaf514b06028 |
 | pub_semver | 2.2.1 | transitive | BSD-style text | ff0b91d4f3c32b25cb6ec84985e8da89b0ba2a2b2f7eef353cda5e5423a20390 |
 | record_use | 0.6.0 | transitive | BSD-style text | 1cda25a8de6880c5338de0b4a06ee89e8537c213eb1379c16a4c035bfd198b5c |

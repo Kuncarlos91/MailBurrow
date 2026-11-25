@@ -72,6 +72,7 @@ class OpenArchiverApi extends ArchiveApi {
     super.attachmentDeadline,
     super.attachmentIdleTimeout,
     super.responseTimeout,
+    super.trust,
   });
 
   @override
