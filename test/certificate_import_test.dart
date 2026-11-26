@@ -116,6 +116,16 @@ void main() {
       );
       expect(accepted(cert.pemBytes).kind, CertificateKind.rootCa);
     });
+
+    test('non-critical name constraints are still accepted', () {
+      final cert = labCert(
+        cn: 'Lab Root CA',
+        key: LabKey.ec(),
+        ca: true,
+        extraExtensions: [('2.5.29.30', derSequence([]), false)],
+      );
+      expect(accepted(cert.pemBytes).kind, CertificateKind.rootCa);
+    });
   });
 
   test('accepted bytes and fingerprint cannot change after validation', () {
@@ -224,6 +234,42 @@ void main() {
         key: LabKey.ec(),
         ca: true,
         extraExtensions: [('1.3.6.1.4.1.99999.1', derSequence([]), true)],
+      );
+      expect(
+        rejected(cert.pemBytes),
+        CertificateRejection.unsupportedCriticalExtension,
+      );
+    });
+
+    for (final (oid, name) in [
+      ('2.5.29.30', 'name constraints'),
+      ('2.5.29.32', 'certificate policies'),
+      ('2.5.29.36', 'policy constraints'),
+      ('2.5.29.37', 'extended key usage'),
+      ('2.5.29.54', 'inhibit any policy'),
+    ]) {
+      test('critical $name on an imported CA', () {
+        final cert = labCert(
+          cn: 'Lab Root CA',
+          key: LabKey.ec(),
+          ca: true,
+          extraExtensions: [(oid, derSequence([]), true)],
+        );
+        expect(
+          rejected(cert.pemBytes),
+          CertificateRejection.unsupportedCriticalExtension,
+        );
+      });
+    }
+
+    test('critical extended key usage on a self-signed server', () {
+      final cert = labCert(
+        cn: 'lab server',
+        key: LabKey.ec(),
+        san: true,
+        extraExtensions: [
+          ('2.5.29.37', derSequence([derOid('1.3.6.1.5.5.7.3.1')]), true),
+        ],
       );
       expect(
         rejected(cert.pemBytes),

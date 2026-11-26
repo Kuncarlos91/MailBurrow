@@ -588,7 +588,7 @@ const _understoodExtensions = {
   '2.5.29.15', // keyUsage
   '2.5.29.17', // subjectAltName
   '2.5.29.19', // basicConstraints
-  '2.5.29.30', // nameConstraints (enforced by the TLS engine)
+  '2.5.29.30', // nameConstraints (non-critical only)
   '2.5.29.31', // cRLDistributionPoints
   '2.5.29.32', // certificatePolicies
   '2.5.29.35', // authorityKeyIdentifier
@@ -602,15 +602,13 @@ const _understoodExtensions = {
 /// Recognized critical-extension policy. Actual enforcement for imported
 /// trust anchors (rather than chain members) still needs platform evidence
 /// before this internal parser is exposed to users; others are refused.
+// Critical rules MailBurrow can't confirm the platforms enforce on an
+// imported trust anchor (name constraints, policy constraints, policies,
+// inhibitAnyPolicy, extended key usage) are refused rather than trusted.
 const _criticalAllowed = {
-  '2.5.29.15',
-  '2.5.29.17',
-  '2.5.29.19',
-  '2.5.29.30',
-  '2.5.29.32',
-  '2.5.29.36',
-  '2.5.29.37',
-  '2.5.29.54',
+  '2.5.29.15', // keyUsage
+  '2.5.29.17', // subjectAltName
+  '2.5.29.19', // basicConstraints
 };
 
 // ---- Certificate -------------------------------------------------------------------

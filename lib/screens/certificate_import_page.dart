@@ -239,14 +239,17 @@ class _CertificateImportPageState extends State<CertificateImportPage> {
           childrenPadding: EdgeInsets.only(bottom: 8),
           expandedCrossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _Help('step-ca', 'Run: step ca root root_ca.crt'),
+            _Help(
+              'step-ca',
+              'Run: step ca root root_ca.crt. On the CA host, it is certs/root_ca.crt in the folder shown by step path.',
+            ),
             _Help(
               'OPNsense',
-              'System › Trust › Authorities, then export the CA certificate.',
+              'System › Trust › Authorities, then download the certificate (not the key).',
             ),
             _Help(
               'TrueNAS',
-              'Credentials › Certificates › Certificate Authorities, then download it.',
+              'Credentials › Certificates, then download your CA under Certificate Authorities. Menu names vary between versions.',
             ),
             _Help(
               'Self-signed server',
@@ -346,7 +349,7 @@ class _CertificateImportPageState extends State<CertificateImportPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  "Compare it with the fingerprint from your server's console or admin page, never from this connection. For step-ca: step certificate fingerprint root_ca.crt",
+                  "Compare it with the fingerprint from your server's console or admin page, never from this connection. Case and colons don't matter. For step-ca: step certificate fingerprint root_ca.crt",
                   style: theme.textTheme.bodySmall,
                 ),
               ],
