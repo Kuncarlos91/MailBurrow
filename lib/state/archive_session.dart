@@ -1114,6 +1114,12 @@ class ArchiveSession extends ChangeNotifier {
     return true;
   }
 
+  /// The saved archive [id]'s own certificate (DER), or null when it uses
+  /// default trust. Throws [SavedCertificateUnavailable] when the saved
+  /// record can't be used, and [SavedArchiveMissing] when [id] is gone.
+  Future<List<int>?> savedCertificate(String id) async =>
+      (await _store.connection(id)).certificate;
+
   String _savedCertificateMessage(SavedCertificateUnavailable failure) =>
       "This archive's own certificate can't be used: ${failure.message} "
       "MailBurrow didn't connect without it. Replace or remove it under "

@@ -1,9 +1,11 @@
 import Flutter
 import UIKit
+import UniformTypeIdentifiers
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private let savedFiles = SavedAttachmentAccess()
+  private let certificatePicker = CertificatePicker()
 
   override func application(
     _ application: UIApplication,
@@ -40,6 +42,72 @@ import UIKit
       }
     }
     AppLockPrivacyCover.shared.observe()
+    let certificateChannel = FlutterMethodChannel(
+      name: "mailburrow/certificate_picker",
+      binaryMessenger: engineBridge.applicationRegistrar.messenger()
+    )
+    certificateChannel.setMethodCallHandler { [weak self] call, result in
+      guard let self = self else { return result(["status": "unavailable"]) }
+      self.certificatePicker.handle(call, result: result)
+    }
+  }
+}
+
+// Certificate import: open the original document (no copy into the app),
+// read at most limit + 1 bytes under temporary security-scoped access, then
+// release it. Nothing about the file is kept or logged.
+private final class CertificatePicker: NSObject, UIDocumentPickerDelegate {
+  private var pending: FlutterResult?
+  private var limit = 0
+
+  private var presenter: UIViewController? {
+    let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+    var controller = scenes.filter { $0.activationState == .foregroundActive }
+      .flatMap { $0.windows }.first { $0.isKeyWindow }?.rootViewController
+    while let presented = controller?.presentedViewController { controller = presented }
+    return controller
+  }
+
+  func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+    guard call.method == "pick" else { return result(FlutterMethodNotImplemented) }
+    let args = call.arguments as? [String: Any] ?? [:]
+    let requested = args["limit"] as? Int ?? 0
+    guard pending == nil, requested > 0, let controller = presenter else {
+      return result(["status": "unavailable"])
+    }
+    pending = result
+    limit = requested
+    let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.item], asCopy: false)
+    picker.delegate = self
+    picker.allowsMultipleSelection = false
+    controller.present(picker, animated: true)
+  }
+
+  func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+    guard let completion = pending else { return }
+    pending = nil
+    guard let url = urls.first else { return completion(["status": "cancelled"]) }
+    let maximum = limit
+    DispatchQueue.global(qos: .userInitiated).async {
+      let scoped = url.startAccessingSecurityScopedResource()
+      defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+      var reply: [String: Any] = ["status": "unreadable"]
+      if let handle = try? FileHandle(forReadingFrom: url) {
+        defer { try? handle.close() }
+        if let data = try? handle.read(upToCount: maximum + 1) {
+          reply = data.count > maximum
+            ? ["status": "too_large"]
+            : ["status": "picked", "bytes": FlutterStandardTypedData(bytes: data)]
+        }
+      }
+      DispatchQueue.main.async { completion(reply) }
+    }
+  }
+
+  func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+    let completion = pending
+    pending = nil
+    completion?(["status": "cancelled"])
   }
 }
 

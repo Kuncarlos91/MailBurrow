@@ -31,6 +31,17 @@ class PublicPagesTests(unittest.TestCase):
         self.assertIn("block screenshots", files["index.html"])
         self.assertIn("doesn't encrypt anything", files["setup.html"])
 
+    def test_own_certificate_is_described_with_its_limits(self):
+        files = public_files(self.contact)
+        for name in ("index.html", "setup.html", "privacy.html"):
+            page = files[name]
+            self.assertIn('id="own-certificate"', page)
+            self.assertIn("versions after 0.6.0", page)
+        self.assertIn("never offers to skip them", files["index.html"])
+        self.assertIn("Revocation isn't checked", files["setup.html"])
+        self.assertIn("don't install an older version", files["setup.html"])
+        self.assertIn("keeps no copy of the file", files["privacy.html"])
+
     def test_bichon_setup_and_privacy_state_the_release_boundary(self):
         files = public_files(self.contact)
         setup, privacy = files["setup.html"], files["privacy.html"]
@@ -147,7 +158,7 @@ class PublicPackageTests(unittest.TestCase):
     def test_setup_page_keeps_the_service_boundary_and_safety_rules(self):
         setup = self.files["setup.html"]
         for phrase in ("Api__Enabled", "2607.3 or later", "inherits the permissions of the user who creates it",
-                       "Self-signed certificates don't work", "No redirects.", "tailscale serve --bg 30315",
+                       "Versions after 0.6.0 can also use", "No redirects.", "tailscale serve --bg 30315",
                        "Never paste it into chats", "Try the demo", "is not the official Mail-Archiver or Tailscale app"):
             self.assertIn(phrase, setup)
         for name in ("index.html", "setup.html", "privacy.html"):

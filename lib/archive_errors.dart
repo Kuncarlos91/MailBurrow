@@ -64,7 +64,7 @@ String readableError(Object error) {
     };
   }
   if (error is HandshakeException) {
-    return 'The server certificate could not be verified. Check the HTTPS server configuration.';
+    return "MailBurrow couldn't verify the server's certificate and stopped. The certificate may come from your own certificate authority or be self-signed, may not match this address, or may be outside its validity dates.";
   }
   if (error is TimeoutException) {
     return 'The server took too long to respond. Check your connection and retry.';

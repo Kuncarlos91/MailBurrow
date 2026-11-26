@@ -44,7 +44,7 @@ Android 0.5.0 was tested with Mail-Archiver 2611.2, Open Archiver 0.6.2 and Bich
 MailBurrow is a client for an archive you run yourself. It is not a hosted email service and does not connect to Gmail or any mailbox with your email password.
 
 1. A [Mail-Archiver](https://github.com/s1t5/mail-archiver) server with API access turned on, an [Open Archiver](https://github.com/LogicLabs-OU/OpenArchiver) 0.6.2 server, or a [Bichon](https://github.com/rustmailer/bichon) 2.4.2 Community server, with your archived mail. TrueNAS is one way to host them, but not a requirement.
-2. An **HTTPS address with a valid certificate** for that server, and an API key created on it (for Bichon, an access token for a read-only user).
+2. An **HTTPS address with a valid certificate** for that server, and an API key created on it (for Bichon, an access token for a read-only user). A publicly trusted certificate (Tailscale Serve, Let's Encrypt) is easiest; versions after 0.6.0 can also trust [your own certificate authority or a self-signed certificate](docs/setup-guide.md#your-own-certificate) for one archive.
 3. If your server is only reachable through **Tailscale**, your own Tailscale account with the Tailscale app connected on your phone. Any other working HTTPS setup is fine too.
 
 The [setup guide](docs/setup-guide.md) explains how the pieces fit together and the exact settings for Mail-Archiver, Open Archiver, Bichon, TrueNAS and Tailscale. The project does not host servers, provide accounts or set up private networks. Server permissions, retention, logs and backups are up to you or your server administrator.
@@ -100,6 +100,7 @@ Your server address and key are saved in the device's secure storage. Never send
 - **Bounded downloads:** response sizes, attachment sizes and request times are capped.
 - **Careful with content:** remote images don't load automatically, links ask before opening, and risky attachment types get a warning.
 - **No analytics or crash reporting.** Your server may still keep its own access logs.
+- **Your own certificate** (versions after 0.6.0): trust a home certificate authority or a self-signed server certificate for one archive, after checking its fingerprint. Certificate checks stay on; MailBurrow never offers to skip them.
 - **Optional app lock** (after 0.5.0): ask for your fingerprint, face or device screen lock to open the app, and hide it in the recent-apps screen. It controls access to the app on your phone; it doesn't encrypt anything or block screenshots.
 
 Details are in the [privacy notice](PRIVACY.md). To report a security problem privately, see [SECURITY.md](SECURITY.md). For app help, use the [support and privacy contact](docs/security/public-contacts.md#support-and-privacy).

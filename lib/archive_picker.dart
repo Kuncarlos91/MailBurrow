@@ -9,7 +9,9 @@ const addArchiveChoice = '';
 /// labels can be told apart.
 String archiveDetails(ConnectionProfile profile) {
   final host = Uri.tryParse(profile.server)?.host ?? '';
-  return '${profile.serverType.label} · ${host.isEmpty ? profile.server : host}';
+  final place = host.isEmpty ? profile.server : host;
+  return '${profile.serverType.label} · $place'
+      '${profile.ownCertificate ? ' · Own certificate' : ''}';
 }
 
 /// Lists the saved archives. Returns the chosen profile ID,

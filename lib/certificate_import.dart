@@ -155,13 +155,25 @@ class CertificateRejected extends CertificateImportResult {
 /// This classifies and screens input; it does not decide whether a server is
 /// trusted. Chain, hostname and validity checks at connection time stay with
 /// the TLS engine. Never throws for bad input.
-CertificateImportResult readCertificateFile(List<int> bytes, {DateTime? now}) {
+///
+/// [checkValidity] false is for showing an already saved certificate in
+/// settings, where an expired one must still be described; imports always
+/// check validity.
+CertificateImportResult readCertificateFile(
+  List<int> bytes, {
+  DateTime? now,
+  bool checkValidity = true,
+}) {
   if (bytes.length > certificateImportByteLimit) {
     return const CertificateRejected(CertificateRejection.tooLarge);
   }
   try {
     final der = _extractDer(Uint8List.fromList(bytes));
-    final details = _parse(der, (now ?? DateTime.now()).toUtc());
+    final details = _parse(
+      der,
+      (now ?? DateTime.now()).toUtc(),
+      checkValidity: checkValidity,
+    );
     try {
       SecurityContext(
         withTrustedRoots: false,
@@ -603,7 +615,11 @@ const _criticalAllowed = {
 
 // ---- Certificate -------------------------------------------------------------------
 
-CertificateDetails _parse(Uint8List der, DateTime now) {
+CertificateDetails _parse(
+  Uint8List der,
+  DateTime now, {
+  bool checkValidity = true,
+}) {
   final cert = _readTlv(der, 0, der.length);
   if (cert.headerStart != 0 || cert.end != der.length) throw _bad;
   final top = _expect(cert, 0x30).children();
@@ -717,8 +733,10 @@ CertificateDetails _parse(Uint8List der, DateTime now) {
     throw const _Reject(CertificateRejection.caIssuedServerCertificate);
   }
 
-  if (now.isAfter(notAfter)) throw const _Reject(CertificateRejection.expired);
-  if (now.isBefore(notBefore)) {
+  if (checkValidity && now.isAfter(notAfter)) {
+    throw const _Reject(CertificateRejection.expired);
+  }
+  if (checkValidity && now.isBefore(notBefore)) {
     throw const _Reject(CertificateRejection.notYetValid);
   }
 

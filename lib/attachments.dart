@@ -325,7 +325,7 @@ class _MessageAttachmentsState extends State<MessageAttachments> {
               : error is ArchiveFailure
               ? readableError(error)
               : error is HandshakeException
-              ? 'The server certificate could not be verified. Check the HTTPS server configuration.'
+              ? "MailBurrow couldn't verify the server's certificate and stopped. The certificate may come from your own certificate authority or be self-signed, may not match this address, or may be outside its validity dates."
               : error is TimeoutException || error is SocketException
               ? 'The download connection failed or timed out. Check your private network and retry.'
               : phase == 'save'

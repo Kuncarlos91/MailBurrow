@@ -47,7 +47,7 @@
       <tbody>
         <tr><td><a href="https://github.com/s1t5/mail-archiver">Mail-Archiver</a> <strong>2607.3 or later</strong>, or <a href="https://github.com/LogicLabs-OU/OpenArchiver">Open Archiver</a> <strong>0.6.2</strong>, or <a href="https://github.com/rustmailer/bichon">Bichon</a> <strong>2.4.2 Community</strong></td><td>Yes, at least one</td><td>Archives your mail and provides the API. Mail-Archiver's API is <strong>off by default</strong>. Other Open Archiver and Bichon versions, and Bichon Pro/Enterprise, haven't been tested.</td></tr>
         <tr><td>An API key (Bichon: an access token) for that server</td><td>Yes</td><td>Lets the app read the archive with its user's permissions.</td></tr>
-        <tr><td>An HTTPS address with a <strong>trusted certificate</strong></td><td>Yes</td><td>For example <code>https://archive.example.ts.net</code>. Self-signed certificates don't work.</td></tr>
+        <tr><td>An HTTPS address with a <strong>trusted certificate</strong></td><td>Yes</td><td>For example <code>https://archive.example.ts.net</code>. A publicly trusted certificate is easiest. Versions after 0.6.0 can also use <a href="#own-certificate">your own certificate</a> from a home certificate authority or a self-signed server.</td></tr>
         <tr><td><a href="https://tailscale.com/">Tailscale</a> on the server and the phone</td><td>Recommended</td><td>Private access from anywhere, plus a free trusted certificate through Tailscale Serve.</td></tr>
         <tr><td>TrueNAS</td><td>Optional</td><td>One easy way to run either server, through its community app. Docker on any machine works too.</td></tr>
         <tr><td>Your own domain and a reverse proxy</td><td>Optional</td><td>An alternative to Tailscale for the HTTPS address.</td></tr>
@@ -149,7 +149,7 @@
     <h3 id="proxy">Option B: Your own domain with a reverse proxy</h3>
     <p>If you already run a reverse proxy such as Caddy, Nginx Proxy Manager or Traefik with Let's Encrypt certificates, add a host like <code>mail.example.com</code> that forwards to Mail-Archiver's port. Some things to watch:</p>
     <ul>
-      <li>The certificate must be publicly trusted. Let's Encrypt is fine; self-signed certificates and private certificate authorities aren't supported.</li>
+      <li>A publicly trusted certificate, such as Let's Encrypt, works as it is. For a private certificate authority or a self-signed certificate, see <a href="#own-certificate">Your own certificate</a> (versions after 0.6.0).</li>
       <li><strong>No redirects.</strong> MailBurrow doesn't follow redirects, so its key is never sent anywhere unexpected. Use the final address, and don't put a login page or single sign-on in front of <code>/api/</code>.</li>
       <li>If Mail-Archiver lives under a path such as <code>https://example.com/mail</code>, enter that full address in the app; the path is kept.</li>
       <li>If the address is reachable from the internet, your archive's web interface is too. Consider keeping it private, for example with Tailscale or a VPN, and keep Mail-Archiver updated.</li>
@@ -159,7 +159,7 @@
       <thead><tr><th scope="col">Address</th><th scope="col">Why</th></tr></thead>
       <tbody>
         <tr><td><code>http://truenas:30315</code> or <code>http://100.x.y.z:30315</code></td><td>Plain HTTP. The app only connects over HTTPS.</td></tr>
-        <tr><td><code>https://192.168.1.10</code> with a self-signed certificate</td><td>The certificate isn't trusted.</td></tr>
+        <tr><td><code>https://192.168.1.10</code> with a self-signed certificate</td><td>The phone doesn't trust it. In versions after 0.6.0, add <a href="#own-certificate">your own certificate</a> to the archive; the certificate must also list that IP address.</td></tr>
         <tr><td>An address that redirects to another one</td><td>The app doesn't follow redirects. Use the final address.</td></tr>
       </tbody>
     </table></div>
@@ -204,6 +204,18 @@
     <p>Only one archive is open at a time. There's no combined inbox or search across archives.</p>
   </section>
 
+  <section id="own-certificate"><h2>Your own certificate</h2>
+    <p>In versions after 0.6.0, an archive can trust your own certificate authority (such as step-ca, OPNsense or TrueNAS) or a self-signed server certificate. Tailscale Serve or a publicly trusted certificate is still the easiest path.</p>
+    <ul>
+      <li><strong>Which file:</strong> your CA's root certificate as a <code>.pem</code>, <code>.crt</code> or <code>.cer</code> file, or a self-signed server's own certificate. Server certificates issued by your CA, private keys, bundles, <code>.p12</code> files, SHA-1 or MD5 signatures and RSA keys under 2048 bits are refused.</li>
+      <li><strong>Where to find it:</strong> step-ca: <code>step ca root root_ca.crt</code>. OPNsense: <strong>System &rsaquo; Trust &rsaquo; Authorities</strong>, export. TrueNAS: <strong>Credentials &rsaquo; Certificates &rsaquo; Certificate Authorities</strong>, download.</li>
+      <li><strong>Add it:</strong> in setup, enter the address, then tap <strong>Use your own certificate</strong> under Advanced (or after Connect can't verify the certificate). Choose the file, compare its SHA-256 fingerprint with the one your server shows (step-ca: <code>step certificate fingerprint root_ca.crt</code>), then tap <strong>Trust and connect</strong>.</li>
+      <li><strong>What it changes:</strong> it is trusted for that archive only, in addition to the public authorities. The server's certificate must still be valid and match the address. It doesn't change your phone's settings or other archives.</li>
+      <li><strong>Later:</strong> <strong>Settings &rarr; Archives &rarr; &#8942; &rarr; Certificate</strong> shows, replaces or removes it, with a warning 30 days before it expires.</li>
+    </ul>
+    <p>Revocation isn't checked: if your CA's key is exposed, remove the certificate and replace the archive's key on your server. Once an archive has its own certificate, 0.6.0 and earlier can't read any saved archive, so don't install an older version.</p>
+  </section>
+
   <section id="app-lock"><h2>App lock</h2>
     <p>In versions after 0.5.0. Off until you turn it on.</p>
     <ul>
@@ -221,7 +233,7 @@
       <tbody>
         <tr><td>Enter a valid HTTPS server address&hellip;</td><td>The address has <code>http://</code>, a username and password, a query or a fragment</td><td>Enter just the host name, or <code>https://</code> plus host name and optional path</td></tr>
         <tr><td>Unable to connect. Check your HTTPS address and private network.</td><td>Tailscale is off on the phone, the address is wrong, or Serve or the proxy isn't running</td><td>Turn on Tailscale, open the address in the phone's browser, check <code>tailscale serve status</code></td></tr>
-        <tr><td>The server certificate could not be verified.</td><td>Self-signed or untrusted certificate</td><td>Use Tailscale Serve or a Let's Encrypt certificate</td></tr>
+        <tr><td>MailBurrow couldn't verify the server's certificate and stopped. (0.6.0 and earlier: The server certificate could not be verified.)</td><td>Your own CA or a self-signed certificate, a certificate that doesn't match the address, an expired certificate, or a wrong date on the phone</td><td>Check the phone's date. Use Tailscale Serve or a Let's Encrypt certificate, or (versions after 0.6.0) <a href="#own-certificate">your own certificate</a></td></tr>
         <tr><td>Your API key was not accepted.</td><td>Key mistyped, expired or revoked, or its user is inactive</td><td>Create a new key and enter it again; for a saved archive, use <strong>Enter a new key</strong></td></tr>
         <tr><td>This source keeps full original messages&hellip;</td><td>The Open Archiver source has Preserve Original File turned on</td><td>Read it on Open Archiver's website; MailBurrow doesn't open those messages</td></tr>
         <tr><td>Archive API or message unavailable.</td><td>Mail-Archiver's API isn't enabled or it's older than 2607.3, the wrong server type is chosen, the address points at the wrong service, or the message is outside the key's accounts or sources</td><td>Check the server type, <code>Api__Enabled=true</code> and the version, then the address</td></tr>

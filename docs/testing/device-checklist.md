@@ -13,4 +13,13 @@ Use harmless synthetic messages/files and report Pass/Fail/Not tested with model
 7. Largest text, landscape, navigation bars/notches, keyboard, iPad split view, light/dark mode, screen-reader labels and reachable controls.
 8. Demo mode: tap Try the demo with no network connected. Browse, search, filter, switch the three accounts, open the long and complex messages, and save and open an attachment. The banner shows on every screen, including Connection settings and the reader, and at the largest text it stays a compact bar. Exit from the banner, from Settings and from the reader; a previously saved real connection still restores. Relaunching never opens the demo.
 9. App lock (versions after 0.5.0): turn it on (biometric, and device PIN/pattern/passcode fallback); change the timing; Home and return for immediately and for the 1-minute grace (short and long away); cancel the prompt (stays locked, no automatic re-prompt); recent-apps preview blank; swipe away and reopen (locked); save an attachment within the grace period; turn it off (cancel keeps it on). On iOS also check Face ID and the app-switcher snapshot.
-10. Before public binaries also verify signed update, OS restart, missing viewer/deleted copy, low storage, real transport cancellation/timeouts, startup/memory and exact artifact metadata/notices. Host mocks do not establish these results.
+10. Own certificate (versions after 0.6.0), with fictional lab certificates only:
+    - Connect to a private-CA server: it fails, then **Use your own certificate** offers the flow. Pick the root, compare the fingerprint, **Trust and connect**.
+    - Restart, switch away and back; it still connects. A second archive on another server isn't affected.
+    - Refusals: a CA-issued server certificate, a key file, a two-certificate file and an expired file are each refused with their message.
+    - A short-lived self-signed certificate shows the warning.
+    - Replace and remove under Archives › ⋮ › Certificate. Remove makes the private-CA server fail again.
+    - A wrong-hostname server is refused even with the CA trusted.
+    - Cancel the picker and back out of step 2.
+    - On iOS also check the document picker and Files providers.
+11. Before public binaries also verify signed update, OS restart, missing viewer/deleted copy, low storage, real transport cancellation/timeouts, startup/memory and exact artifact metadata/notices. Host mocks do not establish these results.

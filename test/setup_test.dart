@@ -10,7 +10,13 @@ void main() {
     await tester.pumpWidget(const MailShelfPreview());
     await tester.pumpAndSettle();
     expect(find.text('Connect to archive'), findsOneWidget);
-    expect(find.text('MailBurrow'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.text('MailBurrow'),
+      ),
+      findsOneWidget,
+    );
     await tester.scrollUntilVisible(
       find.text('Support'),
       120,
