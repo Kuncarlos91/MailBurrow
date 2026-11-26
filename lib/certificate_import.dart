@@ -599,12 +599,9 @@ const _understoodExtensions = {
   '1.3.6.1.4.1.11129.2.4.2', // certificate transparency SCTs
 };
 
-/// Recognized critical-extension policy. Actual enforcement for imported
-/// trust anchors (rather than chain members) still needs platform evidence
-/// before this internal parser is exposed to users; others are refused.
-// Critical rules MailBurrow can't confirm the platforms enforce on an
-// imported trust anchor (name constraints, policy constraints, policies,
-// inhibitAnyPolicy, extended key usage) are refused rather than trusted.
+// Refuse unproven critical anchor rules at import. Basic Constraints is
+// parsed below, but its pathLen constraint is not enforced for a trust
+// anchor by the host engine; that remains a release blocker.
 const _criticalAllowed = {
   '2.5.29.15', // keyUsage
   '2.5.29.17', // subjectAltName

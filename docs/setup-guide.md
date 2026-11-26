@@ -243,12 +243,15 @@ From version 0.6.0, an archive can trust your own certificate authority (CA), su
 **Which file to choose:** your CA's **root certificate**, as a `.pem`, `.crt` or `.cer` file (PEM or DER). For a self-signed server, the server's own certificate file. MailBurrow refuses:
 - a server certificate issued by your CA, because those renew often (daily with step-ca);
 - files containing a private key, bundles with several certificates, `.p12` files;
-- certificates signed with SHA-1 or MD5, or with RSA keys under 2048 bits.
+- certificates signed with SHA-1 or MD5, or with RSA keys under 2048 bits;
+- critical name constraints, certificate policies, policy constraints, inhibit-any-policy or extended key usage that the app cannot safely enforce for imported trust. Don't remove security rules to make a certificate import.
 
 **Where to find it:**
 - **step-ca:** `step ca root root_ca.crt` from a computer set up for your CA. On the CA host itself, the file is `certs/root_ca.crt` in the folder shown by `step path`.
 - **OPNsense:** **System › Trust › Authorities**, then the download button on your CA's row, choosing the certificate (not the key).
-- **TrueNAS:** **Credentials › Certificates**, then the download icon for your CA under **Certificate Authorities**. Menu names vary between TrueNAS versions; newer ones put it in the row's **⋮** menu.
+- **TrueNAS:** versions with built-in CA management (for example 25.04) have **Credentials › Certificates › Certificate Authorities** and a CA download icon. If your version only manages imported certificates, obtain the root from the CA administrator instead. Export the CA certificate, never its private key or a server certificate issued by that CA.
+
+See the upstream [step-ca root command](https://github.com/smallstep/docs/blob/main/step-cli/reference/ca/root/README.mdx), [OPNsense certificate guide](https://github.com/opnsense/docs/blob/master/source/manual/certificates.rst), and [TrueNAS 25.04 CA screen](https://github.com/truenas/documentation/blob/25.04/content/SCALEUIReference/Credentials/Certificates/CAScreensSCALE.md). Menu availability varies by version.
 
 Copy the file to your phone, for example to Files or Downloads.
 

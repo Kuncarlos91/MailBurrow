@@ -249,7 +249,7 @@ class _CertificateImportPageState extends State<CertificateImportPage> {
             ),
             _Help(
               'TrueNAS',
-              'Credentials › Certificates, then download your CA under Certificate Authorities. Menu names vary between versions.',
+              'On versions with a Certificate Authorities section: Credentials › Certificates, then download the CA certificate. Otherwise get the root from the CA administrator; never choose a private key.',
             ),
             _Help(
               'Self-signed server',
