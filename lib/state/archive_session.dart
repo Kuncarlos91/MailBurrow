@@ -1050,12 +1050,12 @@ class ArchiveSession extends ChangeNotifier {
   bool _changingCertificate = false;
 
   /// Trusts [der] as the saved archive [id]'s own certificate, or goes back
-  /// to default trust when [der] is null. The affected open connection is closed before storage
-  /// changes; once saved it is reopened, so the next
+  /// to default trust when [der] is null. The affected open connection is
+  /// closed before storage changes; once saved it is reopened, so the next
   /// request uses the new trust and no old connection is reused. Returns
-  /// false when the save fails or the session is not ready. Failed saves
-  /// preserve the previous saved record; the old connection stays closed for Retry.
-  /// True reports a saved change, not a successful subsequent TLS connection.
+  /// false when the save fails or the session is not ready. A failed save
+  /// keeps the previous saved record, and the old connection stays closed
+  /// for Retry. True reports a saved change, not a successful connection.
   Future<bool> setArchiveCertificate(String id, List<int>? der) async {
     if (_disposed || !canSwitchArchive) return false;
     final open = api != null && id == activeArchiveId;
