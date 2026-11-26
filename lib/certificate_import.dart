@@ -600,8 +600,9 @@ const _understoodExtensions = {
 };
 
 // Refuse unproven critical anchor rules at import. Basic Constraints is
-// parsed below, but its pathLen constraint is not enforced for a trust
-// anchor by the host engine; that remains a release blocker.
+// parsed below. The TLS engine enforces path-length limits on
+// intermediates but not an imported root's own limit; that is disclosed in
+// the setup guide and pinned by test/archive_trust_test.dart.
 const _criticalAllowed = {
   '2.5.29.15', // keyUsage
   '2.5.29.17', // subjectAltName
