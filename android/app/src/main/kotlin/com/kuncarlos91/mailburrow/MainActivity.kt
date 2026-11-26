@@ -36,6 +36,9 @@ class MainActivity : FlutterFragmentActivity() {
     private val savedTypes = SavedAttachmentTypes()
     private val retainedReadUris = mutableSetOf<Uri>()
     private var diagnosticsEnabled = false
+    private var pendingCertificate: MethodChannel.Result? = null
+    private var certificateLimit = 0
+    private var certificateReading = false
 
     // Diagnostic builds opt in; events are fixed categories, never user values.
     private fun trace(event: String) {
@@ -99,11 +102,40 @@ class MainActivity : FlutterFragmentActivity() {
                 else -> result.notImplemented()
             }
         }
+        // Certificate import: the system document picker, then a bounded read
+        // of the original document. No copy, no persisted URI grant, no log.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "mailburrow/certificate_picker").setMethodCallHandler { call, result ->
+            when (call.method) {
+                "pick" -> {
+                    val limit = call.argument<Int>("limit") ?: 0
+                    if (pendingCertificate != null || pendingSave != null || pendingLocate != null) {
+                        result.error("busy", "A file picker is already open.", null)
+                    } else if (limit <= 0 || limit > 65536) {
+                        result.error("invalid_limit", "Invalid size limit.", null)
+                    } else {
+                        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            // Certificate MIME types are reported inconsistently.
+                            type = "*/*"
+                        }
+                        pendingCertificate = result
+                        certificateLimit = limit
+                        try {
+                            startActivityForResult(intent, 7403)
+                        } catch (_: Exception) {
+                            pendingCertificate = null
+                            result.success(mapOf("status" to "unavailable"))
+                        }
+                    }
+                }
+                else -> result.notImplemented()
+            }
+        }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "mailshelf/saved_files").setMethodCallHandler { call, result ->
             if (call.argument<Boolean>("diagnostics") == true) diagnosticsEnabled = true
             when (call.method) {
                 "save" -> {
-                    if (pendingSave != null || pendingLocate != null) {
+                    if (pendingSave != null || pendingLocate != null || pendingCertificate != null) {
                         result.error("busy", "A save dialog is already open.", null)
                     } else {
                         val source = File(call.argument<String>("source") ?: "").canonicalFile
@@ -133,7 +165,7 @@ class MainActivity : FlutterFragmentActivity() {
                     }
                 }
                 "locate" -> {
-                    if (pendingSave != null || pendingLocate != null) {
+                    if (pendingSave != null || pendingLocate != null || pendingCertificate != null) {
                         result.error("busy", "A file picker is already open.", null)
                     } else {
                         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
@@ -196,6 +228,41 @@ class MainActivity : FlutterFragmentActivity() {
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == 7403) {
+            val result = pendingCertificate ?: return
+            if (certificateReading) return
+            val uri = data?.data
+            if (resultCode != Activity.RESULT_OK || uri == null) {
+                pendingCertificate = null
+                result.success(mapOf("status" to "cancelled"))
+                return
+            }
+            val limit = certificateLimit
+            certificateReading = true
+            Thread {
+                val reply: Map<String, Any> = try {
+                    val input = contentResolver.openInputStream(uri) ?: throw java.io.IOException()
+                    input.use { stream ->
+                        // Read at most limit + 1 bytes, so an oversized file is
+                        // detected without loading it.
+                        val buffer = ByteArray(limit + 1)
+                        var total = 0
+                        while (total < buffer.size) {
+                            val read = stream.read(buffer, total, buffer.size - total)
+                            if (read < 0) break
+                            if (read == 0) throw java.io.IOException()
+                            total += read
+                        }
+                        if (total > limit) mapOf("status" to "too_large")
+                        else mapOf("status" to "picked", "bytes" to buffer.copyOf(total))
+                    }
+                } catch (_: Exception) {
+                    mapOf("status" to "unreadable")
+                }
+                runOnUiThread { certificateReading = false; pendingCertificate = null; result.success(reply) }
+            }.start()
+            return
+        }
         if (requestCode == 7402) {
             val result = pendingLocate ?: return
             pendingLocate = null

@@ -121,12 +121,28 @@ class ArchiveApi implements ArchiveBackend, CancellableMessageBackend {
   // One client per connection lets API calls reuse TLS connections.
   // Attachment downloads keep their own client in [_clients].
   HttpClient? _apiClient;
+  Timer? _trustExpiryTimer;
+
+  void _validateTrust() {
+    final configured = trust;
+    if (configured == null) return;
+    try {
+      configured.validateForRequest();
+      _trustExpiryTimer ??= Timer(configured.remainingValidity, close);
+    } catch (_) {
+      close();
+      rethrow;
+    }
+  }
+
   final _calls = <_ApiCall>{};
   final _clients = <HttpClient>{};
   bool _closed = false;
 
   @override
   void close() {
+    _trustExpiryTimer?.cancel();
+    _trustExpiryTimer = null;
     _closed = true;
     for (final call in _calls.toList()) {
       call.cancel();
@@ -201,6 +217,7 @@ class ArchiveApi implements ArchiveBackend, CancellableMessageBackend {
     final load = MessageLoad.current;
     load?.throwIfCancelled();
     validateServer(server.toString());
+    _validateTrust();
     final client = _apiClient ??= createArchiveHttpClient(_context);
     final call = _ApiCall(isMail: isMailRequest(path));
     _calls.add(call);
@@ -219,9 +236,7 @@ class ArchiveApi implements ArchiveBackend, CancellableMessageBackend {
         return request;
       }
 
-      final request = await call.guard(
-        open().timeout(archiveConnectTimeout),
-      );
+      final request = await call.guard(open().timeout(archiveConnectTimeout));
       request.followRedirects = false;
       authorize(request);
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
@@ -267,7 +282,8 @@ class ArchiveApi implements ArchiveBackend, CancellableMessageBackend {
   }
 
   @override
-  Future<ArchiveStats> stats() async => ArchiveStats.fromJson(await get('stats'));
+  Future<ArchiveStats> stats() async =>
+      ArchiveStats.fromJson(await get('stats'));
   @override
   Future<List<ArchiveFolder>> folders(String id) async => flattenFolders(
     await get('accounts/${_mailArchiverId(id)}/folders') as List<dynamic>,
@@ -328,6 +344,7 @@ class ArchiveApi implements ArchiveBackend, CancellableMessageBackend {
   }) async {
     if (_closed) throw StateError('Archive connection closed');
     validateServer(server.toString());
+    _validateTrust();
     if (url.scheme != server.scheme ||
         url.host != server.host ||
         url.port != server.port ||

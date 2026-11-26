@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../archive_picker.dart';
+import 'certificate_settings_page.dart';
 import '../state/archive_session.dart';
 import '../state/connection_store.dart';
 
-enum _ArchiveAction { rename, change, forget }
+enum _ArchiveAction { rename, change, certificate, forget }
 
 /// Settings → Archives: open, rename, change the address and key or token
 /// of, or forget each saved archive, and add another. Opening uses the same
@@ -87,6 +88,10 @@ class ArchivesPage extends StatelessWidget {
                                   ),
                                 ),
                                 const PopupMenuItem(
+                                  value: _ArchiveAction.certificate,
+                                  child: Text('Certificate'),
+                                ),
+                                const PopupMenuItem(
                                   value: _ArchiveAction.forget,
                                   child: Text('Forget on this device'),
                                 ),
@@ -110,7 +115,7 @@ class ArchivesPage extends StatelessWidget {
               const Padding(
                 padding: EdgeInsets.all(16),
                 child: Text(
-                  'Tap an archive to switch to it. Use ⋮ to rename, change or forget it.\n\nArchives are saved only on this device. Forgetting one removes its address and API key or access token here; it does not change mail on the server or revoke the key or token.',
+                  'Tap an archive to switch to it. Use ⋮ to rename, change, set its own certificate or forget it.\n\nArchives are saved only on this device. Forgetting one removes its address and API key or access token here; it does not change mail on the server or revoke the key or token.',
                 ),
               ),
             ],
@@ -139,6 +144,13 @@ class ArchivesPage extends StatelessWidget {
       case _ArchiveAction.change:
         Navigator.pop(context);
         session.openReconfigure(profile.id);
+      case _ArchiveAction.certificate:
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) =>
+                CertificateSettingsPage(session: session, profile: profile),
+          ),
+        );
       case _ArchiveAction.forget:
         final open = profile.id == session.activeArchive?.id;
         final confirmed = await showDialog<bool>(
