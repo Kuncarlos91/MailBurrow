@@ -21,5 +21,8 @@ Use harmless synthetic messages/files and report Pass/Fail/Not tested with model
     - Replace and remove under Archives › ⋮ › Certificate. Remove makes the private-CA server fail again.
     - A wrong-hostname server is refused even with the CA trusted.
     - Cancel the picker and back out of step 2.
-    - On iOS also check the document picker and Files providers.
+    - Change the setup destination or server type while import is pending: its result cannot trust or connect to the changed destination. Lock the app while the picker reads: no confirmation or save starts under the lock.
+    - Let a synthetic imported certificate expire between choosing and confirming, and while an API/attachment request is active. Confirmation refuses it; active requests stop and the pooled connection cannot send another request. Check suspension/resume and device-time changes too.
+    - Verify critical name/policy constraints and EKU on the imported anchor itself with allowed and prohibited chains. Host TLS tests do not close this release gate.
+    - On Android and iOS check local and cloud document providers: cancellation, short reads, an over-64-KiB file, a stalled provider, and repeated picks while reading. On iOS also compile the native picker before testing Files providers.
 11. Before public binaries also verify signed update, OS restart, missing viewer/deleted copy, low storage, real transport cancellation/timeouts, startup/memory and exact artifact metadata/notices. Host mocks do not establish these results.

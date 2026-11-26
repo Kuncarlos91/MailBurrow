@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -27,6 +28,8 @@ class LabServer {
   LabServer._(this._server);
   final HttpServer _server;
   int requests = 0;
+  bool holdResponses = false;
+  final received = Completer<void>();
 
   static Future<LabServer> start(LabCert server) async {
     final context = SecurityContext()
@@ -40,6 +43,8 @@ class LabServer {
     final lab = LabServer._(http);
     http.listen((request) {
       lab.requests++;
+      if (!lab.received.isCompleted) lab.received.complete();
+      if (lab.holdResponses) return;
       final response = request.response;
       if (request.uri.path.endsWith('/accounts')) {
         response.headers.contentType = ContentType.json;
@@ -237,6 +242,65 @@ void main() {
           );
         }
         expect(lab.requests, ArchiveServerType.values.length * 2);
+      },
+    );
+
+    test(
+      'anchor expiry cancels a request waiting for response headers',
+      () async {
+        final lab = await LabServer.start(leaf);
+        lab.holdResponses = true;
+        final parsed = ArchiveTrust(derOf(ca));
+        final nearExpiry = parsed.notAfter.subtract(const Duration(seconds: 1));
+        final api = ArchiveApi(
+          lab.address,
+          'synthetic-test-only',
+          trust: ArchiveTrust(derOf(ca), clock: () => nearExpiry),
+        );
+        addTearDown(() async {
+          api.close();
+          await lab.close();
+        });
+        final cancelled = expectLater(
+          api.accounts().timeout(const Duration(seconds: 3)),
+          throwsA(
+            isA<HttpException>().having(
+              (e) => e.message,
+              'message',
+              'Request cancelled',
+            ),
+          ),
+        );
+        await lab.received.future.timeout(const Duration(seconds: 2));
+        await cancelled;
+        expect(lab.requests, 1);
+        await expectLater(api.accounts(), throwsStateError);
+      },
+    );
+
+    test(
+      'an expired imported anchor cannot reuse the pooled API client',
+      () async {
+        final lab = await LabServer.start(leaf);
+        var now = DateTime.now().toUtc();
+        final trust = ArchiveTrust(derOf(ca), clock: () => now);
+        final api = ArchiveApi(
+          lab.address,
+          'synthetic-test-only',
+          trust: trust,
+        );
+        addTearDown(() async {
+          api.close();
+          await lab.close();
+        });
+        expect(await api.accounts(), isEmpty);
+        now = trust.notAfter.add(const Duration(seconds: 1));
+        await expectLater(api.accounts(), throwsA(isA<HandshakeException>()));
+        expect(
+          lab.requests,
+          1,
+          reason: 'no request/auth after imported-anchor expiry',
+        );
       },
     );
 

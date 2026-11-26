@@ -38,6 +38,7 @@ class MainActivity : FlutterFragmentActivity() {
     private var diagnosticsEnabled = false
     private var pendingCertificate: MethodChannel.Result? = null
     private var certificateLimit = 0
+    private var certificateReading = false
 
     // Diagnostic builds opt in; events are fixed categories, never user values.
     private fun trace(event: String) {
@@ -109,7 +110,7 @@ class MainActivity : FlutterFragmentActivity() {
                     val limit = call.argument<Int>("limit") ?: 0
                     if (pendingCertificate != null || pendingSave != null || pendingLocate != null) {
                         result.error("busy", "A file picker is already open.", null)
-                    } else if (limit <= 0) {
+                    } else if (limit <= 0 || limit > 65536) {
                         result.error("invalid_limit", "Invalid size limit.", null)
                     } else {
                         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
@@ -229,13 +230,15 @@ class MainActivity : FlutterFragmentActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (requestCode == 7403) {
             val result = pendingCertificate ?: return
-            pendingCertificate = null
+            if (certificateReading) return
             val uri = data?.data
             if (resultCode != Activity.RESULT_OK || uri == null) {
+                pendingCertificate = null
                 result.success(mapOf("status" to "cancelled"))
                 return
             }
             val limit = certificateLimit
+            certificateReading = true
             Thread {
                 val reply: Map<String, Any> = try {
                     val input = contentResolver.openInputStream(uri) ?: throw java.io.IOException()
@@ -247,6 +250,7 @@ class MainActivity : FlutterFragmentActivity() {
                         while (total < buffer.size) {
                             val read = stream.read(buffer, total, buffer.size - total)
                             if (read < 0) break
+                            if (read == 0) throw java.io.IOException()
                             total += read
                         }
                         if (total > limit) mapOf("status" to "too_large")
@@ -255,7 +259,7 @@ class MainActivity : FlutterFragmentActivity() {
                 } catch (_: Exception) {
                     mapOf("status" to "unreadable")
                 }
-                runOnUiThread { result.success(reply) }
+                runOnUiThread { certificateReading = false; pendingCertificate = null; result.success(reply) }
             }.start()
             return
         }

@@ -12,7 +12,7 @@
 <a class="skip" href="#main">Skip to content</a>
 <header><a class="brand" href="index.html">MailBurrow</a><nav aria-label="Main"><a href="index.html">Support</a><a aria-current="page" href="setup.html">Setup</a><a href="privacy.html">Privacy</a><a href="https://github.com/Kuncarlos91/MailBurrow">Source</a></nav></header>
 <main id="main" tabindex="-1">
-  <p class="notice">Updated November 17, 2026 &middot; Checked against Mail-Archiver's <a href="https://github.com/s1t5/mail-archiver/blob/main/doc/API.md">REST API guide</a>, Open Archiver 0.6.2, Bichon 2.4.2 Community, the TrueNAS Mail Archiver, Open Archiver and Tailscale apps, and Tailscale's HTTPS and Serve documentation. Menu names can change between versions.</p>
+  <p class="notice">Updated November 25, 2026 &middot; Checked against Mail-Archiver's <a href="https://github.com/s1t5/mail-archiver/blob/main/doc/API.md">REST API guide</a>, Open Archiver 0.6.2, Bichon 2.4.2 Community, the TrueNAS Mail Archiver, Open Archiver and Tailscale apps, and Tailscale's HTTPS and Serve documentation. Menu names can change between versions.</p>
   <p class="eyebrow">SETUP GUIDE</p>
   <h1>Connect MailBurrow to your archive.</h1>
   <p class="lead">Four steps: prepare your archive server, create a read-only key, give the server an HTTPS address, then connect the app.</p>
@@ -211,9 +211,9 @@
       <li><strong>Where to find it:</strong> step-ca: <code>step ca root root_ca.crt</code>. OPNsense: <strong>System &rsaquo; Trust &rsaquo; Authorities</strong>, export. TrueNAS: <strong>Credentials &rsaquo; Certificates &rsaquo; Certificate Authorities</strong>, download.</li>
       <li><strong>Add it:</strong> in setup, enter the address, then tap <strong>Use your own certificate</strong> under Advanced (or after Connect can't verify the certificate). Choose the file, compare its SHA-256 fingerprint with the one your server shows (step-ca: <code>step certificate fingerprint root_ca.crt</code>), then tap <strong>Trust and connect</strong>.</li>
       <li><strong>What it changes:</strong> it is trusted for that archive only, in addition to the public authorities. The server's certificate must still be valid and match the address. It doesn't change your phone's settings or other archives.</li>
-      <li><strong>Later:</strong> <strong>Settings &rarr; Archives &rarr; &#8942; &rarr; Certificate</strong> shows, replaces or removes it, with a warning 30 days before it expires.</li>
+      <li><strong>Later:</strong> <strong>Settings &rarr; Archives &rarr; &#8942; &rarr; Certificate</strong> shows, replaces or removes it, with a warning 30 days before it expires. At expiry, active requests stop and the archive won't connect until you replace it.</li>
     </ul>
-    <p>Revocation isn't checked: if your CA's key is exposed, remove the certificate and replace the archive's key on your server. Once an archive has its own certificate, 0.6.0 and earlier can't read any saved archive, so don't install an older version.</p>
+    <p>Revocation isn't checked: if your CA's key is exposed, remove the certificate and replace the archive's key on your server. MailBurrow checks the file you import for weak algorithms, not the certificates your CA issues later. Once an archive has its own certificate, 0.6.0 and earlier can't read any saved archive, so don't install an older version.</p>
   </section>
 
   <section id="app-lock"><h2>App lock</h2>

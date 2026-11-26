@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../certificate_import.dart';
+import '../app_lock/app_lock_gate.dart';
 import '../certificate_picker.dart';
+
+bool certificateActionsAllowed(BuildContext context) =>
+    context
+        .getInheritedWidgetOfExactType<AppLockScope>()
+        ?.notifier
+        ?.contentVisible ??
+    true;
 
 /// Shows the two-step "use your own certificate" flow for [destination]
 /// (the archive's address, shown as what the certificate will be trusted
@@ -76,7 +84,7 @@ Future<List<int>?> showCertificateImport(
   CertificateRejection.unsupportedCriticalExtension => (
     title: "This certificate has a rule MailBurrow can't check",
     body:
-        "It's marked with a critical extension MailBurrow doesn't understand, so it can't be trusted safely. Use a certificate without it.",
+        "It has a certificate rule MailBurrow cannot safely enforce for imported trust. Ask your administrator for a supported certificate; don't remove security rules just to import it.",
   ),
   CertificateRejection.caCannotSignCertificates => (
     title: "This CA isn't allowed to sign certificates",
@@ -129,12 +137,25 @@ class _CertificateImportPageState extends State<CertificateImportPage> {
   bool _reading = false;
 
   Future<void> _choose() async {
+    if (_reading || !certificateActionsAllowed(context)) return;
     setState(() {
       _reading = true;
       _problem = null;
     });
-    final pick = await widget.picker();
+    CertificatePick pick;
+    try {
+      pick = await widget.picker();
+    } catch (_) {
+      pick = const CertificatePickFailed();
+    }
     if (!mounted) return;
+    if (!certificateActionsAllowed(context)) {
+      setState(() {
+        _reading = false;
+        _details = null;
+      });
+      return;
+    }
     CertificateDetails? details;
     ({String title, String body})? problem;
     switch (pick) {
@@ -360,7 +381,21 @@ class _CertificateImportPageState extends State<CertificateImportPage> {
             const SizedBox(width: 12),
             Expanded(
               child: FilledButton(
-                onPressed: () => Navigator.of(context).pop(details.der),
+                onPressed: () {
+                  if (!certificateActionsAllowed(context)) return;
+                  final checked = readCertificateFile(
+                    details.der,
+                    now: widget.clock(),
+                  );
+                  if (checked case CertificateRejected(:final reason)) {
+                    setState(() {
+                      _details = null;
+                      _problem = certificateProblemText(reason);
+                    });
+                    return;
+                  }
+                  Navigator.of(context).pop(details.der);
+                },
                 child: Text(shortLived ? 'Trust this one' : widget.trustLabel),
               ),
             ),

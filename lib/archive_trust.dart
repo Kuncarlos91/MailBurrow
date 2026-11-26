@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'archive_api.dart' show archiveConnectTimeout;
+import 'certificate_import.dart';
 
 /// An extra certificate one saved archive trusts for HTTPS, in addition to
 /// the platform's public certificate authorities.
@@ -16,12 +17,16 @@ import 'archive_api.dart' show archiveConnectTimeout;
 /// be imported (one certificate, no private key, accepted types and
 /// algorithms) happens before an [ArchiveTrust] is created.
 class ArchiveTrust {
-  ArchiveTrust(List<int> der) : der = List.unmodifiable(der) {
+  ArchiveTrust(List<int> der, {DateTime Function()? clock})
+    : der = List.unmodifiable(der),
+      _clock = clock ?? DateTime.now {
     if (der.isEmpty) throw ArgumentError('Empty certificate');
   }
 
   /// The certificate's DER bytes.
   final List<int> der;
+  final DateTime Function() _clock;
+  Duration get remainingValidity => notAfter.difference(_clock().toUtc());
 
   String get _pem {
     final b64 = base64.encode(der);
@@ -33,10 +38,36 @@ class ArchiveTrust {
         '-----END CERTIFICATE-----\n';
   }
 
+  late final CertificateDetails _details = switch (readCertificateFile(
+    der,
+    checkValidity: false,
+  )) {
+    CertificateAccepted(:final details) => details,
+    CertificateRejected() => throw const HandshakeException(
+      'Configured certificate cannot be used.',
+    ),
+  };
+
+  DateTime get notAfter => _details.notAfter;
+
+  /// Enforce the imported anchor's dates even when a TLS engine treats
+  /// trust-anchor validity differently, including on pooled connections.
+  void validateForRequest({DateTime? now}) {
+    final instant = (now ?? _clock()).toUtc();
+    if (instant.isBefore(_details.notBefore) ||
+        !instant.isBefore(_details.notAfter)) {
+      throw const HandshakeException(
+        'Configured certificate is outside its validity period.',
+      );
+    }
+  }
+
   /// A new TLS context: the public roots plus this certificate.
-  SecurityContext createContext() =>
-      SecurityContext(withTrustedRoots: true)
-        ..setTrustedCertificatesBytes(utf8.encode(_pem));
+  SecurityContext createContext() {
+    validateForRequest();
+    return SecurityContext(withTrustedRoots: true)
+      ..setTrustedCertificatesBytes(utf8.encode(_pem));
+  }
 }
 
 /// Creates every HTTPS client MailBurrow uses to reach an archive.

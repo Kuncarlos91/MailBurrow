@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io' show HandshakeException;
 import 'dart:typed_data';
 
@@ -17,6 +18,11 @@ import 'package:mailburrow/state/connection_store.dart';
 
 import 'support/fake_archive_backend.dart';
 import 'support/lab_certs.dart';
+import 'app_lock_test.dart' as lock_support;
+import 'package:mailburrow/app_lock/app_lock_controller.dart';
+import 'package:mailburrow/app_lock/app_lock_gate.dart';
+import 'package:mailburrow/app_lock/app_lock_platform.dart';
+import 'package:mailburrow/app_lock/app_lock_settings.dart';
 
 class Entries extends SecureEntries {
   final values = <String, String>{};
@@ -113,6 +119,77 @@ void main() {
   }
 
   group('import flow', () {
+    testWidgets(
+      'confirmation rechecks expiry instead of trusting stale details',
+      (tester) async {
+        var now = DateTime.now().toUtc();
+        await tester.pumpWidget(
+          MaterialApp(
+            home: CertificateImportPage(
+              destination: 'https://archive.example',
+              trustLabel: 'Trust',
+              picker: file(root.pemBytes),
+              clock: () => now,
+            ),
+          ),
+        );
+        await tester.tap(find.text('Choose file'));
+        await tester.pumpAndSettle();
+        expect(find.text('Check before you trust it'), findsOneWidget);
+        now = now.add(const Duration(days: 400));
+        await tester.ensureVisible(find.text('Trust'));
+        await tester.tap(find.text('Trust'));
+        await tester.pumpAndSettle();
+        expect(find.text('This certificate has expired'), findsOneWidget);
+      },
+    );
+
+    testWidgets('picker result is discarded when app lock covers the flow', (
+      tester,
+    ) async {
+      final platform = lock_support.FakePlatform()
+        ..autoAnswer = AppLockAuthResult.success;
+      var lifecycle = AppLifecycleState.resumed;
+      final lock = AppLockController(
+        store: AppLockStore(
+          entries: lock_support.MemoryEntries({
+            AppLockStore.entry: lock_support.stored(true, 60),
+          }),
+        ),
+        platform: platform,
+        lifecycleState: () => lifecycle,
+      );
+      addTearDown(lock.dispose);
+      await lock.start();
+      await lock.unlock();
+      final pending = Completer<CertificatePick>();
+      await tester.pumpWidget(
+        MaterialApp(
+          builder: (_, child) => AppLockScope(
+            controller: lock,
+            child: AppLockGate(controller: lock, child: child!),
+          ),
+          home: CertificateImportPage(
+            destination: 'https://archive.example',
+            trustLabel: 'Trust',
+            picker: () => pending.future,
+          ),
+        ),
+      );
+      await tester.tap(find.text('Choose file'));
+      await tester.pump();
+      lifecycle = AppLifecycleState.paused;
+      lock.didChangeAppLifecycleState(AppLifecycleState.paused);
+      await tester.pump();
+      pending.complete(CertificateFile(Uint8List.fromList(root.pemBytes)));
+      await tester.pumpAndSettle();
+      lifecycle = AppLifecycleState.resumed;
+      lock.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(find.text('Choose your certificate file'), findsOneWidget);
+      expect(find.text('Check before you trust it'), findsNothing);
+    });
+
     testWidgets('a root CA is shown for checking, then trusted', (
       tester,
     ) async {
@@ -266,6 +343,30 @@ void main() {
       expect(s.api, isNotNull);
       expect(created.last.trust!.der, labDer(root));
       expect((await store.read())!.certificate, labDer(root));
+    });
+
+    testWidgets('a setup destination changed during import receives no trust', (
+      tester,
+    ) async {
+      final s = session();
+      addTearDown(s.dispose);
+      await pumpSetup(tester, s, file(root.pemBytes));
+      s.server.text = 'https://archive.example';
+      s.keyInput.text = 'synthetic';
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('setup-own-certificate')),
+      );
+      await tester.tap(find.byKey(const ValueKey('setup-own-certificate')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Choose file'));
+      await tester.pumpAndSettle();
+      s.server.text = 'https://other.example';
+      await tester.ensureVisible(find.text('Trust and connect'));
+      await tester.tap(find.text('Trust and connect'));
+      await tester.pumpAndSettle();
+      expect(s.pendingCertificate, isNull);
+      expect(created, isEmpty);
+      expect(entries.values, isEmpty);
     });
 
     testWidgets('the setup entry needs an address first', (tester) async {

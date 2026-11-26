@@ -22,6 +22,9 @@ import UniformTypeIdentifiers
     )
     channel.setMethodCallHandler { [weak self] call, result in
       guard let self = self else { return result("unavailable") }
+      if self.certificatePicker.isBusy && (call.method == "save" || call.method == "locate") {
+        return result(FlutterError(code: "busy", message: "A file picker is already open.", details: nil))
+      }
       self.savedFiles.handle(call, result: result)
     }
     let lockChannel = FlutterMethodChannel(
@@ -59,12 +62,14 @@ import UniformTypeIdentifiers
 private final class CertificatePicker: NSObject, UIDocumentPickerDelegate {
   private var pending: FlutterResult?
   private var limit = 0
+  private var reading = false
+  var isBusy: Bool { pending != nil }
 
   private var presenter: UIViewController? {
     let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-    var controller = scenes.filter { $0.activationState == .foregroundActive }
+    let controller = scenes.filter { $0.activationState == .foregroundActive }
       .flatMap { $0.windows }.first { $0.isKeyWindow }?.rootViewController
-    while let presented = controller?.presentedViewController { controller = presented }
+    guard controller?.presentedViewController == nil else { return nil }
     return controller
   }
 
@@ -72,7 +77,7 @@ private final class CertificatePicker: NSObject, UIDocumentPickerDelegate {
     guard call.method == "pick" else { return result(FlutterMethodNotImplemented) }
     let args = call.arguments as? [String: Any] ?? [:]
     let requested = args["limit"] as? Int ?? 0
-    guard pending == nil, requested > 0, let controller = presenter else {
+    guard pending == nil, requested > 0, requested <= 65536, let controller = presenter else {
       return result(["status": "unavailable"])
     }
     pending = result
@@ -84,27 +89,33 @@ private final class CertificatePicker: NSObject, UIDocumentPickerDelegate {
   }
 
   func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-    guard let completion = pending else { return }
-    pending = nil
-    guard let url = urls.first else { return completion(["status": "cancelled"]) }
+    guard let completion = pending, !reading else { return }
+    guard let url = urls.first else { pending = nil; return completion(["status": "cancelled"]) }
     let maximum = limit
+    reading = true
     DispatchQueue.global(qos: .userInitiated).async {
       let scoped = url.startAccessingSecurityScopedResource()
       defer { if scoped { url.stopAccessingSecurityScopedResource() } }
       var reply: [String: Any] = ["status": "unreadable"]
       if let handle = try? FileHandle(forReadingFrom: url) {
         defer { try? handle.close() }
-        if let data = try? handle.read(upToCount: maximum + 1) {
+        do {
+          var data = Data()
+          while data.count <= maximum {
+            guard let chunk = try handle.read(upToCount: maximum + 1 - data.count), !chunk.isEmpty else { break }
+            data.append(chunk)
+          }
           reply = data.count > maximum
             ? ["status": "too_large"]
             : ["status": "picked", "bytes": FlutterStandardTypedData(bytes: data)]
-        }
+        } catch { reply = ["status": "unreadable"] }
       }
-      DispatchQueue.main.async { completion(reply) }
+      DispatchQueue.main.async { self.reading = false; self.pending = nil; completion(reply) }
     }
   }
 
   func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+    guard !reading else { return }
     let completion = pending
     pending = nil
     completion?(["status": "cancelled"])
@@ -160,7 +171,7 @@ private final class SavedAttachmentAccess: NSObject, UIDocumentPickerDelegate,
 
   private var presenter: UIViewController? {
     let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-    var controller = scenes.filter { $0.activationState == .foregroundActive }
+    let controller = scenes.filter { $0.activationState == .foregroundActive }
       .flatMap { $0.windows }.first { $0.isKeyWindow }?.rootViewController
     while let presented = controller?.presentedViewController { controller = presented }
     return controller

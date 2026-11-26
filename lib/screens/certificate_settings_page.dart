@@ -51,13 +51,20 @@ class _CertificateSettingsPageState extends State<CertificateSettingsPage> {
   }
 
   Future<void> _replace() async {
+    if (!_ready || !certificateActionsAllowed(context)) return;
+    final generation = widget.session.certificateFlowGeneration;
     final der = await showCertificateImport(
       context,
       destination: widget.profile.server,
       trustLabel: 'Trust',
       picker: widget.picker,
     );
-    if (der == null || !mounted) return;
+    if (der == null ||
+        !mounted ||
+        !certificateActionsAllowed(context) ||
+        generation != widget.session.certificateFlowGeneration) {
+      return;
+    }
     await _save(der, 'Certificate saved.');
   }
 
@@ -81,11 +88,14 @@ class _CertificateSettingsPageState extends State<CertificateSettingsPage> {
         ],
       ),
     );
-    if (confirmed != true || !mounted) return;
+    if (confirmed != true || !mounted || !certificateActionsAllowed(context)) {
+      return;
+    }
     await _save(null, 'Certificate removed.');
   }
 
   Future<void> _save(List<int>? der, String done) async {
+    if (!_ready || !certificateActionsAllowed(context)) return;
     setState(() => _saving = true);
     final saved = await widget.session.setArchiveCertificate(
       widget.profile.id,

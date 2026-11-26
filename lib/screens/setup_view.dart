@@ -280,6 +280,11 @@ class SetupView extends StatelessWidget {
   /// Runs the two-step certificate flow for the address entered now; a
   /// trusted certificate is kept for this destination and Connect runs.
   Future<void> _useOwnCertificate(BuildContext context) async {
+    if (!certificateActionsAllowed(context) || session.busy || session.demo) {
+      return;
+    }
+    final generation = session.certificateFlowGeneration;
+    final type = session.setupServerType;
     final messenger = ScaffoldMessenger.of(context);
     final Uri uri;
     try {
@@ -292,11 +297,26 @@ class SetupView extends StatelessWidget {
     }
     final der = await showCertificateImport(
       context,
-      destination: uri.host,
+      destination: uri.toString(),
       trustLabel: 'Trust and connect',
       picker: certificatePicker,
     );
-    if (der == null || !context.mounted) return;
+    if (der == null ||
+        !context.mounted ||
+        !certificateActionsAllowed(context)) {
+      return;
+    }
+    if (generation != session.certificateFlowGeneration ||
+        type != session.setupServerType ||
+        !session.setup ||
+        session.demo) {
+      return;
+    }
+    try {
+      if (validateServer(session.server.text) != uri) return;
+    } on FormatException {
+      return;
+    }
     if (!session.setPendingCertificate(der)) {
       messenger.showSnackBar(
         const SnackBar(

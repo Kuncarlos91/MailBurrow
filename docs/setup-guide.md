@@ -264,7 +264,7 @@ Copy the file to your phone, for example to Files or Downloads.
 - A new key for the same address keeps it; a changed address or server type doesn't.
 
 **Later:** use **Settings → Archives → ⋮ → Certificate** to see it, replace it or remove it.
-- A warning appears there 30 days before it expires. Once expired, the archive won't connect until you replace it.
+- A warning appears there 30 days before it expires. At expiry, active requests stop and the archive won't connect until you replace it.
 - If you replace your CA, import the new root.
 - If MailBurrow suddenly can't verify the server and you changed nothing, don't import anything new. Check the server first.
 

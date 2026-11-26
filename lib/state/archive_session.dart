@@ -112,6 +112,7 @@ class ArchiveSession extends ChangeNotifier {
     setupServerType = value;
     keyInput.clear();
     _pendingCertificate = null;
+    _certificateFlowGeneration++;
     error = null;
     _notify();
   }
@@ -210,6 +211,7 @@ class ArchiveSession extends ChangeNotifier {
     server.clear();
     keyInput.clear();
     _pendingCertificate = null;
+    _certificateFlowGeneration++;
     final token = _openingToken;
     final connectToken = _connectToken;
     bool current() =>
@@ -241,6 +243,9 @@ class ArchiveSession extends ChangeNotifier {
   /// archive; it is cleared with the unsaved key.
   ({List<int> der, ArchiveServerType type, String server})? _pendingCertificate;
 
+  int _certificateFlowGeneration = 0;
+  int get certificateFlowGeneration => _certificateFlowGeneration;
+
   /// The certificate confirmed in setup and not yet saved, if any.
   List<int>? get pendingCertificate => _pendingCertificate?.der;
 
@@ -250,6 +255,7 @@ class ArchiveSession extends ChangeNotifier {
   bool setPendingCertificate(List<int> der) {
     final hadPending = _pendingCertificate != null;
     _pendingCertificate = null;
+    _certificateFlowGeneration++;
     if (_disposed || demo || busy) {
       if (hadPending) _notify();
       return false;
@@ -276,6 +282,7 @@ class ArchiveSession extends ChangeNotifier {
   void clearPendingCertificate() {
     if (_pendingCertificate == null) return;
     _pendingCertificate = null;
+    _certificateFlowGeneration++;
     _notify();
   }
 
@@ -393,6 +400,7 @@ class ArchiveSession extends ChangeNotifier {
     _lastConnectFailure = null;
     keyInput.clear();
     _pendingCertificate = null;
+    _certificateFlowGeneration++;
     restoring = true;
     busy = true;
     error = null;
@@ -482,6 +490,7 @@ class ArchiveSession extends ChangeNotifier {
     messages = [];
     keyInput.clear();
     _pendingCertificate = null;
+    _certificateFlowGeneration++;
     final token = ++_openingToken;
     bool current() => !_disposed && token == _openingToken;
     switchingArchive = profile;
@@ -642,6 +651,7 @@ class ArchiveSession extends ChangeNotifier {
         } else {
           // Confirmed for a different destination: never reused.
           _pendingCertificate = null;
+          _certificateFlowGeneration++;
           final profile = profileId == null
               ? null
               : archives.where((item) => item.id == profileId).firstOrNull;
@@ -744,6 +754,7 @@ class ArchiveSession extends ChangeNotifier {
       reconnectArchiveId = null;
       keyInput.clear();
       _pendingCertificate = null;
+      _certificateFlowGeneration++;
       _notify();
       await _refreshArchives();
       await loadFolders();
@@ -1025,6 +1036,7 @@ class ArchiveSession extends ChangeNotifier {
     reconfiguring = null;
     keyInput.clear();
     _pendingCertificate = null;
+    _certificateFlowGeneration++;
     setup = true;
     error = null;
     _notify();
@@ -1042,6 +1054,7 @@ class ArchiveSession extends ChangeNotifier {
     server.text = profile.server;
     keyInput.clear();
     _pendingCertificate = null;
+    _certificateFlowGeneration++;
     setup = true;
     error = null;
     _notify();
@@ -1077,6 +1090,7 @@ class ArchiveSession extends ChangeNotifier {
       reconfiguring = null;
       keyInput.clear();
       _pendingCertificate = null;
+      _certificateFlowGeneration++;
       _retryArchiveId = id;
     }
     busy = true;
@@ -1164,6 +1178,7 @@ class ArchiveSession extends ChangeNotifier {
       server.clear();
       keyInput.clear();
       _pendingCertificate = null;
+      _certificateFlowGeneration++;
       error = null;
       _notify();
       return;
@@ -1172,6 +1187,7 @@ class ArchiveSession extends ChangeNotifier {
     reconfiguring = null;
     keyInput.clear();
     _pendingCertificate = null;
+    _certificateFlowGeneration++;
     setup = false;
     setupServerType = serverType;
     error = null;
@@ -1202,6 +1218,7 @@ class ArchiveSession extends ChangeNotifier {
       server.clear();
       keyInput.clear();
       _pendingCertificate = null;
+      _certificateFlowGeneration++;
       setup = true;
       hasSavedConnection = false;
       activeArchiveId = null;
@@ -1225,6 +1242,8 @@ class ArchiveSession extends ChangeNotifier {
   Future<void> startDemo() async {
     if (_changingCertificate) return;
     if (demo && !setup) return;
+    _pendingCertificate = null;
+    _certificateFlowGeneration++;
     if (!demo) _demoReturnId = api != null ? activeArchiveId : null;
     mailRequestFailed = false;
     accountSwitchGeneration++;
