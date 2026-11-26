@@ -197,6 +197,7 @@ class LabCert {
 
 /// Builds and signs a certificate with an EC (ECDSA) or RSA (PKCS#1 v1.5,
 /// SHA-256) issuer key. [keyUsageByte] overrides a CA's key usage bits;
+/// [pathLen] is a CA's Basic Constraints path-length limit (null: none).
 /// [extraExtensions] are (oid, DER value, critical) triples added as-is.
 LabCert labCert({
   required String cn,
@@ -214,6 +215,7 @@ LabCert labCert({
   Duration notAfter = const Duration(days: 365),
   bool sha1 = false,
   int keyUsageByte = 0x06,
+  int? pathLen = 0,
   List<(String, List<int>, bool)> extraExtensions = const [],
 }) {
   final signer = issuerKey ?? key;
@@ -226,7 +228,10 @@ LabCert labCert({
     if (ca != null)
       _ext(
         '2.5.29.19',
-        _seq([if (ca) _true, if (ca) _int(BigInt.zero)]),
+        _seq([
+          if (ca) _true,
+          if (ca && pathLen != null) _int(BigInt.from(pathLen)),
+        ]),
         critical: true,
       ),
     if (ca == true && keyUsage)

@@ -44,7 +44,7 @@ flowchart LR
 | --- | --- | --- |
 | [Mail-Archiver](https://github.com/s1t5/mail-archiver), release **2607.3 or later**, or [Open Archiver](https://github.com/LogicLabs-OU/OpenArchiver) **0.6.2**, or [Bichon](https://github.com/rustmailer/bichon) **2.4.2 Community** | Yes, at least one | Archives your mail and provides the API. Mail-Archiver's API is **off by default**. Other Open Archiver and Bichon versions, and Bichon Pro/Enterprise, are unverified. Bichon needs MailBurrow 0.5.0 or later. |
 | An API key or Bichon access token for that server | Yes | Lets the app read the archive with its user's permissions. |
-| An HTTPS address with a **trusted certificate** | Yes | For example `https://archive.example.ts.net`. A publicly trusted certificate is easiest. Versions after 0.6.0 can also use [your own certificate](#your-own-certificate) from a home certificate authority or a self-signed server. |
+| An HTTPS address with a **trusted certificate** | Yes | For example `https://archive.example.ts.net`. A publicly trusted certificate is easiest. Versions 0.6.0 and later can also use [your own certificate](#your-own-certificate) from a home certificate authority or a self-signed server. |
 | [Tailscale](https://tailscale.com/) on the server and the phone | Recommended | Private access from anywhere, plus a free trusted certificate through Tailscale Serve. |
 | TrueNAS | Optional | One easy way to run either server, through its community app. A suitable Docker host works too. |
 | Your own domain and a reverse proxy | Optional | An alternative to Tailscale for the HTTPS address. |
@@ -186,7 +186,7 @@ The first connection can take a few seconds while Tailscale issues the certifica
 
 If you already run a reverse proxy such as Caddy, Nginx Proxy Manager or Traefik with Let's Encrypt certificates, add a host like `mail.example.com` that forwards to Mail-Archiver's port. Some things to watch:
 
-- A publicly trusted certificate, such as Let's Encrypt, works as it is. For a private certificate authority or a self-signed certificate, see [Your own certificate](#your-own-certificate) (versions after 0.6.0).
+- A publicly trusted certificate, such as Let's Encrypt, works as it is. For a private certificate authority or a self-signed certificate, see [Your own certificate](#your-own-certificate) (0.6.0 and later).
 - **No redirects.** MailBurrow doesn't follow redirects, so its key is never sent anywhere unexpected. Use the final address, and don't put a login page or single sign-on in front of `/api/`.
 - If Mail-Archiver lives under a path such as `https://example.com/mail`, enter that full address in the app; the path is kept.
 - If the address is reachable from the internet, your archive's web interface is too. Consider keeping it private, for example with Tailscale or a VPN, and keep Mail-Archiver updated.
@@ -196,7 +196,7 @@ If you already run a reverse proxy such as Caddy, Nginx Proxy Manager or Traefik
 | Address | Why |
 | --- | --- |
 | `http://truenas:30315` or `http://100.x.y.z:30315` | Plain HTTP. The app only connects over HTTPS. |
-| `https://192.168.1.10` with a self-signed certificate | The phone doesn't trust it. In versions after 0.6.0, add [your own certificate](#your-own-certificate) to the archive; the certificate must also list that IP address. |
+| `https://192.168.1.10` with a self-signed certificate | The phone doesn't trust it. From version 0.6.0, add [your own certificate](#your-own-certificate) to the archive; the certificate must also list that IP address. |
 | An address that redirects to another one | The app doesn't follow redirects. Use the final address. |
 
 ## Step 4: Connect the app
@@ -238,29 +238,33 @@ App lock only controls opening the app on your phone. It doesn't encrypt anythin
 
 ## Your own certificate
 
-In versions after 0.6.0, an archive can trust your own certificate authority (CA), such as step-ca, OPNsense or TrueNAS, or a self-signed server certificate. Tailscale Serve or a publicly trusted certificate is still the easiest path and needs nothing here.
+From version 0.6.0, an archive can trust your own certificate authority (CA), such as step-ca, OPNsense or TrueNAS, or a self-signed server certificate. Tailscale Serve or a publicly trusted certificate is still the easiest path and needs nothing here.
 
 **Which file to choose:** your CA's **root certificate**, as a `.pem`, `.crt` or `.cer` file (PEM or DER). For a self-signed server, the server's own certificate file. MailBurrow refuses:
 - a server certificate issued by your CA, because those renew often (daily with step-ca);
 - files containing a private key, bundles with several certificates, `.p12` files;
-- certificates signed with SHA-1 or MD5, or with RSA keys under 2048 bits.
+- certificates signed with SHA-1 or MD5, or with RSA keys under 2048 bits;
+- critical name constraints, certificate policies, policy constraints, inhibit-any-policy or extended key usage that the app cannot safely enforce for imported trust. Don't remove security rules to make a certificate import.
 
 **Where to find it:**
-- **step-ca:** `step ca root root_ca.crt`.
-- **OPNsense:** **System › Trust › Authorities**, then export the CA certificate.
-- **TrueNAS:** **Credentials › Certificates › Certificate Authorities**, then download it.
+- **step-ca:** `step ca root root_ca.crt` from a computer set up for your CA. On the CA host itself, the file is `certs/root_ca.crt` in the folder shown by `step path`.
+- **OPNsense:** **System › Trust › Authorities**, then the download button on your CA's row, choosing the certificate (not the key).
+- **TrueNAS:** versions with built-in CA management (for example 25.04) have **Credentials › Certificates › Certificate Authorities** and a CA download icon. If your version only manages imported certificates, obtain the root from the CA administrator instead. Export the CA certificate, never its private key or a server certificate issued by that CA.
+
+See the upstream [step-ca root command](https://github.com/smallstep/docs/blob/main/step-cli/reference/ca/root/README.mdx), [OPNsense certificate guide](https://github.com/opnsense/docs/blob/master/source/manual/certificates.rst), and [TrueNAS 25.04 CA screen](https://github.com/truenas/documentation/blob/25.04/content/SCALEUIReference/Credentials/Certificates/CAScreensSCALE.md). Menu availability varies by version.
 
 Copy the file to your phone, for example to Files or Downloads.
 
 **To add it:**
 1. In setup, enter the server address. Then tap **Use your own certificate** under **Advanced**, or tap that button after **Connect** says the certificate couldn't be verified.
 2. Choose the file.
-3. Check the name, dates and **SHA-256 fingerprint**. Compare the fingerprint with the one shown by your server, never by the connection itself; for step-ca, `step certificate fingerprint root_ca.crt`.
+3. Check the name, dates and **SHA-256 fingerprint**. Compare the fingerprint with the one shown by your server, never by the connection itself; for step-ca, `step certificate fingerprint root_ca.crt`. Some tools print it in lowercase or without colons; the characters must match, case and colons aside.
 4. Tap **Trust and connect**.
 
 **What it changes:**
 - The certificate is trusted for **that archive only**, in addition to the public authorities. It doesn't change your phone's settings or other archives, even on the same server.
 - The server's certificate must still be valid and match the address you entered.
+- Path-length limits on intermediate certificates are enforced. The imported root's **own** path-length limit is not applied, so the chain is only as tight as the intermediates your CA issues. Caddy's and step-ca's default intermediates carry their own limit.
 - A new key for the same address keeps it; a changed address or server type doesn't.
 
 **Later:** use **Settings → Archives → ⋮ → Certificate** to see it, replace it or remove it.
@@ -271,7 +275,7 @@ Copy the file to your phone, for example to Files or Downloads.
 **Limits:**
 - Revocation isn't checked. If your CA's key is exposed, remove the certificate and replace the archive's API key or token on your server.
 - MailBurrow checks the file you import for weak algorithms, not the certificates your CA issues later.
-- Once an archive has its own certificate, older versions (0.6.0 and earlier) can't read **any** saved archive and offer to remove them all. Don't install an older version.
+- Once an archive has its own certificate, older versions (0.5.0 and earlier) can't read **any** saved archive and offer to remove them all. Don't install an older version.
 
 ## If something goes wrong
 
@@ -279,7 +283,7 @@ Copy the file to your phone, for example to Files or Downloads.
 | --- | --- | --- |
 | Enter a valid HTTPS server address… | The address has `http://`, a username and password, a query or a fragment | Enter just the host name, or `https://` plus host name and optional path |
 | Unable to connect. Check your HTTPS address and private network. | Tailscale is off on the phone, the address is wrong, or Serve or the proxy isn't running | Turn on Tailscale, open the address in the phone's browser, check `tailscale serve status` |
-| MailBurrow couldn't verify the server's certificate and stopped. (0.6.0 and earlier: The server certificate could not be verified.) | Your own CA or a self-signed certificate, a certificate that doesn't match the address, an expired certificate, or a wrong date on the phone | Check the phone's date. Use Tailscale Serve or a Let's Encrypt certificate, or (versions after 0.6.0) [your own certificate](#your-own-certificate) |
+| MailBurrow couldn't verify the server's certificate and stopped. (0.5.0 and earlier: The server certificate could not be verified.) | Your own CA or a self-signed certificate, a certificate that doesn't match the address, an expired certificate, or a wrong date on the phone | Check the phone's date. Use Tailscale Serve or a Let's Encrypt certificate, or (0.6.0 and later) [your own certificate](#your-own-certificate) |
 | This archive's own certificate can't be used… | Its saved certificate record is missing, damaged or from a newer version | **Settings → Archives → ⋮ → Certificate**: replace or remove it, or forget the archive and add it again |
 | Your API key was not accepted. | Key mistyped, expired or revoked, or its user is inactive | Create a new key and enter it again; for a saved archive, use **Enter a new key** |
 | Your access token was not accepted. (Bichon) | Token mistyped, expired or deleted, or its user can no longer sign in | Create a new token for the phone's read-only user; for a saved archive, use **Enter a new access token** |

@@ -588,7 +588,7 @@ const _understoodExtensions = {
   '2.5.29.15', // keyUsage
   '2.5.29.17', // subjectAltName
   '2.5.29.19', // basicConstraints
-  '2.5.29.30', // nameConstraints (enforced by the TLS engine)
+  '2.5.29.30', // nameConstraints (non-critical only)
   '2.5.29.31', // cRLDistributionPoints
   '2.5.29.32', // certificatePolicies
   '2.5.29.35', // authorityKeyIdentifier
@@ -599,18 +599,14 @@ const _understoodExtensions = {
   '1.3.6.1.4.1.11129.2.4.2', // certificate transparency SCTs
 };
 
-/// Recognized critical-extension policy. Actual enforcement for imported
-/// trust anchors (rather than chain members) still needs platform evidence
-/// before this internal parser is exposed to users; others are refused.
+// Refuse unproven critical anchor rules at import. Basic Constraints is
+// parsed below. The TLS engine enforces path-length limits on
+// intermediates but not an imported root's own limit; that is disclosed in
+// the setup guide and pinned by test/archive_trust_test.dart.
 const _criticalAllowed = {
-  '2.5.29.15',
-  '2.5.29.17',
-  '2.5.29.19',
-  '2.5.29.30',
-  '2.5.29.32',
-  '2.5.29.36',
-  '2.5.29.37',
-  '2.5.29.54',
+  '2.5.29.15', // keyUsage
+  '2.5.29.17', // subjectAltName
+  '2.5.29.19', // basicConstraints
 };
 
 // ---- Certificate -------------------------------------------------------------------
