@@ -171,7 +171,7 @@ private final class SavedAttachmentAccess: NSObject, UIDocumentPickerDelegate,
 
   private var presenter: UIViewController? {
     let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-    let controller = scenes.filter { $0.activationState == .foregroundActive }
+    var controller = scenes.filter { $0.activationState == .foregroundActive }
       .flatMap { $0.windows }.first { $0.isKeyWindow }?.rootViewController
     while let presented = controller?.presentedViewController { controller = presented }
     return controller
