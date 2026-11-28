@@ -1,30 +1,20 @@
-# Android 0.6.0
+# Android 0.6.0 build instructions and draft release notes
 
 [Main index](../../README.md) · [Build/signing guide](android.md) · [Device checklist](../testing/device-checklist.md) · [0.5.0 release](android-0.5.0.md)
 
-## Status and identity
+The latest published Android release is [0.5.0](https://github.com/Kuncarlos91/MailBurrow/releases/tag/v0.5.0). The 0.6.0 release notes below are a draft, not a claim that a release APK is available or has passed device checks.
 
-**Candidate, not built.** `main` contains app lock (#76) and private CA support (#80–#87). No signed build 33 exists yet, and nothing here authorizes signing, publication or deploying the website. Record the source commit, file size and SHA-256 only once the maintainer has built and checked the exact APK. Never record keys, certificate fields, private hosts, server addresses or raw logs here.
+## Build instructions
 
-| Item | Value |
-| --- | --- |
-| Android version / code | `0.6.0` / `33` (reserved in #78) |
-| Settings stamp | `0.6.0 (33)` |
-| Release application ID | `com.kuncarlos91.mailburrow` (unchanged) |
-| Source commit | Pending: the exact `main` commit that is built |
-| File | Pending: `MailBurrow-0.6.0-build33.apk` |
-| SHA-256 | Pending |
-| Signing | Existing maintainer release key |
-| ABI | arm64-v8a only |
-| Toolchain | Flutter 3.47.8, Dart 3.13.7, locked dependencies |
+The source version is `0.6.0+33`. The release application ID remains `com.kuncarlos91.mailburrow`; release APKs target arm64-v8a. The pinned toolchain is Flutter 3.47.8 / Dart 3.13.7 with locked dependencies.
 
-Build command, from the repository root with the existing signing configuration:
+Follow the [build/signing guide](android.md) for signing configuration and a checkout outside your personal profile. From the repository root:
 
 ```sh
 flutter build apk --release --target-platform android-arm64 --build-name=0.6.0 --build-number=33 --dart-define=MAILSHELF_BUILD_VERSION=0.6.0 --dart-define=MAILSHELF_BUILD_NUMBER=33
 ```
 
-Test APKs from the `android-test-apk` workflow are debug builds. Their passes support the release but don't stand in for the signed build-33 checks below.
+Existing users' updates require the same signing key and application ID. Before distributing an APK, verify its package/version, signature, non-debuggable flag, merged permissions, arm64-only libraries, notices, privacy scan and checksum. Follow the [device checklist](../testing/device-checklist.md) on the exact signed APK, including an update from 0.5.0. Debug APKs from `android-test-apk` install separately and do not establish signed-update behavior.
 
 ## What is in 0.6.0
 
@@ -36,32 +26,6 @@ Test APKs from the `android-test-apk` workflow are debug builds. Their passes su
 - **Setup** shows the app version and build before connecting.
 
 Full list: [CHANGELOG](../../CHANGELOG.md).
-
-## Checks on the exact APK
-
-**Artifact checks** (same as 0.5.0):
-- package and version;
-- not debuggable;
-- permissions: `INTERNET` and `USE_BIOMETRIC`, plus AndroidX's app-private receiver permission; record anything else the merged manifest adds (for example a fingerprint permission from `local_auth`) before release;
-- arm64-v8a only;
-- the privacy scan finds 0 findings;
-- the established signing certificate;
-- bundled notices readable, including `pointycastle` and `androidx.biometric`;
-- the installed copy's hash matches.
-
-**Device checks**, on the exact APK (see the [device checklist](../testing/device-checklist.md), items 9 to 11):
-- **Update from 0.5.0** (build 31) keeps saved archives, names, the selected account and keys.
-- **App lock:** biometric and PIN fallback, each timing, cancelling the prompt, the blank recent-apps preview, swipe away and reopen, saving an attachment within the grace period, and turning it off.
-- **Own certificate**, with fictional lab certificates only:
-  - the Caddy lab: import, hostname refusal, restart, remove and re-import, attachment save;
-  - a CA with a critical name constraint is refused;
-  - the CA-limit warning shows for root and intermediate CAs, not for a self-signed server, and stays readable at the largest text size;
-  - a chain over an intermediate's limit is refused before any request.
-- **Regression pass:** Mail-Archiver, Open Archiver and Bichon browse, search, reader and attachment save; offline and Tailscale recovery; the demo; largest text in landscape.
-
-## Release decisions
-
-To be completed after the checks. Carry forward unless retested: TalkBack, expired Open Archiver keys (not before 2026-12-12), cancellation timing and retention, as described for [0.5.0](android-0.5.0.md#release-decisions). iOS/iPadOS stays source-only until a TestFlight run is separately approved.
 
 ## Release notes (draft)
 
