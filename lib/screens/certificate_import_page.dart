@@ -363,6 +363,15 @@ class _CertificateImportPageState extends State<CertificateImportPage> {
           text:
               "Only trust a certificate you made for your own server. Whoever holds its key could read this archive's traffic, including your API key. It adds an authority; it doesn't lock the archive to one certificate.",
         ),
+        if (details.isCa) ...[
+          const SizedBox(height: 12),
+          const _Notice(
+            icon: Icons.warning_amber_outlined,
+            warning: true,
+            text:
+                "This CA's own limit on how many other CAs it can authorize is not applied. This applies to both root and intermediate CAs. When you can, import your root CA rather than an intermediate, so the intermediate's limit still applies.",
+          ),
+        ],
         if (shortLived) ...[
           const SizedBox(height: 12),
           _Notice(

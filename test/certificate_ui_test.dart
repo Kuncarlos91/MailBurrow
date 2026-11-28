@@ -205,12 +205,43 @@ void main() {
             find.textContaining('Only trust a certificate'),
             findsOneWidget,
           );
+          expect(find.textContaining("This CA's own limit"), findsOneWidget);
           await tester.ensureVisible(find.text('Trust and connect'));
           await tester.tap(find.text('Trust and connect'));
           await tester.pumpAndSettle();
         },
       );
       expect(der, labDer(root));
+    });
+
+    testWidgets('an intermediate CA shows the anchor limitation before trust', (
+      tester,
+    ) async {
+      final rootKey = LabKey.ec();
+      final intermediate = labCert(
+        cn: 'Home Lab Intermediate CA',
+        key: LabKey.ec(),
+        issuerCn: 'Home Lab Root CA',
+        issuerKey: rootKey,
+        ca: true,
+      );
+      final der = await runImport(
+        tester,
+        file(intermediate.pemBytes),
+        steps: () async {
+          expect(
+            find.text('Certificate authority (intermediate)'),
+            findsOneWidget,
+          );
+          final notice = find.textContaining("This CA's own limit");
+          await tester.ensureVisible(notice);
+          expect(notice, findsOneWidget);
+          await tester.ensureVisible(find.text('Trust and connect'));
+          await tester.tap(find.text('Trust and connect'));
+          await tester.pumpAndSettle();
+        },
+      );
+      expect(der, labDer(intermediate));
     });
 
     testWidgets('a private key is refused with a fix', (tester) async {
@@ -260,6 +291,7 @@ void main() {
         file(selfShort.pemBytes),
         steps: () async {
           expect(find.textContaining('expires on'), findsOneWidget);
+          expect(find.textContaining("This CA's own limit"), findsNothing);
           await tester.ensureVisible(find.text('Trust this one'));
           expect(find.text('Choose another file'), findsOneWidget);
           await tester.tap(find.text('Trust this one'));
