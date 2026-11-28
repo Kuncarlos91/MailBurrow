@@ -369,7 +369,7 @@ class _CertificateImportPageState extends State<CertificateImportPage> {
             icon: Icons.warning_amber_outlined,
             warning: true,
             text:
-                "This CA's own limit on how many other CAs it can authorize is not applied. This applies to both root and intermediate CAs.",
+                "This CA's own limit on how many other CAs it can authorize is not applied. This applies to both root and intermediate CAs. When you can, import your root CA rather than an intermediate, so the intermediate's limit still applies.",
           ),
         ],
         if (shortLived) ...[
