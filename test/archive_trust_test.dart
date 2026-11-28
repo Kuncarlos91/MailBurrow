@@ -358,58 +358,74 @@ void main() {
   });
 
   // Pins the engine's path-length behaviour, documented in the setup guide:
-  // limits on intermediates are enforced; an imported root's own limit is
-  // not (owner decision PC09, November 26, 2026). If the engine starts
-  // enforcing the root's limit, update the docs and this test together.
+  // limits below the imported CA anchor are enforced; the anchor's own limit
+  // is not, whether it is a root or intermediate. If the engine starts
+  // enforcing the anchor's limit, update the disclosure and tests together.
   group('path-length limits', () {
-    test("an intermediate's limit is enforced before any request", () async {
-      final rootKey = LabKey.ec();
-      final root = labCert(
-        cn: 'Lab Root CA',
-        key: rootKey,
-        ca: true,
-        pathLen: null,
-      );
-      final intKey = LabKey.ec();
-      final intermediate = labCert(
-        cn: 'Lab Intermediate CA',
-        key: intKey,
-        issuerCn: root.cn,
-        issuerKey: rootKey,
-        ca: true,
-      );
-      final subKey = LabKey.ec();
-      final sub = labCert(
-        cn: 'Lab Sub CA',
-        key: subKey,
-        issuerCn: intermediate.cn,
-        issuerKey: intKey,
-        ca: true,
-        pathLen: null,
-      );
-      final leaf = labCert(
-        cn: 'lab server',
-        key: LabKey.ec(),
-        issuerCn: sub.cn,
-        issuerKey: subKey,
-        ca: false,
-      );
-      final lab = await LabServer.start(
-        leaf,
-        intermediates: [sub, intermediate],
-      );
-      final api = ArchiveApi(
-        lab.address,
-        'synthetic-test-only',
-        trust: ArchiveTrust(derOf(root)),
-      );
-      addTearDown(() async {
-        api.close();
-        await lab.close();
-      });
-      await expectLater(api.accounts(), throwsA(isA<HandshakeException>()));
-      expect(lab.requests, 0);
-    });
+    test(
+      "a chain intermediate's limit is enforced before any request",
+      () async {
+        final rootKey = LabKey.ec();
+        final root = labCert(
+          cn: 'Lab Root CA',
+          key: rootKey,
+          ca: true,
+          pathLen: null,
+        );
+        final intKey = LabKey.ec();
+        final subKey = LabKey.ec();
+        final sub = labCert(
+          cn: 'Lab Sub CA',
+          key: subKey,
+          issuerCn: 'Lab Intermediate CA',
+          issuerKey: intKey,
+          ca: true,
+          pathLen: null,
+        );
+        final leaf = labCert(
+          cn: 'lab server',
+          key: LabKey.ec(),
+          issuerCn: sub.cn,
+          issuerKey: subKey,
+          ca: false,
+        );
+        // Change only the intermediate's constraint. The same keys, names,
+        // subordinate CA and leaf must work when that constraint is absent.
+        for (final constrained in [true, false]) {
+          final intermediate = labCert(
+            cn: 'Lab Intermediate CA',
+            key: intKey,
+            issuerCn: root.cn,
+            issuerKey: rootKey,
+            ca: true,
+            pathLen: constrained ? 0 : null,
+          );
+          final lab = await LabServer.start(
+            leaf,
+            intermediates: [sub, intermediate],
+          );
+          final api = ArchiveApi(
+            lab.address,
+            'synthetic-test-only',
+            trust: ArchiveTrust(derOf(root)),
+          );
+          addTearDown(() async {
+            api.close();
+            await lab.close();
+          });
+          if (constrained) {
+            await expectLater(
+              api.accounts(),
+              throwsA(isA<HandshakeException>()),
+            );
+            expect(lab.requests, 0);
+          } else {
+            expect(await api.accounts(), isEmpty);
+            expect(lab.requests, 1);
+          }
+        }
+      },
+    );
 
     test("an imported root's own limit is not applied", () async {
       final rootKey = LabKey.ec();
@@ -441,6 +457,54 @@ void main() {
         await lab.close();
       });
       expect(await api.accounts(), isEmpty);
+      expect(lab.requests, 1);
     });
+
+    for (final withSubordinate in [false, true]) {
+      test("an imported intermediate's own limit is not applied "
+          '(${withSubordinate ? 'subordinate CA' : 'direct leaf'})', () async {
+        final rootKey = LabKey.ec();
+        final anchorKey = LabKey.ec();
+        final anchor = labCert(
+          cn: 'Lab Intermediate Anchor',
+          key: anchorKey,
+          issuerCn: 'Lab Root CA',
+          issuerKey: rootKey,
+          ca: true,
+          pathLen: 0,
+        );
+        final subKey = LabKey.ec();
+        final sub = labCert(
+          cn: 'Lab Sub CA',
+          key: subKey,
+          issuerCn: anchor.cn,
+          issuerKey: anchorKey,
+          ca: true,
+          pathLen: null,
+        );
+        final leaf = labCert(
+          cn: 'lab server',
+          key: LabKey.ec(),
+          issuerCn: withSubordinate ? sub.cn : anchor.cn,
+          issuerKey: withSubordinate ? subKey : anchorKey,
+          ca: false,
+        );
+        final lab = await LabServer.start(
+          leaf,
+          intermediates: [if (withSubordinate) sub, anchor],
+        );
+        final api = ArchiveApi(
+          lab.address,
+          'synthetic-test-only',
+          trust: ArchiveTrust(derOf(anchor)),
+        );
+        addTearDown(() async {
+          api.close();
+          await lab.close();
+        });
+        expect(await api.accounts(), isEmpty);
+        expect(lab.requests, 1);
+      });
+    }
   });
 }

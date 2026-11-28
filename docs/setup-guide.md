@@ -264,7 +264,7 @@ Copy the file to your phone, for example to Files or Downloads.
 **What it changes:**
 - The certificate is trusted for **that archive only**, in addition to the public authorities. It doesn't change your phone's settings or other archives, even on the same server.
 - The server's certificate must still be valid and match the address you entered.
-- Path-length limits on intermediate certificates are enforced. The imported root's **own** path-length limit is not applied, so the chain is only as tight as the intermediates your CA issues. Caddy's and step-ca's default intermediates carry their own limit.
+- The imported CA certificate becomes a **trust anchor**, whether it is a root or an intermediate CA. Its **own** path-length limit (how many other CAs it may authorize) is not applied. Limits on intermediate certificates **below** that anchor are enforced. Importing an intermediate makes its own limit ineffective too; importing the root keeps that intermediate's limit in the chain. Caddy's and step-ca's default intermediates carry their own limit. The confirmation screen explains this before you trust a CA.
 - A new key for the same address keeps it; a changed address or server type doesn't.
 
 **Later:** use **Settings → Archives → ⋮ → Certificate** to see it, replace it or remove it.
