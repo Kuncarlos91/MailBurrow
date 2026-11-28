@@ -1,0 +1,27 @@
+name: PR text privacy
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-text-privacy-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check-pr-text:
+    name: Check PR text privacy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Test PR text guard
+        run: python3 -m unittest discover -s tools -p 'test_check_pr_text.py'
+      - name: Check title and description without echoing them
+        run: python3 tools/check_pr_text.py --event "$GITHUB_EVENT_PATH"

@@ -122,7 +122,7 @@ Flutter UI → ArchiveBackend (implemented by ArchiveApi) → configured HTTPS M
 | Filters/dates/pages | [search_filters.dart](../lib/search_filters.dart), [message_date.dart](../lib/message_date.dart), [pagination.dart](../lib/pagination.dart). |
 | Settings | [archive_information.dart](../lib/archive_information.dart), [build_information.dart](../lib/build_information.dart). |
 | App lock | [app_lock_controller.dart](../lib/app_lock/app_lock_controller.dart) (state, timing, settings changes), [app_lock_gate.dart](../lib/app_lock/app_lock_gate.dart) (gate, lock screen, Settings rows), [app_lock_settings.dart](../lib/app_lock/app_lock_settings.dart), [app_lock_platform.dart](../lib/app_lock/app_lock_platform.dart) (`local_auth` and the `mailburrow/app_lock` channel in `MainActivity.kt` and `AppDelegate.swift`). |
-| Validation | [Flutter tests](../test), [helpers](../tools), [CI/setup](development/setup-and-ci.md). |
+| Validation | [Flutter tests](../test), [helpers](../tools), [CI/setup](development/setup-and-ci.md). [check_pr_text.py](../tools/check_pr_text.py) checks proposed public PR titles/bodies before posting; [PR text CI](../.github/workflows/pr-text-privacy.yml) also checks edits from event JSON with read-only access and fixed-label findings. It reuses the strict privacy classifier and flags known private distribution references/approvals; it cannot detect every private statement or retract posted text. |
 
 ## API contract currently consumed
 
@@ -158,7 +158,7 @@ The setup guide and website describe Open Archiver 0.6.2 source-scoped read/sear
 | `pubspec.yaml`, `pubspec.lock` | Dependency and native version/build source; docs moves do not upgrade dependencies. |
 | `keystore.properties.example` → ignored `keystore.properties` | Android signing config stays at root; keystore stays outside Git. Never overwrite existing local settings. |
 | `android/`, `ios/` | Platform projects, IDs, entitlements and native integrations stay in place. Android's release ID is `com.kuncarlos91.mailburrow`. iOS development source is prepared for `com.kuncarlos91.mailburrow` (bundle name `MailBurrow`); no new TestFlight upload or device validation is implied; earlier iOS TestFlight builds used `com.kuncarlos91.mailshelf`, a separate app whose saved connections and Keychain items don't carry over. The internal platform-channel name `mailshelf/saved_files` is unchanged. |
-| `.github/workflows/` | Existing CI/manual signing paths unchanged; docs do not dispatch them. |
+| `.github/workflows/` | Flutter/source checks, manual Android test APK and PR-text privacy checks. PR-text checks include edited events; they do not dispatch signing or native builds. |
 | `assets/demo/` | Generated fictional demo archive and attachments; edit the generator, not the files. Must contain only invented people and reserved example domains. |
 | `THIRD_PARTY_NOTICES.md` | Root content/path preserved; privacy tooling depends on it. |
 | `docs/development/dependencies.md`, `docs/development/native-dependencies.md` | Relocated inventories; generators updated to match. |
