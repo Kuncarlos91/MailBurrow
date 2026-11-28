@@ -21,7 +21,7 @@ Existing users' updates require the same signing key and application ID. Before 
 - **App lock** (**Settings → App lock**): fingerprint or face, with the device PIN, pattern or password as backup. It relocks immediately, after 1 minute (the default) or after 5 minutes away, and recent apps show a blank preview while locked.
 - **Your own certificate per archive:** trust a home CA's root or a self-signed server certificate for one archive, after comparing its SHA-256 fingerprint. Hostname and validity checks stay on and can't be skipped.
   - Certificates with critical name constraints, policy constraints or extended key usage are refused.
-  - An imported CA's own path-length limit is not applied; limits on intermediates below it are. The confirmation screen says so before you trust a CA.
+  - An imported CA's own path-length limit is not applied on Android; limits on intermediates below it are. The confirmation screen says so before you trust a CA.
   - Saved archives with a certificate use index version 4, which 0.5.0 can't read.
 - **Setup** shows the app version and build before connecting.
 
@@ -38,7 +38,7 @@ A read-only mobile viewer for your own Mail-Archiver, Open Archiver or Bichon se
 - **Setup** now shows the app version and build.
 
 **Known limits:**
-- **Own certificate:** an imported CA's own limit on how many other CAs it can authorize is not applied; limits on intermediates below it are. Import your root CA rather than an intermediate when you can. Certificates with critical name constraints, policy constraints or extended key usage are refused.
+- **Own certificate:** an imported CA's own limit on how many other CAs it can authorize is not applied on Android; limits on intermediates below it are. Import your root CA rather than an intermediate when you can. Certificates with critical name constraints, policy constraints or extended key usage are refused.
 - **Going back:** once an archive has its own certificate, 0.5.0 and earlier can't read any saved archive and offer to remove them all. Don't install an older version.
 - **Carried over from 0.5.0:** TalkBack untested, expired Open Archiver keys untested, unmeasured cancellation timing, Bichon Pro/Enterprise untested.
 - **Mail and attachments:** complex mail may use a simplified layout. Links and attachments are not malware-scanned. Attachment downloads are limited to 50 MiB and two minutes.

@@ -28,6 +28,18 @@ A separate dependency-free Python job scans tracked/non-ignored files and runs t
 
 The same job validates local documentation links with `python tools/check_docs.py`. It has no network dependency. See [documentation rules](documentation.md).
 
+## Public PR text
+
+Before creating or editing a PR, check the proposed title and body locally:
+
+```sh
+python tools/check_pr_text.py --title "Describe the change" --body-file path/to/pr-body.md
+```
+
+The separate `PR text privacy` workflow checks titles and descriptions on opening, editing, reopening, new commits and ready-for-review events. It reads the event JSON from a file, never interpolates PR text into shell commands, uses a read-only token and runs no signed or native builds. It reuses the strict privacy classifier and adds known private-repository/run references, distribution approvals and internal build-status patterns. It reports fixed labels rather than matched text. Legacy product names and public CI links remain allowed.
+
+This is a bounded pattern check, not a guarantee that all private planning prose is detected. CI runs after text is posted; it cannot prevent or retract initial publication. The local preflight and direct review are required for that boundary. A failed check reports a problem; repository branch rules determine whether it blocks merging.
+
 ## iOS builds
 
 There is no hosted iOS workflow in this repository. Build and run iOS locally on macOS with Xcode (`flutter run` or `flutter build ios`). Signed iOS distribution is handled privately by the maintainer and is not part of this repository.

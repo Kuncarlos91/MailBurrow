@@ -600,9 +600,10 @@ const _understoodExtensions = {
 };
 
 // Refuse unproven critical anchor rules at import. Basic Constraints is
-// parsed below. The TLS engine enforces path-length limits on intermediates
-// below the imported CA anchor, but not the anchor's own limit (root or
-// intermediate); that is disclosed before trust and in
+// parsed below. Path-length limits on intermediates below the imported CA
+// anchor are enforced; the anchor's own limit (root or intermediate) is not
+// applied on Android but is by Apple's trust evaluation. That is disclosed
+// before trust and in
 // the setup guide and pinned by test/archive_trust_test.dart.
 const _criticalAllowed = {
   '2.5.29.15', // keyUsage

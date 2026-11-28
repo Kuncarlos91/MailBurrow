@@ -10,6 +10,8 @@ MailBurrow is a read-only client. Users configure their own Mail-Archiver, HTTPS
 
 All feature plans, roadmaps, automation designs, scope decisions and living task trackers belong in the owner’s private planning repository. This public repository holds reviewed implementation, workflows, user documentation and verified compatibility facts. Do not create public planning PRs or copy/link private plans or evidence here. This location rule does not require extra approval for implementation already authorized in the session.
 
+Before creating or editing a public PR, write its proposed body to a temporary file and run `python tools/check_pr_text.py --title "PR title" --body-file <temporary-body-file>`. Resolve findings before posting. Keep private distribution run references, build allocations and run approvals in private records; describe the implementation and verified compatibility publicly. The PR-text CI check also runs on description/title edits, but it runs after posting and cannot undo an initial disclosure. Pattern checks supplement direct review.
+
 ## Rolling documentation
 
 For every meaningful feature/fix, API/native integration, configuration or failure-recovery change, review the playbook and update affected behavior, architecture/source references, limitations and validation/release status when needed. Update the setup guide and troubleshooting in the same change when they are affected. If documentation is unaffected, say why in the work summary. Record user-visible changes in CHANGELOG; avoid contradictory current instructions.
