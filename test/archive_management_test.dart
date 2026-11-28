@@ -150,7 +150,7 @@ void main() {
       created = [];
       await seedTwo();
       session = ArchiveSession(
-        backendFactory: (type, server, key) {
+        backendFactory: (type, server, key, {trust}) {
           final api = HostArchive(server, key);
           created.add(api);
           return api;

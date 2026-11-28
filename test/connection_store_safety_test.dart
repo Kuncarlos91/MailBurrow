@@ -82,7 +82,7 @@ void main() {
     final entries = MemoryEntries();
     const id = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
     entries.values['connections'] = jsonEncode({
-      'version': 4,
+      'version': ConnectionStore.certificateIndexVersion + 1,
       'profiles': [
         {'id': id},
       ],

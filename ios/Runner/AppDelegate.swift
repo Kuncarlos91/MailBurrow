@@ -1,9 +1,11 @@
 import Flutter
 import UIKit
+import UniformTypeIdentifiers
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private let savedFiles = SavedAttachmentAccess()
+  private let certificatePicker = CertificatePicker()
 
   override func application(
     _ application: UIApplication,
@@ -20,6 +22,9 @@ import UIKit
     )
     channel.setMethodCallHandler { [weak self] call, result in
       guard let self = self else { return result("unavailable") }
+      if self.certificatePicker.isBusy && (call.method == "save" || call.method == "locate") {
+        return result(FlutterError(code: "busy", message: "A file picker is already open.", details: nil))
+      }
       self.savedFiles.handle(call, result: result)
     }
     let lockChannel = FlutterMethodChannel(
@@ -40,6 +45,80 @@ import UIKit
       }
     }
     AppLockPrivacyCover.shared.observe()
+    let certificateChannel = FlutterMethodChannel(
+      name: "mailburrow/certificate_picker",
+      binaryMessenger: engineBridge.applicationRegistrar.messenger()
+    )
+    certificateChannel.setMethodCallHandler { [weak self] call, result in
+      guard let self = self else { return result(["status": "unavailable"]) }
+      self.certificatePicker.handle(call, result: result)
+    }
+  }
+}
+
+// Certificate import: open the original document (no copy into the app),
+// read at most limit + 1 bytes under temporary security-scoped access, then
+// release it. Nothing about the file is kept or logged.
+private final class CertificatePicker: NSObject, UIDocumentPickerDelegate {
+  private var pending: FlutterResult?
+  private var limit = 0
+  private var reading = false
+  var isBusy: Bool { pending != nil }
+
+  private var presenter: UIViewController? {
+    let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+    let controller = scenes.filter { $0.activationState == .foregroundActive }
+      .flatMap { $0.windows }.first { $0.isKeyWindow }?.rootViewController
+    guard controller?.presentedViewController == nil else { return nil }
+    return controller
+  }
+
+  func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+    guard call.method == "pick" else { return result(FlutterMethodNotImplemented) }
+    let args = call.arguments as? [String: Any] ?? [:]
+    let requested = args["limit"] as? Int ?? 0
+    guard pending == nil, requested > 0, requested <= 65536, let controller = presenter else {
+      return result(["status": "unavailable"])
+    }
+    pending = result
+    limit = requested
+    let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.item], asCopy: false)
+    picker.delegate = self
+    picker.allowsMultipleSelection = false
+    controller.present(picker, animated: true)
+  }
+
+  func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+    guard let completion = pending, !reading else { return }
+    guard let url = urls.first else { pending = nil; return completion(["status": "cancelled"]) }
+    let maximum = limit
+    reading = true
+    DispatchQueue.global(qos: .userInitiated).async {
+      let scoped = url.startAccessingSecurityScopedResource()
+      defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+      var reply: [String: Any] = ["status": "unreadable"]
+      if let handle = try? FileHandle(forReadingFrom: url) {
+        defer { try? handle.close() }
+        do {
+          var data = Data()
+          while data.count <= maximum {
+            guard let chunk = try handle.read(upToCount: maximum + 1 - data.count), !chunk.isEmpty else { break }
+            data.append(chunk)
+          }
+          reply = data.count > maximum
+            ? ["status": "too_large"]
+            : ["status": "picked", "bytes": FlutterStandardTypedData(bytes: data)]
+        } catch { reply = ["status": "unreadable"] }
+      }
+      DispatchQueue.main.async { self.reading = false; self.pending = nil; completion(reply) }
+    }
+  }
+
+  func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+    guard !reading else { return }
+    let completion = pending
+    pending = nil
+    completion?(["status": "cancelled"])
   }
 }
 
