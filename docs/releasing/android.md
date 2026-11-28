@@ -20,4 +20,4 @@ Public release APKs target 64-bit ARM only: `--target-platform android-arm64` fo
 
 Never commit or upload local artifacts incidentally. Before public distribution verify signature, package/version, non-debuggable flag, merged permissions, notices, privacy metadata, checksum and signed-update/device tests. Run the [device testing checklist](../testing/device-checklist.md) on the exact APK.
 
-The [0.4.0 candidate guide](android-0.4.0.md) records the intended identity, draft release notes and pending artifact/device checks; the [RC9 candidate guide](android-rc9.md) is the record of the previous release. This command does not authorize publication.
+The [0.6.0 build instructions and draft release notes](android-0.6.0.md) give the stamped command and describe the changes and known limits. The [0.4.0 candidate guide](android-0.4.0.md) records the intended identity, draft release notes and pending artifact/device checks; the [RC9 candidate guide](android-rc9.md) is the record of the previous release. This command does not authorize publication.
