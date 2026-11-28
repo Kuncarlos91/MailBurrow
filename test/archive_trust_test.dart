@@ -358,9 +358,21 @@ void main() {
   });
 
   // Pins the engine's path-length behaviour, documented in the setup guide:
-  // limits below the imported CA anchor are enforced; the anchor's own limit
-  // is not, whether it is a root or intermediate. If the engine starts
-  // enforcing the anchor's limit, update the disclosure and tests together.
+  // limits below the imported CA anchor are enforced everywhere. The anchor's
+  // own limit (root or intermediate) is not applied by BoringSSL (Linux,
+  // Android, Windows) but is by Apple's trust evaluation (macOS, and expected
+  // on iOS). If either side changes, update the disclosure and tests together.
+  final appleTrust = Platform.isMacOS || Platform.isIOS;
+  Future<void> expectAnchorLimit(ArchiveApi api, LabServer lab) async {
+    if (appleTrust) {
+      await expectLater(api.accounts(), throwsA(isA<HandshakeException>()));
+      expect(lab.requests, 0);
+    } else {
+      expect(await api.accounts(), isEmpty);
+      expect(lab.requests, 1);
+    }
+  }
+
   group('path-length limits', () {
     test(
       "a chain intermediate's limit is enforced before any request",
@@ -427,41 +439,43 @@ void main() {
       },
     );
 
-    test("an imported root's own limit is not applied", () async {
-      final rootKey = LabKey.ec();
-      final root = labCert(cn: 'Lab Root CA', key: rootKey, ca: true);
-      final intKey = LabKey.ec();
-      final intermediate = labCert(
-        cn: 'Lab Intermediate CA',
-        key: intKey,
-        issuerCn: root.cn,
-        issuerKey: rootKey,
-        ca: true,
-        pathLen: null,
-      );
-      final leaf = labCert(
-        cn: 'lab server',
-        key: LabKey.ec(),
-        issuerCn: intermediate.cn,
-        issuerKey: intKey,
-        ca: false,
-      );
-      final lab = await LabServer.start(leaf, intermediates: [intermediate]);
-      final api = ArchiveApi(
-        lab.address,
-        'synthetic-test-only',
-        trust: ArchiveTrust(derOf(root)),
-      );
-      addTearDown(() async {
-        api.close();
-        await lab.close();
-      });
-      expect(await api.accounts(), isEmpty);
-      expect(lab.requests, 1);
-    });
+    test(
+      "an imported root's own limit (applied only by Apple trust)",
+      () async {
+        final rootKey = LabKey.ec();
+        final root = labCert(cn: 'Lab Root CA', key: rootKey, ca: true);
+        final intKey = LabKey.ec();
+        final intermediate = labCert(
+          cn: 'Lab Intermediate CA',
+          key: intKey,
+          issuerCn: root.cn,
+          issuerKey: rootKey,
+          ca: true,
+          pathLen: null,
+        );
+        final leaf = labCert(
+          cn: 'lab server',
+          key: LabKey.ec(),
+          issuerCn: intermediate.cn,
+          issuerKey: intKey,
+          ca: false,
+        );
+        final lab = await LabServer.start(leaf, intermediates: [intermediate]);
+        final api = ArchiveApi(
+          lab.address,
+          'synthetic-test-only',
+          trust: ArchiveTrust(derOf(root)),
+        );
+        addTearDown(() async {
+          api.close();
+          await lab.close();
+        });
+        await expectAnchorLimit(api, lab);
+      },
+    );
 
     for (final withSubordinate in [false, true]) {
-      test("an imported intermediate's own limit is not applied "
+      test("an imported intermediate's own limit (applied only by Apple trust) "
           '(${withSubordinate ? 'subordinate CA' : 'direct leaf'})', () async {
         final rootKey = LabKey.ec();
         final anchorKey = LabKey.ec();
@@ -502,8 +516,12 @@ void main() {
           api.close();
           await lab.close();
         });
-        expect(await api.accounts(), isEmpty);
-        expect(lab.requests, 1);
+        if (withSubordinate) {
+          await expectAnchorLimit(api, lab);
+        } else {
+          expect(await api.accounts(), isEmpty);
+          expect(lab.requests, 1);
+        }
       });
     }
   });
